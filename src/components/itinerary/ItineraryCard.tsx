@@ -1,7 +1,7 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ItineraryItem } from '@/src/types';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
 type Props = {
   item: ItineraryItem;
@@ -28,8 +28,10 @@ export function ItineraryCard({ item, onToggleDone, onToggleRsvp, attending }: P
         <Text style={styles.title}>{item.title}</Text>
         {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}
         <View style={styles.actions}>
-          <Pressable onPress={onToggleDone} style={styles.chip}>
-            <Text style={styles.chipText}>{item.done ? 'Feito' : 'Marcar feito'}</Text>
+          <Pressable onPress={onToggleDone} style={[styles.chip, item.done && styles.chipOn]}>
+            <Text style={[styles.chipText, item.done && styles.chipTextOn]}>
+              {item.done ? 'Feito' : 'Marcar feito'}
+            </Text>
           </Pressable>
           <Pressable onPress={onToggleRsvp} style={[styles.chip, attending && styles.chipOn]}>
             <Text style={[styles.chipText, attending && styles.chipTextOn]}>
@@ -44,27 +46,30 @@ export function ItineraryCard({ item, onToggleDone, onToggleRsvp, attending }: P
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.ink,
+    backgroundColor: colors.surface,
     borderRadius: radii.xl,
     overflow: 'hidden',
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
   done: {
-    opacity: 0.72,
+    opacity: 0.78,
   },
   image: {
     width: '100%',
     height: 180,
   },
   imageFallback: {
-    backgroundColor: '#292524',
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
   fallbackText: {
-    color: colors.itineraryAccent,
+    color: colors.accent,
     fontSize: 48,
-    fontWeight: '700',
+    fontFamily: fonts.displayBold,
   },
   body: {
     padding: spacing.md,
@@ -73,26 +78,29 @@ const styles = StyleSheet.create({
   meta: {
     flexDirection: 'row',
     gap: spacing.sm,
+    alignItems: 'center',
   },
   time: {
-    color: colors.itineraryAccent,
-    fontWeight: '700',
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
     fontSize: 12,
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   location: {
-    color: 'rgba(255,255,255,0.65)',
+    color: colors.inkSoft,
+    fontFamily: fonts.ui,
     fontSize: 12,
   },
   title: {
-    color: colors.white,
+    color: colors.ink,
     fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.4,
+    fontFamily: fonts.display,
+    letterSpacing: -0.3,
   },
   desc: {
-    color: 'rgba(255,255,255,0.75)',
+    color: colors.inkSoft,
+    fontFamily: fonts.ui,
     fontSize: 14,
     lineHeight: 20,
   },
@@ -103,21 +111,22 @@ const styles = StyleSheet.create({
   },
   chip: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderRadius: 999,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.sm,
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
   },
   chipOn: {
-    backgroundColor: colors.itineraryAccent,
-    borderColor: colors.itineraryAccent,
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
   },
   chipText: {
-    color: colors.white,
+    color: colors.inkSoft,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.uiSemi,
   },
   chipTextOn: {
-    color: colors.white,
+    color: colors.accentDark,
   },
 });

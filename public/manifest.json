@@ -4,8 +4,8 @@
   "description": "Gerencie finanças, roteiro e memórias da sua viagem em grupo.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#F7F6F3",
-  "theme_color": "#0F6E56",
+  "background_color": "#F4F6F8",
+  "theme_color": "#0C6B58",
   "orientation": "portrait",
   "lang": "pt-BR",
   "icons": [

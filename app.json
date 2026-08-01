@@ -15,7 +15,7 @@
     "android": {
       "package": "com.tripledger.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0F6E56",
+        "backgroundColor": "#0C6B58",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -34,8 +34,8 @@
       "name": "TripLedger",
       "shortName": "TripLedger",
       "lang": "pt-BR",
-      "themeColor": "#0F6E56",
-      "backgroundColor": "#F7F6F3",
+      "themeColor": "#0C6B58",
+      "backgroundColor": "#F4F6F8",
       "display": "standalone",
       "startUrl": "/"
     },
@@ -46,7 +46,7 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#F7F6F3"
+          "backgroundColor": "#F4F6F8"
         }
       ],
       [
@@ -54,7 +54,8 @@
         {
           "photosPermission": "O TripLedger precisa acessar fotos para comprovantes e o feed da viagem."
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true

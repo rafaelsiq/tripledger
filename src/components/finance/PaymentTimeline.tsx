@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { Payment, TripMember } from '@/src/types';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { Caption } from '@/src/components/ui';
 
@@ -106,15 +106,15 @@ const styles = StyleSheet.create({
   label: {
     color: colors.inkSoft,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: fonts.uiSemi,
   },
   value: {
     color: colors.finance,
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fonts.uiBold,
   },
   track: {
-    height: 12,
+    height: 10,
     borderRadius: 999,
     backgroundColor: colors.financeSoft,
     overflow: 'visible',
@@ -124,14 +124,14 @@ const styles = StyleSheet.create({
   fill: {
     height: '100%',
     borderRadius: 999,
-    backgroundColor: colors.finance,
+    backgroundColor: colors.accent,
   },
   marker: {
     position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginLeft: -8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginLeft: -7,
     top: -2,
     borderWidth: 2,
     borderColor: colors.white,
@@ -148,15 +148,17 @@ const styles = StyleSheet.create({
   },
   tooltipTitle: {
     color: colors.white,
-    fontWeight: '700',
+    fontFamily: fonts.uiBold,
     fontSize: 14,
   },
   tooltipBody: {
-    color: 'rgba(255,255,255,0.85)',
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: fonts.ui,
     fontSize: 13,
   },
   tooltipStatus: {
-    color: 'rgba(255,255,255,0.7)',
+    color: 'rgba(255,255,255,0.72)',
+    fontFamily: fonts.ui,
     fontSize: 12,
     marginTop: 2,
   },

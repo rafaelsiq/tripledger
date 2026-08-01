@@ -4,10 +4,10 @@ import { useRouter } from 'expo-router';
 import { Button, EmptyState } from '@/src/components/ui';
 import { FeedPostCard } from '@/src/components/feed/FeedPostCard';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useTrip } from '@/src/hooks/useTrip';
 import { subscribeFeed } from '@/src/services/feed';
 import type { FeedPost } from '@/src/types';
-import { spacing } from '@/src/theme';
-import { useTrip } from '@/src/hooks/useTrip';
+import { colors, fonts, spacing } from '@/src/theme';
 
 export default function FeedHome() {
   const { trip } = useTrip();
@@ -56,17 +56,18 @@ export default function FeedHome() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0C0A09',
+    backgroundColor: colors.bg,
     padding: spacing.md,
   },
   hero: {
-    color: '#FFF7ED',
+    color: colors.ink,
     fontSize: 34,
-    fontWeight: '700',
+    fontFamily: fonts.displayBold,
     letterSpacing: -0.8,
   },
   sub: {
-    color: 'rgba(255,247,237,0.65)',
+    color: colors.inkSoft,
+    fontFamily: fonts.ui,
     marginBottom: spacing.md,
     marginTop: 6,
   },

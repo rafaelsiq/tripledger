@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Label, Screen } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
@@ -87,7 +87,7 @@ export default function FinanceHome() {
 const styles = StyleSheet.create({
   actions: { gap: spacing.sm, marginBottom: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  title: { fontWeight: '700', color: colors.ink, fontSize: 15 },
-  meta: { color: colors.inkSoft, fontSize: 12 },
-  amount: { fontWeight: '700', color: colors.finance },
+  title: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
+  meta: { color: colors.inkSoft, fontSize: 12, fontFamily: fonts.ui },
+  amount: { fontFamily: fonts.uiBold, color: colors.finance },
 });

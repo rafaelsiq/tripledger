@@ -1,7 +1,7 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { Badge, Card } from '@/src/components/ui';
-import { colors, spacing, typography } from '@/src/theme';
+import { colors, fonts, spacing, typography } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 
 type Props = {
@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   card: {
     gap: spacing.sm,
     backgroundColor: colors.financeSoft,
-    borderColor: 'transparent',
+    borderColor: colors.border,
   },
   amount: {
     ...typography.number,
@@ -49,5 +49,6 @@ const styles = StyleSheet.create({
     color: colors.inkSoft,
     fontSize: 13,
     lineHeight: 18,
+    fontFamily: fonts.ui,
   },
 });

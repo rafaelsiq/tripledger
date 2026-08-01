@@ -1,28 +1,35 @@
+export const fonts = {
+  ui: 'Manrope_500Medium',
+  uiSemi: 'Manrope_600SemiBold',
+  uiBold: 'Manrope_700Bold',
+  display: 'Fraunces_600SemiBold',
+  displayBold: 'Fraunces_700Bold',
+};
+
 export const colors = {
-  bg: '#F7F6F3',
+  bg: '#F4F6F8',
+  bgSoft: '#EEF2F5',
   surface: '#FFFFFF',
-  surfaceMuted: '#EFEEEA',
-  ink: '#1A1F24',
-  inkSoft: '#5C6570',
-  inkMuted: '#8B939C',
-  border: '#E2E0DA',
-  accent: '#0F6E56',
-  accentSoft: '#E4F3EE',
-  accentDark: '#0A4F3D',
-  finance: '#1B3A4B',
-  financeSoft: '#E8EEF2',
-  warn: '#B45309',
-  warnSoft: '#FEF3C7',
+  surfaceMuted: '#F0F3F6',
+  ink: '#14212B',
+  inkSoft: '#5A6B7A',
+  inkMuted: '#8A97A3',
+  border: '#E6EAF0',
+  accent: '#0C6B58',
+  accentSoft: '#E3F2EE',
+  accentDark: '#084C3F',
+  finance: '#243B53',
+  financeSoft: '#EAF0F5',
+  warn: '#A15C07',
+  warnSoft: '#FFF4DE',
   danger: '#B42318',
   dangerSoft: '#FEE4E2',
   success: '#067647',
   successSoft: '#DCFAE6',
-  itinerary: '#1C1917',
-  itineraryAccent: '#C2410C',
-  feed: '#0C0A09',
   white: '#FFFFFF',
   black: '#000000',
-  overlay: 'rgba(26, 31, 36, 0.45)',
+  overlay: 'rgba(20, 33, 43, 0.4)',
+  shadow: 'rgba(20, 33, 43, 0.08)',
 };
 
 export const spacing = {
@@ -35,51 +42,68 @@ export const spacing = {
 };
 
 export const radii = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: 10,
+  md: 14,
+  lg: 18,
   xl: 24,
+};
+
+export const shadows = {
+  card: {
+    shadowColor: colors.ink,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
+  },
 };
 
 export const typography = {
   brand: {
-    fontFamily: 'System',
-    fontSize: 28,
+    fontFamily: fonts.displayBold,
+    fontSize: 40,
     fontWeight: '700' as const,
-    letterSpacing: -0.5,
+    letterSpacing: -1,
+    color: colors.ink,
   },
   title: {
-    fontSize: 22,
-    fontWeight: '700' as const,
-    letterSpacing: -0.3,
+    fontFamily: fonts.display,
+    fontSize: 26,
+    fontWeight: '600' as const,
+    letterSpacing: -0.4,
     color: colors.ink,
   },
   subtitle: {
+    fontFamily: fonts.uiSemi,
     fontSize: 16,
     fontWeight: '600' as const,
     color: colors.ink,
   },
   body: {
+    fontFamily: fonts.ui,
     fontSize: 15,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     color: colors.ink,
     lineHeight: 22,
   },
   caption: {
+    fontFamily: fonts.ui,
     fontSize: 13,
-    fontWeight: '400' as const,
+    fontWeight: '500' as const,
     color: colors.inkSoft,
   },
   number: {
+    fontFamily: fonts.uiBold,
     fontSize: 28,
     fontWeight: '700' as const,
     letterSpacing: -0.8,
     color: colors.finance,
   },
   label: {
+    fontFamily: fonts.uiSemi,
     fontSize: 12,
     fontWeight: '600' as const,
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
     textTransform: 'uppercase' as const,
     color: colors.inkMuted,
   },

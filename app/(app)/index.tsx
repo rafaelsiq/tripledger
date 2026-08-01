@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -7,7 +7,54 @@ import { logout } from '@/src/services/auth';
 import { subscribeUserTrips } from '@/src/services/trips';
 import type { Trip } from '@/src/types';
 import { PHASE_LABELS } from '@/src/types';
-import { colors, spacing, typography } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
+
+function TripRow({
+  item,
+  index,
+  onPress,
+}: {
+  item: Trip;
+  index: number;
+  onPress: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(10)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 320,
+        delay: index * 60,
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 320,
+        delay: index * 60,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [index, opacity, translateY]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      <Pressable onPress={onPress}>
+        <Card style={styles.tripCard}>
+          <View style={styles.tripTop}>
+            <Text style={styles.tripName}>{item.name}</Text>
+            <Badge text={PHASE_LABELS[item.phase]} tone="accent" />
+          </View>
+          {item.destination ? <Text style={styles.dest}>{item.destination}</Text> : null}
+          <Text style={styles.dates}>
+            {item.startDate} → {item.endDate}
+          </Text>
+        </Card>
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 export default function TripsHome() {
   const { user, profile } = useAuth();
@@ -20,7 +67,7 @@ export default function TripsHome() {
   }, [user]);
 
   return (
-    <Screen style={{ paddingTop: spacing.sm }}>
+    <Screen ambient style={{ paddingTop: spacing.sm }}>
       <View style={styles.header}>
         <View>
           <Text style={styles.hello}>Olá, {profile?.displayName?.split(' ')[0]}</Text>
@@ -50,21 +97,12 @@ export default function TripsHome() {
             subtitle="Crie uma viagem ou entre com um código de convite."
           />
         }
-        renderItem={({ item }) => (
-          <Pressable onPress={() => router.push(`/(app)/trip/${item.id}`)}>
-            <Card style={styles.tripCard}>
-              <View style={styles.tripTop}>
-                <Text style={styles.tripName}>{item.name}</Text>
-                <Badge text={PHASE_LABELS[item.phase]} tone="accent" />
-              </View>
-              {item.destination ? (
-                <Text style={styles.dest}>{item.destination}</Text>
-              ) : null}
-              <Text style={styles.dates}>
-                {item.startDate} → {item.endDate}
-              </Text>
-            </Card>
-          </Pressable>
+        renderItem={({ item, index }) => (
+          <TripRow
+            item={item}
+            index={index}
+            onPress={() => router.push(`/(app)/trip/${item.id}`)}
+          />
         )}
       />
     </Screen>
@@ -78,9 +116,21 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.md,
   },
-  hello: { ...typography.title },
-  sub: { color: colors.inkSoft, marginTop: 4 },
-  logout: { color: colors.inkMuted, fontWeight: '600' },
+  hello: {
+    fontFamily: fonts.display,
+    fontSize: 28,
+    color: colors.ink,
+    letterSpacing: -0.4,
+  },
+  sub: {
+    color: colors.inkSoft,
+    marginTop: 4,
+    fontFamily: fonts.ui,
+  },
+  logout: {
+    color: colors.inkMuted,
+    fontFamily: fonts.uiSemi,
+  },
   actions: { gap: spacing.sm, marginBottom: spacing.lg },
   tripCard: { gap: spacing.xs },
   tripTop: {
@@ -89,7 +139,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  tripName: { fontSize: 18, fontWeight: '700', color: colors.ink, flex: 1 },
-  dest: { color: colors.inkSoft },
-  dates: { color: colors.inkMuted, fontSize: 13, marginTop: 4 },
+  tripName: {
+    fontSize: 18,
+    fontFamily: fonts.uiBold,
+    color: colors.ink,
+    flex: 1,
+  },
+  dest: { color: colors.inkSoft, fontFamily: fonts.ui },
+  dates: {
+    color: colors.inkMuted,
+    fontSize: 13,
+    marginTop: 4,
+    fontFamily: fonts.ui,
+  },
 });

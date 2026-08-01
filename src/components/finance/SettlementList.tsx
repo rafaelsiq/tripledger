@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { Settlement, TripMember } from '@/src/types';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { Badge, Button } from '@/src/components/ui';
 
@@ -70,9 +70,9 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontWeight: '600',
+    fontFamily: fonts.uiSemi,
     fontSize: 14,
   },
   empty: { padding: spacing.lg, alignItems: 'center' },
-  emptyText: { color: colors.inkSoft },
+  emptyText: { color: colors.inkSoft, fontFamily: fonts.ui },
 });

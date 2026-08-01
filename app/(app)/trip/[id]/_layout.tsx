@@ -59,11 +59,17 @@ export default function TripLayout() {
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
-          tabBarActiveTintColor: colors.accentDark,
+          tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.inkMuted,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
+            height: 60,
+            paddingTop: 4,
+          },
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '600',
           },
         }}
       >

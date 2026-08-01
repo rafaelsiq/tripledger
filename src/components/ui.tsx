@@ -9,15 +9,30 @@ import {
   type TextInputProps,
   type ViewStyle,
 } from 'react-native';
-import { colors, radii, spacing, typography } from '@/src/theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, fonts, radii, shadows, spacing, typography } from '@/src/theme';
 
 export function Screen({
   children,
   style,
+  ambient = false,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
+  ambient?: boolean;
 }) {
+  if (ambient) {
+    return (
+      <View style={[styles.screen, style]}>
+        <LinearGradient
+          colors={['#E8F3F0', colors.bg, colors.bg]}
+          locations={[0, 0.35, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={styles.screenContent}>{children}</View>
+      </View>
+    );
+  }
   return <View style={[styles.screen, style]}>{children}</View>;
 }
 
@@ -86,11 +101,13 @@ export function Button({
         variant === 'danger' && styles.buttonDanger,
         variant === 'finance' && styles.buttonFinance,
         (disabled || loading) && { opacity: 0.5 },
-        pressed && { transform: [{ scale: 0.98 }] },
+        pressed && { transform: [{ scale: 0.985 }], opacity: 0.92 },
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === 'ghost' ? colors.ink : colors.white} />
+        <ActivityIndicator
+          color={variant === 'ghost' || variant === 'secondary' ? colors.ink : colors.white}
+        />
       ) : (
         <Text
           style={[
@@ -135,7 +152,7 @@ export function Badge({
   }[tone];
   return (
     <View style={[styles.badge, { backgroundColor: map.bg }]}>
-      <Text style={{ color: map.fg, fontSize: 12, fontWeight: '600' }}>{text}</Text>
+      <Text style={{ color: map.fg, fontSize: 12, fontFamily: fonts.uiSemi }}>{text}</Text>
     </View>
   );
 }
@@ -155,15 +172,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg,
     padding: spacing.md,
   },
+  screenContent: {
+    flex: 1,
+  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+    ...shadows.card,
   },
   button: {
-    minHeight: 48,
+    minHeight: 50,
     borderRadius: radii.md,
     alignItems: 'center',
     justifyContent: 'center',
@@ -181,7 +202,7 @@ const styles = StyleSheet.create({
   buttonText: {
     color: colors.white,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: fonts.uiBold,
   },
   input: {
     backgroundColor: colors.surface,
@@ -189,15 +210,16 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
+    paddingVertical: 13,
     fontSize: 15,
     color: colors.ink,
+    fontFamily: fonts.ui,
   },
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingVertical: 5,
+    borderRadius: radii.sm,
   },
   empty: {
     paddingVertical: spacing.xl,

@@ -6,7 +6,7 @@ import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { confirmAction } from '@/src/lib/notify';
 import { removeMember, transferFinanceLead } from '@/src/services/trips';
-import { colors, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 
 export default function MembersScreen() {
   const { trip, members, isAdmin } = useTrip();
@@ -101,8 +101,8 @@ export default function MembersScreen() {
 
 const styles = StyleSheet.create({
   title: {
-    fontSize: 22,
-    fontWeight: '700',
+    fontSize: 26,
+    fontFamily: fonts.display,
     color: colors.ink,
     marginBottom: spacing.md,
   },
@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignItems: 'center',
   },
-  name: { fontWeight: '700', color: colors.ink, fontSize: 16 },
-  email: { color: colors.inkSoft, fontSize: 13 },
+  name: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 16 },
+  email: { color: colors.inkSoft, fontSize: 13, fontFamily: fonts.ui },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
 });

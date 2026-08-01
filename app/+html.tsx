@@ -11,7 +11,7 @@ export default function Root({ children }: { children: ReactNode }) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
-        <meta name="theme-color" content="#0F6E56" />
+        <meta name="theme-color" content="#0C6B58" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="description" content="Gerencie finanças, roteiro e memórias da sua viagem em grupo." />
@@ -39,5 +39,5 @@ export default function Root({ children }: { children: ReactNode }) {
 
 const responsiveBackground = `
 body {
-  background-color: #F7F6F3;
+  background-color: #F4F6F8;
 }`;

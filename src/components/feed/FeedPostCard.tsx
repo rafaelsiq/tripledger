@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import type { FeedComment, FeedPost } from '@/src/types';
 import { addComment, subscribeComments, toggleLike } from '@/src/services/feed';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
 type Props = {
   tripId: string;
@@ -60,7 +60,7 @@ export function FeedPostCard({ tripId, post, currentUid, currentName }: Props) {
           value={text}
           onChangeText={setText}
           placeholder="Comentar..."
-          placeholderTextColor="rgba(255,255,255,0.4)"
+          placeholderTextColor={colors.inkMuted}
           style={styles.input}
         />
         <Pressable
@@ -85,10 +85,13 @@ export function FeedPostCard({ tripId, post, currentUid, currentName }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.feed,
+    backgroundColor: colors.surface,
     borderRadius: radii.xl,
     overflow: 'hidden',
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    ...shadows.card,
   },
   header: {
     paddingHorizontal: spacing.md,
@@ -97,14 +100,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  author: { color: colors.white, fontWeight: '700', fontSize: 14 },
-  date: { color: 'rgba(255,255,255,0.5)', fontSize: 12 },
-  media: { width: '100%', height: 280, backgroundColor: '#1c1917' },
+  author: {
+    color: colors.ink,
+    fontFamily: fonts.uiBold,
+    fontSize: 14,
+  },
+  date: {
+    color: colors.inkMuted,
+    fontFamily: fonts.ui,
+    fontSize: 12,
+  },
+  media: {
+    width: '100%',
+    height: 280,
+    backgroundColor: colors.surfaceMuted,
+  },
   caption: {
-    color: 'rgba(255,255,255,0.9)',
+    color: colors.ink,
     padding: spacing.md,
     fontSize: 15,
     lineHeight: 22,
+    fontFamily: fonts.ui,
   },
   actions: {
     flexDirection: 'row',
@@ -112,23 +128,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
   },
-  action: { color: colors.white, fontWeight: '600' },
-  liked: { color: '#F97316' },
+  action: {
+    color: colors.inkSoft,
+    fontFamily: fonts.uiSemi,
+  },
+  liked: { color: colors.accent },
   comments: { paddingHorizontal: spacing.md, gap: 4 },
-  comment: { color: 'rgba(255,255,255,0.8)', fontSize: 13 },
-  commentAuthor: { fontWeight: '700', color: colors.white },
+  comment: {
+    color: colors.inkSoft,
+    fontSize: 13,
+    fontFamily: fonts.ui,
+  },
+  commentAuthor: {
+    fontFamily: fonts.uiBold,
+    color: colors.ink,
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surfaceMuted,
   },
   input: {
     flex: 1,
-    color: colors.white,
+    color: colors.ink,
     fontSize: 14,
+    fontFamily: fonts.ui,
   },
-  send: { color: '#F97316', fontWeight: '700' },
+  send: {
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
+  },
 });

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, EmptyState } from '@/src/components/ui';
 import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useTrip } from '@/src/hooks/useTrip';
 import {
   addTemplateSlots,
   subscribeDayItems,
@@ -11,8 +12,7 @@ import {
   toggleRsvp,
 } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
-import { spacing } from '@/src/theme';
-import { useTrip } from '@/src/hooks/useTrip';
+import { colors, spacing } from '@/src/theme';
 
 export default function DayDetailScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
@@ -70,6 +70,6 @@ export default function DayDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0C0A09', padding: spacing.md },
+  screen: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   actions: { gap: spacing.sm, marginBottom: spacing.md },
 });

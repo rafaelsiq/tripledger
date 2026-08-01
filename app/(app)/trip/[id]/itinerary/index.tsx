@@ -6,7 +6,7 @@ import { ptBR } from 'date-fns/locale';
 import { EmptyState } from '@/src/components/ui';
 import { subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay } from '@/src/types';
-import { spacing } from '@/src/theme';
+import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
 export default function ItineraryHome() {
@@ -40,7 +40,7 @@ export default function ItineraryHome() {
                 params: { dayId: item.id },
               })
             }
-            style={styles.dayCard}
+            style={({ pressed }) => [styles.dayCard, pressed && { opacity: 0.92 }]}
           >
             <Text style={styles.dayIndex}>Dia {index + 1}</Text>
             <Text style={styles.dayTitle}>{item.title || 'Programação'}</Text>
@@ -57,42 +57,45 @@ export default function ItineraryHome() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#0C0A09',
+    backgroundColor: colors.bg,
     padding: spacing.md,
   },
   hero: {
-    color: '#FFF7ED',
+    color: colors.ink,
     fontSize: 34,
-    fontWeight: '700',
+    fontFamily: fonts.displayBold,
     letterSpacing: -0.8,
   },
   sub: {
-    color: 'rgba(255,247,237,0.65)',
+    color: colors.inkSoft,
+    fontFamily: fonts.ui,
     marginBottom: spacing.lg,
     marginTop: 6,
   },
   dayCard: {
-    backgroundColor: '#1C1917',
-    borderRadius: 20,
+    backgroundColor: colors.surface,
+    borderRadius: radii.xl,
     padding: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.border,
+    ...shadows.card,
   },
   dayIndex: {
-    color: '#F97316',
-    fontWeight: '700',
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
     letterSpacing: 1,
     textTransform: 'uppercase',
     fontSize: 12,
   },
   dayTitle: {
-    color: '#FFF7ED',
+    color: colors.ink,
     fontSize: 22,
-    fontWeight: '700',
+    fontFamily: fonts.display,
     marginTop: 8,
   },
   dayDate: {
-    color: 'rgba(255,247,237,0.55)',
+    color: colors.inkMuted,
+    fontFamily: fonts.ui,
     marginTop: 6,
     textTransform: 'capitalize',
   },

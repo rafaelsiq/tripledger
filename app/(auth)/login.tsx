@@ -1,16 +1,32 @@
-import React, { useState } from 'react';
-import { KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Link } from 'expo-router';
 import { Body, Button, Input, Screen, Title } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/useToast';
 import { loginWithEmail } from '@/src/services/auth';
-import { colors, spacing, typography } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 
 export default function LoginScreen() {
   const { showError } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(12)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(slide, { toValue: 0, duration: 500, useNativeDriver: true }),
+    ]).start();
+  }, [fade, slide]);
 
   async function onLogin() {
     if (!email.trim() || !password) {
@@ -28,15 +44,15 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen ambient style={styles.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.inner}
       >
-        <View style={styles.brand}>
+        <Animated.View style={[styles.brand, { opacity: fade, transform: [{ translateY: slide }] }]}>
           <Text style={styles.logo}>TripLedger</Text>
           <Body muted>Planeje, execute e feche a viagem — juntos e em dia.</Body>
-        </View>
+        </Animated.View>
         <View style={styles.form}>
           <Title>Entrar</Title>
           <Input
@@ -66,17 +82,19 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   screen: { justifyContent: 'center' },
-  inner: { gap: spacing.xl },
+  inner: { gap: spacing.xl, flex: 1, justifyContent: 'center' },
   brand: { gap: spacing.sm },
   logo: {
-    ...typography.brand,
-    color: colors.accentDark,
+    fontFamily: fonts.displayBold,
+    fontSize: 44,
+    letterSpacing: -1.2,
+    color: colors.ink,
   },
   form: { gap: spacing.md },
   link: {
     textAlign: 'center',
     color: colors.accent,
-    fontWeight: '600',
+    fontFamily: fonts.uiSemi,
     marginTop: spacing.sm,
   },
 });

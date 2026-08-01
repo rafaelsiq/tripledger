@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { Link } from 'expo-router';
-import { Button, Input, Screen, Title } from '@/src/components/ui';
+import { Body, Button, Input, Screen, Title } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/useToast';
 import { registerWithEmail } from '@/src/services/auth';
-import { colors, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 
 export default function RegisterScreen() {
   const { showError, showSuccess } = useToast();
@@ -30,12 +30,13 @@ export default function RegisterScreen() {
   }
 
   return (
-    <Screen style={styles.screen}>
+    <Screen ambient style={styles.screen}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.form}
       >
         <Title>Criar conta</Title>
+        <Body muted>Organize viagens em grupo com finanças e roteiro claros.</Body>
         <Input label="Nome" value={displayName} onChangeText={setDisplayName} placeholder="Seu nome" />
         <Input
           label="E-mail"
@@ -63,11 +64,11 @@ export default function RegisterScreen() {
 
 const styles = StyleSheet.create({
   screen: { justifyContent: 'center' },
-  form: { gap: spacing.md },
+  form: { gap: spacing.md, flex: 1, justifyContent: 'center' },
   link: {
     textAlign: 'center',
     color: colors.accent,
-    fontWeight: '600',
+    fontFamily: fonts.uiSemi,
     marginTop: spacing.sm,
   },
 });

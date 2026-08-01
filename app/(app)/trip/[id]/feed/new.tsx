@@ -64,7 +64,7 @@ export default function NewFeedPost() {
   }
 
   return (
-    <Screen style={{ backgroundColor: '#0C0A09' }}>
+    <Screen>
       <View style={styles.form}>
         <Button
           title={mediaUri ? 'Mídia selecionada' : 'Escolher foto ou vídeo'}

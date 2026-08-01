@@ -64,7 +64,7 @@ export default function NewItineraryItem() {
   }
 
   return (
-    <Screen style={{ backgroundColor: '#0C0A09' }}>
+    <Screen>
       <ScrollView contentContainerStyle={styles.form}>
         <Input label="Título" value={title} onChangeText={setTitle} placeholder="Trilha da Lagoinha" />
         <Input

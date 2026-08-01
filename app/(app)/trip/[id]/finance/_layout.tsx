@@ -1,5 +1,5 @@
 import { Stack } from 'expo-router';
-import { colors } from '@/src/theme';
+import { colors, fonts } from '@/src/theme';
 
 export default function FinanceLayout() {
   return (
@@ -7,7 +7,8 @@ export default function FinanceLayout() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
         headerShadowVisible: false,
-        headerTintColor: colors.finance,
+        headerTintColor: colors.ink,
+        headerTitleStyle: { fontFamily: fonts.uiSemi },
         contentStyle: { backgroundColor: colors.bg },
       }}
     >

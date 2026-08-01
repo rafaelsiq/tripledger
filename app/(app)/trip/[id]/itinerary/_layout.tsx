@@ -1,14 +1,15 @@
 import { Stack } from 'expo-router';
-import { colors } from '@/src/theme';
+import { colors, fonts } from '@/src/theme';
 
 export default function ItineraryLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: '#0C0A09' },
-        headerTintColor: '#FFF7ED',
+        headerStyle: { backgroundColor: colors.bg },
+        headerTintColor: colors.ink,
+        headerTitleStyle: { fontFamily: fonts.uiSemi },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: '#0C0A09' },
+        contentStyle: { backgroundColor: colors.bg },
       }}
     >
       <Stack.Screen name="index" options={{ title: 'Roteiro' }} />

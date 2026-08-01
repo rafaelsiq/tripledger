@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getErrorMessage } from '@/src/lib/errors';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 
 type ToastTone = 'error' | 'success' | 'info';
 
@@ -111,29 +111,32 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing.sm,
     borderWidth: 1,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
+    backgroundColor: colors.surface,
+    shadowColor: colors.ink,
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   error: {
     backgroundColor: colors.dangerSoft,
-    borderColor: '#F97066',
+    borderColor: '#FECACA',
   },
   success: {
     backgroundColor: colors.successSoft,
-    borderColor: '#75E0A7',
+    borderColor: '#A6F4C5',
   },
   info: {
-    backgroundColor: colors.financeSoft,
+    backgroundColor: colors.surface,
     borderColor: colors.border,
   },
   title: {
-    fontWeight: '700',
+    fontFamily: fonts.uiBold,
     fontSize: 14,
     color: colors.ink,
   },
   message: {
+    fontFamily: fonts.ui,
     fontSize: 13,
     color: colors.inkSoft,
     lineHeight: 18,

@@ -7,7 +7,7 @@ import { useToast } from '@/src/hooks/useToast';
 import { memberBalance } from '@/src/lib/finance';
 import { updateTripPhase } from '@/src/services/trips';
 import { PHASE_LABELS } from '@/src/types';
-import { colors, spacing, typography } from '@/src/theme';
+import { colors, fonts, spacing, typography } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
@@ -37,7 +37,7 @@ export default function TripSummaryScreen() {
   }
 
   return (
-    <Screen>
+    <Screen ambient>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <Badge text={PHASE_LABELS[trip.phase]} tone="accent" />
@@ -93,17 +93,17 @@ export default function TripSummaryScreen() {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   hero: { gap: spacing.xs },
-  title: { ...typography.title, fontSize: 28 },
-  dates: { color: colors.inkMuted, marginTop: 4 },
+  title: { ...typography.title, fontSize: 30 },
+  dates: { color: colors.inkMuted, marginTop: 4, fontFamily: fonts.ui },
   stats: { gap: spacing.sm },
   statRow: { flexDirection: 'row', gap: spacing.md },
-  statLabel: { color: colors.inkSoft, fontSize: 13 },
+  statLabel: { color: colors.inkSoft, fontSize: 13, fontFamily: fonts.ui },
   statValue: { ...typography.number, fontSize: 22 },
   code: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 4,
-    color: colors.accentDark,
+    fontSize: 30,
+    fontFamily: fonts.uiBold,
+    letterSpacing: 5,
+    color: colors.accent,
     marginVertical: spacing.sm,
   },
 });

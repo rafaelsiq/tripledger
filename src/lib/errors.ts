@@ -9,6 +9,12 @@ const FIREBASE_MESSAGES: Record<string, string> = {
   'auth/too-many-requests': 'Muitas tentativas. Aguarde e tente novamente.',
   'auth/network-request-failed': 'Falha de rede. Verifique sua conexão.',
   'auth/popup-closed-by-user': 'Login cancelado.',
+  'auth/operation-not-allowed':
+    'Cadastro por e-mail/senha não está habilitado no Firebase.',
+  'auth/missing-password': 'Informe a senha.',
+  'auth/missing-email': 'Informe o e-mail.',
+  'auth/invalid-password': 'Senha inválida. Use pelo menos 6 caracteres.',
+  'auth/configuration-not-found': 'Autenticação não configurada no projeto Firebase.',
   'permission-denied': 'Sem permissão para esta ação.',
   'unavailable': 'Serviço temporariamente indisponível.',
   'not-found': 'Registro não encontrado.',
@@ -20,38 +26,46 @@ const FIREBASE_MESSAGES: Record<string, string> = {
   'storage/quota-exceeded': 'Limite de armazenamento excedido.',
 };
 
+function extractCode(error: { code?: string; message?: string }) {
+  if (error.code && typeof error.code === 'string') return error.code;
+  const fromMessage = error.message?.match(/\(([^)]+)\)/)?.[1];
+  if (fromMessage) return fromMessage;
+  return undefined;
+}
+
 export function getErrorMessage(error: unknown, fallback = 'Algo deu errado. Tente novamente.') {
   if (!error) return fallback;
 
-  if (typeof error === 'string' && error.trim()) return error;
+  if (typeof error === 'string' && error.trim()) {
+    const lower = error.trim().toLowerCase();
+    if (lower === 'error' || lower === 'firebase: error') return fallback;
+    return error;
+  }
 
   const anyErr = error as {
     code?: string;
     message?: string;
-    customData?: { message?: string };
+    name?: string;
   };
 
-  if (anyErr?.code && FIREBASE_MESSAGES[anyErr.code]) {
-    return FIREBASE_MESSAGES[anyErr.code]!;
+  const code = extractCode(anyErr);
+  if (code && FIREBASE_MESSAGES[code]) {
+    return FIREBASE_MESSAGES[code]!;
   }
 
-  // Firestore sometimes nests code in message like "FirebaseError: ..."
-  const codeFromMessage = anyErr?.message?.match(/\(([^)]+)\)/)?.[1];
-  if (codeFromMessage && FIREBASE_MESSAGES[codeFromMessage]) {
-    return FIREBASE_MESSAGES[codeFromMessage]!;
-  }
-
-  if (anyErr?.message && !anyErr.message.startsWith('Firebase:')) {
-    return anyErr.message;
-  }
-
+  // Prefer raw useful messages, but ignore useless "Error"
   if (anyErr?.message) {
     const cleaned = anyErr.message
+      .replace(/^FirebaseError:\s*/i, '')
       .replace(/^Firebase:\s*/i, '')
       .replace(/\s*\([^)]*\)\.?\s*$/, '')
       .trim();
-    if (cleaned) return cleaned;
+
+    if (cleaned && cleaned.toLowerCase() !== 'error') {
+      return cleaned;
+    }
   }
 
+  if (code) return `Erro: ${code}`;
   return fallback;
 }
