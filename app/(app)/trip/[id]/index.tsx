@@ -5,6 +5,7 @@ import { BalanceCard } from '@/src/components/finance/BalanceCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { memberBalance } from '@/src/lib/finance';
+import { formatDateLabel } from '@/src/lib/dates';
 import { updateTripPhase } from '@/src/services/trips';
 import { PHASE_LABELS } from '@/src/types';
 import { colors, fonts, spacing, typography } from '@/src/theme';
@@ -44,7 +45,7 @@ export default function TripSummaryScreen() {
           <Text style={styles.title}>{trip.name}</Text>
           {trip.destination ? <Body muted>{trip.destination}</Body> : null}
           <Text style={styles.dates}>
-            {trip.startDate} → {trip.endDate}
+            {formatDateLabel(trip.startDate)} → {formatDateLabel(trip.endDate)}
           </Text>
         </View>
 

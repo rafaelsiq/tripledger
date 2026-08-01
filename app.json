@@ -55,7 +55,28 @@
           "photosPermission": "O TripLedger precisa acessar fotos para comprovantes e o feed da viagem."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@react-native-community/datetimepicker",
+        {
+          "android": {
+            "datePicker": {
+              "colorAccent": {
+                "light": "#0C6B58"
+              },
+              "colorControlActivated": {
+                "light": "#0C6B58"
+              },
+              "textColorPrimary": {
+                "light": "#14212B"
+              },
+              "textColorSecondary": {
+                "light": "#5A6B7A"
+              }
+            }
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

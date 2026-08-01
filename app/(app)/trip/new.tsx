@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { DateField } from '@/src/components/DateField';
 import { Button, Input, Screen, Title, Body } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
+import { daysFromTodayValue, todayValue } from '@/src/lib/dates';
 import { createTrip } from '@/src/services/trips';
 import { spacing } from '@/src/theme';
 
@@ -14,10 +16,17 @@ export default function NewTripScreen() {
   const [name, setName] = useState('');
   const [destination, setDestination] = useState('');
   const [description, setDescription] = useState('');
-  const [startDate, setStartDate] = useState('2026-08-10');
-  const [endDate, setEndDate] = useState('2026-08-17');
+  const [startDate, setStartDate] = useState(todayValue);
+  const [endDate, setEndDate] = useState(() => daysFromTodayValue(7));
   const [budgetTotal, setBudgetTotal] = useState('5000');
   const [loading, setLoading] = useState(false);
+
+  function onStartDateChange(next: string) {
+    setStartDate(next);
+    if (endDate && next > endDate) {
+      setEndDate(next);
+    }
+  }
 
   async function onCreate() {
     if (!user || !profile) {
@@ -26,6 +35,14 @@ export default function NewTripScreen() {
     }
     if (!name.trim()) {
       showError('Informe o nome da viagem.', 'Campo obrigatório');
+      return;
+    }
+    if (!startDate || !endDate) {
+      showError('Selecione as datas de início e fim.', 'Campo obrigatório');
+      return;
+    }
+    if (endDate < startDate) {
+      showError('A data de fim precisa ser igual ou posterior ao início.', 'Datas inválidas');
       return;
     }
     try {
@@ -72,8 +89,19 @@ export default function NewTripScreen() {
           onChangeText={setDescription}
           placeholder="Grupo de amigos"
         />
-        <Input label="Início (AAAA-MM-DD)" value={startDate} onChangeText={setStartDate} />
-        <Input label="Fim (AAAA-MM-DD)" value={endDate} onChangeText={setEndDate} />
+        <DateField
+          label="Início"
+          value={startDate}
+          onChange={onStartDateChange}
+          helperText="Toque para abrir o calendário"
+        />
+        <DateField
+          label="Fim"
+          value={endDate}
+          onChange={setEndDate}
+          minimumDate={startDate}
+          helperText="Não pode ser antes do início"
+        />
         <Input
           label="Orçamento total (R$)"
           keyboardType="decimal-pad"

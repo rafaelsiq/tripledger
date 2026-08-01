@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { DateField } from '@/src/components/DateField';
 import { Button, Input, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
@@ -132,11 +133,12 @@ export default function NewExpenseScreen() {
           onChangeText={setAmount}
           placeholder="1200"
         />
-        <Input
-          label="Vencimento (AAAA-MM-DD)"
+        <DateField
+          label="Vencimento"
           value={dueDate}
-          onChangeText={setDueDate}
+          onChange={setDueDate}
           placeholder="Opcional"
+          optional
         />
         <Input label="Nota" value={note} onChangeText={setNote} placeholder="Observações" />
 
