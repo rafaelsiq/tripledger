@@ -48,21 +48,29 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 }
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     Manrope_500Medium,
     Manrope_600SemiBold,
     Manrope_700Bold,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
   });
+  const [fontsTimedOut, setFontsTimedOut] = React.useState(false);
 
   React.useEffect(() => {
-    if (fontsLoaded) {
+    const timer = setTimeout(() => setFontsTimedOut(true), 2500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const ready = fontsLoaded || !!fontError || fontsTimedOut;
+
+  React.useEffect(() => {
+    if (ready) {
       SplashScreen.hideAsync().catch(() => undefined);
     }
-  }, [fontsLoaded]);
+  }, [ready]);
 
-  if (!fontsLoaded) {
+  if (!ready) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg }}>
         <ActivityIndicator color={colors.accent} size="large" />
