@@ -111,22 +111,25 @@ export async function createExpense(input: {
 
   const refDoc = doc(collection(db, 'trips', input.tripId, 'expenses'));
   const now = Date.now();
-  const expense: Expense = {
-    id: refDoc.id,
-    tripId: input.tripId,
-    kind: input.kind,
-    title: input.title.trim(),
-    category: input.category,
-    amount: input.amount,
-    paidByUid: input.paidByUid,
-    splits,
-    note: input.note,
-    receiptUrl: input.receiptUrl,
-    dueDate: input.dueDate,
-    createdByUid: input.createdByUid,
-    createdAt: now,
-    updatedAt: now,
-  };
+  // Firestore rejects `undefined` fields — only persist defined optionals.
+  const expense = Object.fromEntries(
+    Object.entries({
+      id: refDoc.id,
+      tripId: input.tripId,
+      kind: input.kind,
+      title: input.title.trim(),
+      category: input.category,
+      amount: input.amount,
+      paidByUid: input.paidByUid,
+      splits,
+      note: input.note?.trim() || undefined,
+      receiptUrl: input.receiptUrl,
+      dueDate: input.dueDate || undefined,
+      createdByUid: input.createdByUid,
+      createdAt: now,
+      updatedAt: now,
+    }).filter(([, v]) => v !== undefined)
+  ) as Expense;
   await setDoc(refDoc, expense);
   return expense;
 }
@@ -145,18 +148,20 @@ export async function registerPayment(input: {
     proofUrl = await uploadTripFile(input.tripId, 'proofs', input.proofUri);
   }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'payments'));
-  const payment: Payment = {
-    id: refDoc.id,
-    tripId: input.tripId,
-    expenseId: input.expenseId,
-    fromUid: input.fromUid,
-    toUid: input.toUid,
-    amount: input.amount,
-    proofUrl,
-    paidAt: Date.now(),
-    status: 'pending',
-    note: input.note,
-  };
+  const payment = Object.fromEntries(
+    Object.entries({
+      id: refDoc.id,
+      tripId: input.tripId,
+      expenseId: input.expenseId,
+      fromUid: input.fromUid,
+      toUid: input.toUid,
+      amount: input.amount,
+      proofUrl,
+      paidAt: Date.now(),
+      status: 'pending' as const,
+      note: input.note?.trim() || undefined,
+    }).filter(([, v]) => v !== undefined)
+  ) as Payment;
   await setDoc(refDoc, payment);
   return payment;
 }
