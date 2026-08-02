@@ -124,6 +124,15 @@ export interface ItineraryDay {
   order: number;
 }
 
+/** Group decision on a proposed day activity. */
+export type ItineraryVoteValue = 'yes' | 'maybe' | 'no';
+
+export const ITINERARY_VOTE_LABELS: Record<ItineraryVoteValue, string> = {
+  yes: 'Topa',
+  maybe: 'Talvez',
+  no: 'Não topa',
+};
+
 export interface ItineraryItem {
   id: string;
   dayId: string;
@@ -135,7 +144,10 @@ export interface ItineraryItem {
   mapUrl?: string;
   order: number;
   done: boolean;
+  /** Legacy RSVP list — kept in sync with yes-votes. */
   attendees: string[];
+  /** Per-member vote for whether the group should do this activity. */
+  votes?: Record<string, ItineraryVoteValue>;
   createdByUid: string;
   createdAt: number;
 }

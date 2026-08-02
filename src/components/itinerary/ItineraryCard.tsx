@@ -1,18 +1,22 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { countVotes } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
 type Props = {
   item: ItineraryItem;
-  onToggleDone: () => void;
-  onToggleRsvp: () => void;
-  attending: boolean;
+  onPress: () => void;
 };
 
-export function ItineraryCard({ item, onToggleDone, onToggleRsvp, attending }: Props) {
+export function ItineraryCard({ item, onPress }: Props) {
+  const counts = useMemo(() => countVotes(item), [item]);
+
   return (
-    <View style={[styles.card, item.done && styles.done]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, item.done && styles.done, pressed && { opacity: 0.94 }]}
+    >
       {item.imageUrl ? (
         <Image source={{ uri: item.imageUrl }} style={styles.image} />
       ) : (
@@ -26,21 +30,21 @@ export function ItineraryCard({ item, onToggleDone, onToggleRsvp, attending }: P
           {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
         </View>
         <Text style={styles.title}>{item.title}</Text>
-        {item.description ? <Text style={styles.desc}>{item.description}</Text> : null}
-        <View style={styles.actions}>
-          <Pressable onPress={onToggleDone} style={[styles.chip, item.done && styles.chipOn]}>
-            <Text style={[styles.chipText, item.done && styles.chipTextOn]}>
-              {item.done ? 'Feito' : 'Marcar feito'}
-            </Text>
-          </Pressable>
-          <Pressable onPress={onToggleRsvp} style={[styles.chip, attending && styles.chipOn]}>
-            <Text style={[styles.chipText, attending && styles.chipTextOn]}>
-              {attending ? 'Vou' : 'Quem vai'} · {item.attendees.length}
-            </Text>
-          </Pressable>
+        {item.description ? (
+          <Text style={styles.desc} numberOfLines={2}>
+            {item.description}
+          </Text>
+        ) : null}
+        <View style={styles.footer}>
+          <Text style={styles.voteSummary}>
+            {counts.total === 0
+              ? 'Toque para votar com o grupo'
+              : `${counts.yes} topa · ${counts.maybe} talvez · ${counts.no} não`}
+          </Text>
+          {item.done ? <Text style={styles.doneTag}>Feito</Text> : null}
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -104,29 +108,24 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
-  actions: {
+  footer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radii.sm,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  chipOn: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  chipText: {
-    color: colors.inkSoft,
-    fontSize: 12,
+  voteSummary: {
+    color: colors.inkMuted,
     fontFamily: fonts.uiSemi,
+    fontSize: 12,
+    flex: 1,
   },
-  chipTextOn: {
+  doneTag: {
     color: colors.accentDark,
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
 });

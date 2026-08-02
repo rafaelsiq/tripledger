@@ -10,7 +10,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { uploadTripFile } from '@/src/services/expenses';
-import type { ItineraryDay, ItineraryItem } from '@/src/types';
+import type { ItineraryDay, ItineraryItem, ItineraryVoteValue } from '@/src/types';
 
 export function subscribeItineraryDays(
   tripId: string,
@@ -77,11 +77,26 @@ export async function createItineraryItem(input: {
     order: input.order,
     done: false,
     attendees: [],
+    votes: {},
     createdByUid: input.createdByUid,
     createdAt: Date.now(),
   }) as ItineraryItem;
   await setDoc(refDoc, item);
   return item;
+}
+
+export function subscribeDayItem(
+  tripId: string,
+  dayId: string,
+  itemId: string,
+  cb: (item: ItineraryItem | null) => void
+): Unsubscribe {
+  return onSnapshot(
+    doc(db, 'trips', tripId, 'itineraryDays', dayId, 'items', itemId),
+    (snap) => {
+      cb(snap.exists() ? (snap.data() as ItineraryItem) : null);
+    }
+  );
 }
 
 export async function toggleItemDone(
@@ -93,17 +108,64 @@ export async function toggleItemDone(
   await updateDoc(doc(db, 'trips', tripId, 'itineraryDays', dayId, 'items', itemId), { done });
 }
 
+export function countVotes(item: ItineraryItem) {
+  const votes = item.votes || {};
+  const counts = { yes: 0, maybe: 0, no: 0, total: 0 };
+  for (const value of Object.values(votes)) {
+    if (value === 'yes' || value === 'maybe' || value === 'no') {
+      counts[value] += 1;
+      counts.total += 1;
+    }
+  }
+  // Legacy attendees without an explicit vote count as "yes".
+  for (const uid of item.attendees || []) {
+    if (!votes[uid]) {
+      counts.yes += 1;
+      counts.total += 1;
+    }
+  }
+  return counts;
+}
+
+export async function setItemVote(input: {
+  tripId: string;
+  dayId: string;
+  item: ItineraryItem;
+  uid: string;
+  vote: ItineraryVoteValue;
+}) {
+  const current = input.item.votes?.[input.uid];
+  const votes: Record<string, ItineraryVoteValue> = { ...(input.item.votes || {}) };
+
+  if (current === input.vote) {
+    delete votes[input.uid];
+  } else {
+    votes[input.uid] = input.vote;
+  }
+
+  const attendees = Object.entries(votes)
+    .filter(([, value]) => value === 'yes')
+    .map(([uid]) => uid);
+
+  await updateDoc(
+    doc(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items', input.item.id),
+    { votes, attendees }
+  );
+}
+
+/** @deprecated Prefer setItemVote. Toggles a yes-vote for legacy RSVP chips. */
 export async function toggleRsvp(
   tripId: string,
   dayId: string,
   item: ItineraryItem,
   uid: string
 ) {
-  const attendees = item.attendees.includes(uid)
-    ? item.attendees.filter((id) => id !== uid)
-    : [...item.attendees, uid];
-  await updateDoc(doc(db, 'trips', tripId, 'itineraryDays', dayId, 'items', item.id), {
-    attendees,
+  await setItemVote({
+    tripId,
+    dayId,
+    item,
+    uid,
+    vote: 'yes',
   });
 }
 

@@ -60,7 +60,7 @@ export default function NewItineraryItem() {
         order: Number(order) || 0,
         createdByUid: user.uid,
       });
-      showSuccess('Item adicionado ao roteiro');
+      showSuccess('Atividade adicionada ao roteiro');
       router.back();
     } catch (e) {
       showError(e, 'Falha ao salvar');
