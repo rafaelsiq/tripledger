@@ -110,7 +110,7 @@ export default function DayDetailScreen() {
                   ]}
                 >
                   <Ionicons name="add" size={18} color={colors.white} />
-                  <Text style={styles.newActionText}>Novo</Text>
+                  <Text style={styles.newActionText}>Nova atividade</Text>
                 </Pressable>
               ) : null}
             </View>
@@ -121,8 +121,8 @@ export default function DayDetailScreen() {
             title="Dia livre"
             subtitle={
               canMutate
-                ? 'Toque em Novo para adicionar um card, ou use Template no topo.'
-                : 'Ainda não há itens neste dia.'
+                ? 'Toque em Nova atividade para montar o dia, ou use Template no topo.'
+                : 'Ainda não há atividades neste dia.'
             }
           />
         }

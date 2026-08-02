@@ -14,7 +14,10 @@ export default function ItineraryLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Roteiro' }} />
       <Stack.Screen name="day/[dayId]" options={{ title: 'Dia' }} />
-      <Stack.Screen name="new-item" options={{ title: 'Novo item', presentation: 'modal' }} />
+      <Stack.Screen
+        name="new-item"
+        options={{ title: 'Nova atividade', presentation: 'modal' }}
+      />
     </Stack>
   );
 }
