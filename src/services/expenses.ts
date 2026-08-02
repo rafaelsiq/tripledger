@@ -6,14 +6,12 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc,
-  updateDoc,
   where,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/src/lib/firebase';
-import { omitUndefinedDeep } from '@/src/lib/firestore';
+import { omitUndefinedDeep, safeSetDoc, safeUpdateDoc } from '@/src/lib/firestore';
 import {
   amountsMatchTotal,
   applyPaidToInstallments,
@@ -195,7 +193,7 @@ export async function createExpense(input: {
     createdAt: now,
     updatedAt: now,
   }) as unknown as Expense;
-  await setDoc(refDoc, expense);
+  await safeSetDoc(refDoc, expense);
   return expense;
 }
 
@@ -242,7 +240,7 @@ export async function registerPayment(input: {
     status: 'pending' as const,
     note: input.note?.trim() || undefined,
   }) as unknown as Payment;
-  await setDoc(refDoc, payment);
+  await safeSetDoc(refDoc, payment);
   return payment;
 }
 
@@ -252,7 +250,7 @@ export async function confirmPayment(input: {
   confirmedByUid: string;
   expense: Expense;
 }) {
-  await setDoc(
+  await safeSetDoc(
     doc(db, 'trips', input.tripId, 'payments', input.payment.id),
     omitUndefinedDeep({
       ...input.payment,
@@ -295,7 +293,7 @@ export async function confirmPayment(input: {
     }
   }
 
-  await updateDoc(
+  await safeUpdateDoc(
     doc(db, 'trips', input.tripId, 'expenses', input.expense.id),
     omitUndefinedDeep({
       splits,
@@ -306,7 +304,7 @@ export async function confirmPayment(input: {
 }
 
 export async function rejectPayment(tripId: string, paymentId: string) {
-  await updateDoc(doc(db, 'trips', tripId, 'payments', paymentId), {
+  await safeUpdateDoc(doc(db, 'trips', tripId, 'payments', paymentId), {
     status: 'rejected',
   });
 }
@@ -327,7 +325,7 @@ export async function requestConsolidation(input: {
     status: 'pending',
     createdAt: Date.now(),
   };
-  await setDoc(refDoc, req);
+  await safeSetDoc(refDoc, req);
   return req;
 }
 
@@ -337,7 +335,7 @@ export async function resolveConsolidationRequest(
   status: 'approved' | 'rejected',
   resolvedByUid: string
 ) {
-  await updateDoc(doc(db, 'trips', tripId, 'consolidationRequests', reqId), {
+  await safeUpdateDoc(doc(db, 'trips', tripId, 'consolidationRequests', reqId), {
     status,
     resolvedAt: Date.now(),
     resolvedByUid,
@@ -359,7 +357,7 @@ export async function saveSettlements(
       status: 'open',
       createdAt: Date.now(),
     };
-    await setDoc(refDoc, settlement);
+    await safeSetDoc(refDoc, settlement);
   }
 }
 
@@ -372,7 +370,7 @@ export async function markSettlementSettled(
   if (proofUri) {
     proofUrl = await uploadTripFile(tripId, 'settlements', proofUri);
   }
-  await updateDoc(
+  await safeUpdateDoc(
     doc(db, 'trips', tripId, 'settlements', settlementId),
     omitUndefinedDeep({
       status: 'settled',
@@ -531,7 +529,7 @@ export async function updateExpense(input: {
       const next = { ...payment };
       if (fallback) next.installmentId = fallback;
       else delete next.installmentId;
-      await setDoc(paymentDoc.ref, omitUndefinedDeep(next));
+      await safeSetDoc(paymentDoc.ref, omitUndefinedDeep(next));
     })
   );
 
@@ -555,7 +553,7 @@ export async function updateExpense(input: {
     updatedAt: Date.now(),
   });
 
-  await setDoc(doc(db, 'trips', input.tripId, 'expenses', input.expenseId), payload, {
+  await safeSetDoc(doc(db, 'trips', input.tripId, 'expenses', input.expenseId), payload, {
     merge: true,
   });
 }

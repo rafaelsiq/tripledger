@@ -5,12 +5,16 @@ import {
   getDoc,
   getDocs,
   onSnapshot,
-  setDoc,
-  updateDoc,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { datesBetween, generateInviteCode } from '@/src/lib/finance';
+import {
+  safeBatchSet,
+  safeBatchUpdate,
+  safeSetDoc,
+  safeUpdateDoc,
+} from '@/src/lib/firestore';
 import { normalizeInviteCode } from '@/src/lib/invite';
 import {
   generateDummyUid,
@@ -51,14 +55,14 @@ export async function createTrip(input: {
   const inviteCode = generateInviteCode();
   const now = Date.now();
 
-  const trip: Trip = {
+  const trip = {
     id: tripRef.id,
     name: input.name.trim(),
-    destination: input.destination?.trim(),
-    description: input.description?.trim(),
+    destination: input.destination?.trim() || undefined,
+    description: input.description?.trim() || undefined,
     startDate: input.startDate,
     endDate: input.endDate,
-    phase: 'planning',
+    phase: 'planning' as const,
     adminUid: input.admin.uid,
     financeLeadUid: input.admin.uid,
     inviteCode,
@@ -79,13 +83,13 @@ export async function createTrip(input: {
   };
 
   const batch = writeBatch(db);
-  batch.set(tripRef, trip);
-  batch.set(doc(db, 'trips', tripRef.id, 'members', input.admin.uid), member);
-  batch.set(doc(db, 'inviteCodes', inviteCode), {
+  safeBatchSet(batch, tripRef, trip);
+  safeBatchSet(batch, doc(db, 'trips', tripRef.id, 'members', input.admin.uid), member);
+  safeBatchSet(batch, doc(db, 'inviteCodes', inviteCode), {
     tripId: tripRef.id,
     createdAt: now,
   });
-  batch.set(doc(db, 'users', input.admin.uid, 'memberships', tripRef.id), {
+  safeBatchSet(batch, doc(db, 'users', input.admin.uid, 'memberships', tripRef.id), {
     tripId: tripRef.id,
     joinedAt: now,
     role: 'admin',
@@ -94,7 +98,7 @@ export async function createTrip(input: {
   const days = datesBetween(input.startDate, input.endDate);
   days.forEach((date, index) => {
     const dayRef = doc(collection(db, 'trips', tripRef.id, 'itineraryDays'));
-    batch.set(dayRef, {
+    safeBatchSet(batch, dayRef, {
       id: dayRef.id,
       tripId: tripRef.id,
       date,
@@ -104,7 +108,7 @@ export async function createTrip(input: {
   });
 
   await batch.commit();
-  return trip;
+  return trip as Trip;
 }
 
 export async function joinTripByCode(
@@ -135,8 +139,8 @@ export async function joinTripByCode(
       role: 'member',
       joinedAt: Date.now(),
     };
-    await setDoc(memberRef, member);
-    await setDoc(doc(db, 'users', user.uid, 'memberships', tripId), {
+    await safeSetDoc(memberRef, member);
+    await safeSetDoc(doc(db, 'users', user.uid, 'memberships', tripId), {
       tripId,
       joinedAt: Date.now(),
       role: 'member',
@@ -188,7 +192,7 @@ export async function updateTripPhase(
     throw new Error('Apenas o administrador pode alterar o status da viagem');
   }
   const next = normalizeTripPhase(phase);
-  await updateDoc(doc(db, 'trips', tripId), {
+  await safeUpdateDoc(doc(db, 'trips', tripId), {
     phase: next,
     updatedAt: Date.now(),
   });
@@ -203,7 +207,7 @@ export async function transferFinanceLead(tripId: string, uid: string) {
   if (isDummyMember(member)) {
     throw new Error('Não é possível tornar um placeholder responsável financeiro');
   }
-  await updateDoc(doc(db, 'trips', tripId), {
+  await safeUpdateDoc(doc(db, 'trips', tripId), {
     financeLeadUid: uid,
     updatedAt: Date.now(),
   });
@@ -232,7 +236,7 @@ export async function createDummyMember(input: {
     isDummy: true,
     createdByUid: input.actorUid,
   };
-  await setDoc(doc(db, 'trips', input.tripId, 'members', uid), member);
+  await safeSetDoc(doc(db, 'trips', input.tripId, 'members', uid), member);
   return member;
 }
 
@@ -255,7 +259,7 @@ export async function renameDummyMember(input: {
   }
   const displayName = input.displayName.trim();
   if (!displayName) throw new Error('Informe um nome');
-  await updateDoc(doc(db, 'trips', input.tripId, 'members', input.dummyUid), {
+  await safeUpdateDoc(doc(db, 'trips', input.tripId, 'members', input.dummyUid), {
     displayName,
   });
 }
@@ -318,7 +322,7 @@ export async function linkDummyToRealMember(input: {
       expense.paidByUid === dummyUid || expense.splits.some((s) => s.uid === dummyUid);
     if (!touches) continue;
     const next = remapExpenseUids(expense, dummyUid, realUid);
-    batch.set(expenseDoc.ref, { ...next, updatedAt: Date.now() });
+    safeBatchSet(batch, expenseDoc.ref, { ...next, updatedAt: Date.now() });
     ops += 1;
     await commitIfNeeded();
   }
@@ -332,7 +336,7 @@ export async function linkDummyToRealMember(input: {
       // Self-payment after remap is meaningless; drop it.
       batch.delete(paymentDoc.ref);
     } else {
-      batch.update(paymentDoc.ref, { fromUid, toUid });
+      safeBatchUpdate(batch, paymentDoc.ref, { fromUid, toUid });
     }
     ops += 1;
     await commitIfNeeded();
@@ -346,7 +350,7 @@ export async function linkDummyToRealMember(input: {
     if (fromUid === toUid) {
       batch.delete(settlementDoc.ref);
     } else {
-      batch.update(settlementDoc.ref, { fromUid, toUid });
+      safeBatchUpdate(batch, settlementDoc.ref, { fromUid, toUid });
     }
     ops += 1;
     await commitIfNeeded();
@@ -357,7 +361,7 @@ export async function linkDummyToRealMember(input: {
     const fromUid = req.fromUid === dummyUid ? realUid : req.fromUid;
     const toUid = req.toUid === dummyUid ? realUid : req.toUid;
     if (fromUid === req.fromUid && toUid === req.toUid) continue;
-    batch.update(reqDoc.ref, { fromUid, toUid });
+    safeBatchUpdate(batch, reqDoc.ref, { fromUid, toUid });
     ops += 1;
     await commitIfNeeded();
   }
@@ -389,7 +393,10 @@ export async function linkDummyToRealMember(input: {
           nextVotes[realUid] = dummyVote;
         }
       }
-      batch.update(itemDoc.ref, { attendees: nextAttendees, votes: nextVotes });
+      safeBatchUpdate(batch, itemDoc.ref, {
+        attendees: nextAttendees,
+        votes: nextVotes,
+      });
       ops += 1;
       await commitIfNeeded();
     }
@@ -405,7 +412,7 @@ export async function updateTripBudget(
   budgetTotal: number,
   categoryBudgets: Trip['categoryBudgets']
 ) {
-  await updateDoc(doc(db, 'trips', tripId), {
+  await safeUpdateDoc(doc(db, 'trips', tripId), {
     budgetTotal,
     categoryBudgets,
     updatedAt: Date.now(),
@@ -447,7 +454,7 @@ export async function removeMember(tripId: string, uid: string, actorUid?: strin
   }
 
   if (trip.financeLeadUid === uid) {
-    await updateDoc(doc(db, 'trips', tripId), {
+    await safeUpdateDoc(doc(db, 'trips', tripId), {
       financeLeadUid: trip.adminUid,
       updatedAt: Date.now(),
     });

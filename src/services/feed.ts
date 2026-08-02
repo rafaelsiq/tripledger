@@ -7,12 +7,10 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc,
-  updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
-import { omitUndefinedDeep } from '@/src/lib/firestore';
+import { omitUndefinedDeep, safeSetDoc, safeUpdateDoc } from '@/src/lib/firestore';
 import { uploadTripFile } from '@/src/services/expenses';
 import type { FeedComment, FeedPost } from '@/src/types';
 
@@ -64,16 +62,16 @@ export async function createFeedPost(input: {
     likes: [],
     createdAt: Date.now(),
   }) as FeedPost;
-  await setDoc(refDoc, post);
+  await safeSetDoc(refDoc, post);
   return post;
 }
 
 export async function toggleLike(tripId: string, post: FeedPost, uid: string) {
   const refDoc = doc(db, 'trips', tripId, 'feedPosts', post.id);
   if (post.likes.includes(uid)) {
-    await updateDoc(refDoc, { likes: arrayRemove(uid) });
+    await safeUpdateDoc(refDoc, { likes: arrayRemove(uid) });
   } else {
-    await updateDoc(refDoc, { likes: arrayUnion(uid) });
+    await safeUpdateDoc(refDoc, { likes: arrayUnion(uid) });
   }
 }
 
@@ -94,7 +92,7 @@ export async function addComment(input: {
     text: input.text.trim(),
     createdAt: Date.now(),
   };
-  await setDoc(refDoc, comment);
+  await safeSetDoc(refDoc, comment);
   return comment;
 }
 

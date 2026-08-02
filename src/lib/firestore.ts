@@ -1,6 +1,15 @@
+import {
+  setDoc,
+  updateDoc,
+  type DocumentData,
+  type DocumentReference,
+  type SetOptions,
+  type WriteBatch,
+} from 'firebase/firestore';
+
 /**
  * Firestore rejects `undefined` field values (including nested ones).
- * Strip them recursively before setDoc/updateDoc.
+ * Strip them recursively before setDoc/updateDoc/batch.set.
  */
 export function omitUndefinedDeep<T>(value: T): T {
   if (Array.isArray(value)) {
@@ -19,4 +28,39 @@ export function omitUndefinedDeep<T>(value: T): T {
     ) as T;
   }
   return value;
+}
+
+/** setDoc that never sends `undefined` fields to Firestore. */
+export function safeSetDoc(
+  reference: DocumentReference,
+  data: DocumentData,
+  options?: SetOptions
+) {
+  const cleaned = omitUndefinedDeep(data);
+  return options ? setDoc(reference, cleaned, options) : setDoc(reference, cleaned);
+}
+
+/** updateDoc that never sends `undefined` fields to Firestore. */
+export function safeUpdateDoc(reference: DocumentReference, data: DocumentData) {
+  return updateDoc(reference, omitUndefinedDeep(data));
+}
+
+/** batch.set that never sends `undefined` fields to Firestore. */
+export function safeBatchSet(
+  batch: WriteBatch,
+  reference: DocumentReference,
+  data: DocumentData,
+  options?: SetOptions
+) {
+  const cleaned = omitUndefinedDeep(data);
+  return options ? batch.set(reference, cleaned, options) : batch.set(reference, cleaned);
+}
+
+/** batch.update that never sends `undefined` fields to Firestore. */
+export function safeBatchUpdate(
+  batch: WriteBatch,
+  reference: DocumentReference,
+  data: DocumentData
+) {
+  return batch.update(reference, omitUndefinedDeep(data));
 }

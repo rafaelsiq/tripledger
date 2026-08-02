@@ -4,12 +4,10 @@ import {
   onSnapshot,
   orderBy,
   query,
-  setDoc,
-  updateDoc,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
-import { omitUndefinedDeep } from '@/src/lib/firestore';
+import { omitUndefinedDeep, safeSetDoc, safeUpdateDoc } from '@/src/lib/firestore';
 import { uploadTripFile } from '@/src/services/expenses';
 import type { ItineraryDay, ItineraryItem, ItineraryVoteValue } from '@/src/types';
 
@@ -75,7 +73,7 @@ export async function createItineraryItem(input: {
     createdByUid: input.createdByUid,
     createdAt: Date.now(),
   }) as ItineraryItem;
-  await setDoc(refDoc, item);
+  await safeSetDoc(refDoc, item);
   return item;
 }
 
@@ -99,7 +97,7 @@ export async function toggleItemDone(
   itemId: string,
   done: boolean
 ) {
-  await updateDoc(doc(db, 'trips', tripId, 'itineraryDays', dayId, 'items', itemId), { done });
+  await safeUpdateDoc(doc(db, 'trips', tripId, 'itineraryDays', dayId, 'items', itemId), { done });
 }
 
 export function countVotes(item: ItineraryItem) {
@@ -141,7 +139,7 @@ export async function setItemVote(input: {
     .filter(([, value]) => value === 'yes')
     .map(([uid]) => uid);
 
-  await updateDoc(
+  await safeUpdateDoc(
     doc(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items', input.item.id),
     { votes, attendees }
   );
