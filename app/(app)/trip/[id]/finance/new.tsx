@@ -3,10 +3,12 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { DateField } from '@/src/components/DateField';
-import { Button, Input, Label, Screen } from '@/src/components/ui';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
+import { Body, Button, Input, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { createExpense, uploadTripFile } from '@/src/services/expenses';
 import type { ExpenseCategory, ExpenseKind } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
@@ -23,7 +25,7 @@ const CATEGORIES = Object.keys(CATEGORY_LABELS) as ExpenseCategory[];
 export default function NewExpenseScreen() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, members } = useTrip();
+  const { trip, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const router = useRouter();
   const [kind, setKind] = useState<ExpenseKind>('planned');
   const [category, setCategory] = useState<ExpenseCategory>('food');
@@ -49,6 +51,10 @@ export default function NewExpenseScreen() {
   async function onSave() {
     if (!user || !trip) {
       showError('Sessão ou viagem indisponível.', 'Não foi possível salvar');
+      return;
+    }
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
     const value = Number(String(amount).replace(',', '.'));
@@ -94,9 +100,22 @@ export default function NewExpenseScreen() {
     );
   }
 
+  if (trip && !canMutate) {
+    return (
+      <Screen>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        <Body muted>{closedTripMemberMessage()}</Body>
+        <Button title="Voltar" variant="secondary" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.form}>
+        {trip ? (
+          <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        ) : null}
         <Label>Tipo</Label>
         <View style={styles.chips}>
           {KINDS.map((k) => (

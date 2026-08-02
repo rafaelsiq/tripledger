@@ -1,22 +1,28 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { confirmAction } from '@/src/lib/notify';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { removeMember, transferFinanceLead } from '@/src/services/trips';
 import { colors, fonts, spacing } from '@/src/theme';
 
 export default function MembersScreen() {
-  const { trip, members, isAdmin } = useTrip();
+  const { trip, members, isAdmin, isFinanceLead, canMutate } = useTrip();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
 
   if (!trip || !user) return null;
 
   async function onTransfer(uid: string, name: string) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     const ok = await confirmAction({
       title: 'Transferir responsável financeiro',
       message: `Passar o cargo para ${name}?`,
@@ -32,6 +38,10 @@ export default function MembersScreen() {
   }
 
   async function onRemove(uid: string, name: string) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     if (uid === trip!.adminUid) {
       showError('Não é possível remover o administrador.', 'Ação bloqueada');
       return;
@@ -59,15 +69,16 @@ export default function MembersScreen() {
         keyExtractor={(item) => item.uid}
         contentContainerStyle={{ gap: spacing.sm, paddingBottom: 40 }}
         ListHeaderComponent={
-          isAdmin ? (
-            <View style={{ marginBottom: spacing.sm }}>
+          <View style={{ marginBottom: spacing.sm, gap: spacing.sm }}>
+            <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+            {isAdmin ? (
               <InviteShareCard
                 tripName={trip.name}
                 inviteCode={trip.inviteCode}
                 isAdmin
               />
-            </View>
-          ) : null
+            ) : null}
+          </View>
         }
         ListEmptyComponent={<EmptyState title="Sem membros" />}
         renderItem={({ item }) => {
@@ -85,7 +96,7 @@ export default function MembersScreen() {
                   ) : null}
                 </View>
               </View>
-              {isAdmin ? (
+              {isAdmin && canMutate ? (
                 <View style={{ gap: spacing.sm, minWidth: 140 }}>
                   {!isFinance ? (
                     <Button

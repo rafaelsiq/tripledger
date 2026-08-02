@@ -4,6 +4,7 @@ import { Tabs, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { subscribeExpenses, subscribePayments } from '@/src/services/expenses';
 import { subscribeMembers, subscribeTrip } from '@/src/services/trips';
+import { canMutateTrip, normalizeTripPhase } from '@/src/lib/tripPhase';
 import type { Expense, Payment, Trip, TripMember } from '@/src/types';
 import { colors } from '@/src/theme';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -32,18 +33,23 @@ export default function TripLayout() {
     return () => unsubs.forEach((u) => u());
   }, [tripId]);
 
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    const isAdmin = !!user && trip?.adminUid === user.uid;
+    const isFinanceLead = !!user && trip?.financeLeadUid === user.uid;
+    const phase = normalizeTripPhase(trip?.phase);
+    return {
       tripId,
       trip,
       members,
       expenses,
       payments,
-      isAdmin: !!user && trip?.adminUid === user.uid,
-      isFinanceLead: !!user && trip?.financeLeadUid === user.uid,
-    }),
-    [tripId, trip, members, expenses, payments, user]
-  );
+      isAdmin,
+      isFinanceLead,
+      phase,
+      isClosed: phase === 'closed',
+      canMutate: canMutateTrip(trip, { isAdmin, isFinanceLead }),
+    };
+  }, [tripId, trip, members, expenses, payments, user]);
 
   if (!ready) {
     return (

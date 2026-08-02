@@ -1,12 +1,14 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
 import { SettlementList } from '@/src/components/finance/SettlementList';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { computeNetBalances, expenseTotals, simplifyDebts } from '@/src/lib/finance';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   markSettlementSettled,
   saveSettlements,
@@ -20,7 +22,7 @@ import { formatCurrency } from '@/src/theme';
 export default function FinanceReportScreen() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, expenses, members, isFinanceLead, isAdmin } = useTrip();
+  const { trip, expenses, members, isFinanceLead, isAdmin, canMutate } = useTrip();
   const [settlements, setSettlements] = useState<Settlement[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -53,6 +55,10 @@ export default function FinanceReportScreen() {
     members.find((m) => m.uid === uid)?.displayName || 'Membro';
 
   async function generateSettlements() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     try {
       setLoading(true);
       if (settlements.some((s) => s.status === 'open')) {
@@ -69,6 +75,10 @@ export default function FinanceReportScreen() {
   }
 
   async function onSettle(settlement: Settlement) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     try {
       const pick = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
@@ -85,6 +95,7 @@ export default function FinanceReportScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
         <Card style={{ gap: spacing.sm }}>
           <Label>Visão geral</Label>
           <Text style={styles.number}>{formatCurrency(report.totalActual)}</Text>
@@ -149,7 +160,7 @@ export default function FinanceReportScreen() {
               </Text>
             ))
           )}
-          {(isFinanceLead || isAdmin) && report.suggested.length > 0 ? (
+          {(isFinanceLead || isAdmin) && canMutate && report.suggested.length > 0 ? (
             <Button
               title="Gerar acerto de contas"
               variant="finance"
@@ -165,7 +176,7 @@ export default function FinanceReportScreen() {
             settlements={settlements}
             members={members}
             currentUid={user.uid}
-            canManage={isFinanceLead || isAdmin}
+            canManage={(isFinanceLead || isAdmin) && canMutate}
             onSettle={onSettle}
           />
         </Card>

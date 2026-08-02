@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import {
   Badge,
   Body,
@@ -15,6 +16,7 @@ import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   confirmPayment,
   registerPayment,
@@ -31,7 +33,7 @@ export default function ExpenseDetailScreen() {
   const { expenseId } = useLocalSearchParams<{ expenseId: string }>();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, expenses, payments, members, isFinanceLead } = useTrip();
+  const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
@@ -61,6 +63,10 @@ export default function ExpenseDetailScreen() {
   const paidTotal = currentExpense.splits.reduce((s, sp) => s + sp.paidAmount, 0);
 
   async function onPay() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     if (!mySplit) return;
     const value = Number(String(amount).replace(',', '.')) || mySplit.amount - mySplit.paidAmount;
     if (value <= 0) {
@@ -92,6 +98,10 @@ export default function ExpenseDetailScreen() {
   }
 
   async function onConfirm(paymentId: string) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     const payment = expensePayments.find((p) => p.id === paymentId);
     if (!payment) return;
     try {
@@ -108,6 +118,10 @@ export default function ExpenseDetailScreen() {
   }
 
   async function onRequestConsolidation(paymentId: string) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     const payment = expensePayments.find((p) => p.id === paymentId);
     if (!payment) return;
     try {
@@ -130,6 +144,7 @@ export default function ExpenseDetailScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
         <View style={{ gap: 4 }}>
           <Text style={styles.title}>{expense.title}</Text>
           <Body muted>
@@ -165,7 +180,10 @@ export default function ExpenseDetailScreen() {
           ))}
         </Card>
 
-        {mySplit && mySplit.status !== 'paid' && mySplit.uid !== expense.paidByUid ? (
+        {canMutate &&
+        mySplit &&
+        mySplit.status !== 'paid' &&
+        mySplit.uid !== expense.paidByUid ? (
           <Card style={{ gap: spacing.sm }}>
             <Label>Registrar pagamento</Label>
             <Input
@@ -184,7 +202,7 @@ export default function ExpenseDetailScreen() {
           </Card>
         ) : null}
 
-        {pendingForMe.length > 0 ? (
+        {canMutate && pendingForMe.length > 0 ? (
           <Card style={{ gap: spacing.sm }}>
             <Label>Consolidar pagamentos</Label>
             {pendingForMe.map((p) => (

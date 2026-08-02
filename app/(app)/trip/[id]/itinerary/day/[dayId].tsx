@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Button, EmptyState } from '@/src/components/ui';
 import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useTrip } from '@/src/hooks/useTrip';
+import { useToast } from '@/src/hooks/useToast';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   addTemplateSlots,
   subscribeDayItems,
@@ -16,8 +19,9 @@ import { colors, spacing } from '@/src/theme';
 
 export default function DayDetailScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
-  const { trip } = useTrip();
+  const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
+  const { showError } = useToast();
   const router = useRouter();
   const [items, setItems] = useState<ItineraryItem[]>([]);
 
@@ -28,26 +32,37 @@ export default function DayDetailScreen() {
 
   if (!trip || !user) return null;
 
+  function guardMutate(action: () => void) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    action();
+  }
+
   return (
     <View style={styles.screen}>
-      <View style={styles.actions}>
-        <Button
-          title="Adicionar item"
-          onPress={() =>
-            router.push({
-              pathname: `/(app)/trip/${trip.id}/itinerary/new-item`,
-              params: { dayId: String(dayId), order: String(items.length) },
-            })
-          }
-        />
-        <Button
-          title="Template manhã/tarde/noite"
-          variant="secondary"
-          onPress={() =>
-            addTemplateSlots(trip.id, String(dayId), user.uid, items.length)
-          }
-        />
-      </View>
+      <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+      {canMutate ? (
+        <View style={styles.actions}>
+          <Button
+            title="Adicionar item"
+            onPress={() =>
+              router.push({
+                pathname: `/(app)/trip/${trip.id}/itinerary/new-item`,
+                params: { dayId: String(dayId), order: String(items.length) },
+              })
+            }
+          />
+          <Button
+            title="Template manhã/tarde/noite"
+            variant="secondary"
+            onPress={() =>
+              addTemplateSlots(trip.id, String(dayId), user.uid, items.length)
+            }
+          />
+        </View>
+      ) : null}
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
@@ -59,9 +74,13 @@ export default function DayDetailScreen() {
             item={item}
             attending={item.attendees.includes(user.uid)}
             onToggleDone={() =>
-              toggleItemDone(trip.id, String(dayId), item.id, !item.done)
+              guardMutate(() =>
+                toggleItemDone(trip.id, String(dayId), item.id, !item.done)
+              )
             }
-            onToggleRsvp={() => toggleRsvp(trip.id, String(dayId), item, user.uid)}
+            onToggleRsvp={() =>
+              guardMutate(() => toggleRsvp(trip.id, String(dayId), item, user.uid))
+            }
           />
         )}
       />

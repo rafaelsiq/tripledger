@@ -2,15 +2,17 @@ import React, { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Button, Input, Screen } from '@/src/components/ui';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
+import { Body, Button, Input, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { createFeedPost } from '@/src/services/feed';
 import { spacing } from '@/src/theme';
 
 export default function NewFeedPost() {
-  const { trip } = useTrip();
+  const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user, profile } = useAuth();
   const { showError, showSuccess } = useToast();
   const router = useRouter();
@@ -40,6 +42,10 @@ export default function NewFeedPost() {
       showError('Sessão ou viagem indisponível.', 'Não foi possível publicar');
       return;
     }
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
     if (!mediaUri) {
       showError('Selecione uma foto ou vídeo.', 'Mídia obrigatória');
       return;
@@ -63,9 +69,22 @@ export default function NewFeedPost() {
     }
   }
 
+  if (trip && !canMutate) {
+    return (
+      <Screen>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        <Body muted>{closedTripMemberMessage()}</Body>
+        <Button title="Voltar" variant="secondary" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <View style={styles.form}>
+        {trip ? (
+          <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        ) : null}
         <Button
           title={mediaUri ? 'Mídia selecionada' : 'Escolher foto ou vídeo'}
           variant="secondary"
