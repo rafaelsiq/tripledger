@@ -1,5 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { memberLabel } from '@/src/lib/members';
 import type { Settlement, TripMember } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
@@ -20,8 +21,10 @@ export function SettlementList({
   canManage,
   onSettle,
 }: Props) {
-  const nameOf = (uid: string) =>
-    members.find((m) => m.uid === uid)?.displayName || 'Membro';
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   if (settlements.length === 0) {
     return (

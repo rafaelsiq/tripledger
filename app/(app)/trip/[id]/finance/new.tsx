@@ -8,6 +8,7 @@ import { Body, Button, Input, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { createExpense, uploadTripFile } from '@/src/services/expenses';
 import type { ExpenseCategory, ExpenseKind } from '@/src/types';
@@ -170,7 +171,7 @@ export default function NewExpenseScreen() {
               style={[styles.chip, paidByUid === m.uid && styles.chipOn]}
             >
               <Text style={[styles.chipText, paidByUid === m.uid && styles.chipTextOn]}>
-                {m.displayName}
+                {memberLabel(m)}
               </Text>
             </Pressable>
           ))}
@@ -187,7 +188,7 @@ export default function NewExpenseScreen() {
               <Text
                 style={[styles.chipText, selected.includes(m.uid) && styles.chipTextOn]}
               >
-                {m.displayName}
+                {memberLabel(m)}
               </Text>
             </Pressable>
           ))}

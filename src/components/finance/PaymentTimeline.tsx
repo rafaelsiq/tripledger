@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { memberLabel } from '@/src/lib/members';
 import type { Payment, TripMember } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
@@ -36,8 +37,10 @@ export function PaymentTimeline({ total, paid, payments, members }: Props) {
     }));
   }, [payments]);
 
-  const nameOf = (uid: string) =>
-    members.find((m) => m.uid === uid)?.displayName || 'Membro';
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   const selectedPayment = payments.find((p) => p.id === selected);
 
