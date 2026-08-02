@@ -16,6 +16,7 @@ import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   confirmPayment,
@@ -35,11 +36,13 @@ export default function ExpenseDetailScreen() {
   const { showError, showSuccess } = useToast();
   const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
   const [amount, setAmount] = useState('');
+  const [proxyUid, setProxyUid] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
 
   const expense = expenses.find((e) => e.id === expenseId);
   const expensePayments = payments.filter((p) => p.expenseId === expenseId);
+  const canManageFinance = isAdmin || isFinanceLead;
 
   React.useEffect(() => {
     if (!trip) return;
@@ -51,24 +54,32 @@ export default function ExpenseDetailScreen() {
     [expense, user]
   );
 
+  const unpaidManagedSplits = useMemo(() => {
+    if (!expense || !canManageFinance) return [];
+    return expense.splits.filter(
+      (s) => s.status !== 'paid' && s.uid !== expense.paidByUid
+    );
+  }, [expense, canManageFinance]);
+
   if (!trip || !expense || !user) return null;
 
   const currentTrip = trip;
   const currentExpense = expense;
   const currentUser = user;
 
-  const nameOf = (uid: string) =>
-    members.find((m) => m.uid === uid)?.displayName || 'Membro';
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   const paidTotal = currentExpense.splits.reduce((s, sp) => s + sp.paidAmount, 0);
 
-  async function onPay() {
+  async function registerFor(fromUid: string, owedLeft: number) {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
-    if (!mySplit) return;
-    const value = Number(String(amount).replace(',', '.')) || mySplit.amount - mySplit.paidAmount;
+    const value = Number(String(amount).replace(',', '.')) || owedLeft;
     if (value <= 0) {
       showError('Informe um valor válido.', 'Pagamento');
       return;
@@ -83,18 +94,33 @@ export default function ExpenseDetailScreen() {
       await registerPayment({
         tripId: currentTrip.id,
         expenseId: currentExpense.id,
-        fromUid: currentUser.uid,
+        fromUid,
         toUid: currentExpense.paidByUid,
         amount: value,
         proofUri,
       });
       setAmount('');
-      showSuccess('Pagamento enviado', 'Aguardando consolidação do recebedor.');
+      showSuccess('Pagamento registrado', 'Aguardando consolidação.');
     } catch (e) {
       showError(e, 'Falha ao registrar pagamento');
     } finally {
       setLoading(false);
     }
+  }
+
+  async function onPay() {
+    if (!mySplit) return;
+    await registerFor(currentUser.uid, mySplit.amount - mySplit.paidAmount);
+  }
+
+  async function onProxyPay() {
+    const targetUid = proxyUid || unpaidManagedSplits[0]?.uid;
+    const split = unpaidManagedSplits.find((s) => s.uid === targetUid);
+    if (!split) {
+      showError('Selecione quem está pagando.', 'Pagamento');
+      return;
+    }
+    await registerFor(split.uid, split.amount - split.paidAmount);
   }
 
   async function onConfirm(paymentId: string) {
@@ -185,7 +211,7 @@ export default function ExpenseDetailScreen() {
         mySplit.status !== 'paid' &&
         mySplit.uid !== expense.paidByUid ? (
           <Card style={{ gap: spacing.sm }}>
-            <Label>Registrar pagamento</Label>
+            <Label>Registrar meu pagamento</Label>
             <Input
               label="Valor"
               keyboardType="decimal-pad"
@@ -197,6 +223,48 @@ export default function ExpenseDetailScreen() {
               title="Pagar com comprovante"
               variant="finance"
               onPress={onPay}
+              loading={loading}
+            />
+          </Card>
+        ) : null}
+
+        {canMutate && canManageFinance && unpaidManagedSplits.length > 0 ? (
+          <Card style={{ gap: spacing.sm }}>
+            <Label>Registrar pagamento por alguém</Label>
+            <Body muted>
+              Útil para placeholders ou quando o admin/financeiro registra em nome do membro.
+            </Body>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+              {unpaidManagedSplits.map((s) => {
+                const member = members.find((m) => m.uid === s.uid);
+                const selected = (proxyUid || unpaidManagedSplits[0]?.uid) === s.uid;
+                return (
+                  <Button
+                    key={s.uid}
+                    title={member ? memberLabel(member) : nameOf(s.uid)}
+                    variant={selected ? 'finance' : 'secondary'}
+                    onPress={() => setProxyUid(s.uid)}
+                  />
+                );
+              })}
+            </View>
+            <Input
+              label="Valor"
+              keyboardType="decimal-pad"
+              value={amount}
+              onChangeText={setAmount}
+              placeholder={String(
+                (() => {
+                  const uid = proxyUid || unpaidManagedSplits[0]?.uid;
+                  const split = unpaidManagedSplits.find((s) => s.uid === uid);
+                  return split ? split.amount - split.paidAmount : 0;
+                })()
+              )}
+            />
+            <Button
+              title="Registrar pagamento"
+              variant="finance"
+              onPress={onProxyPay}
               loading={loading}
             />
           </Card>

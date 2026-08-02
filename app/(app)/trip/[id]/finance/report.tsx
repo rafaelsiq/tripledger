@@ -8,6 +8,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { computeNetBalances, expenseTotals, simplifyDebts } from '@/src/lib/finance';
+import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   markSettlementSettled,
@@ -51,8 +52,10 @@ export default function FinanceReportScreen() {
 
   if (!trip || !user) return null;
 
-  const nameOf = (uid: string) =>
-    members.find((m) => m.uid === uid)?.displayName || 'Membro';
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   async function generateSettlements() {
     if (!canMutate) {

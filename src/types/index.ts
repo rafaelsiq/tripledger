@@ -44,6 +44,9 @@ export interface TripMember {
   role: MemberRole;
   joinedAt: number;
   photoURL?: string;
+  /** Placeholder member (no app login) managed by admin until linked to a real user. */
+  isDummy?: boolean;
+  createdByUid?: string;
 }
 
 export interface ExpenseSplit {
