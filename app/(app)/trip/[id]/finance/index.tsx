@@ -1,11 +1,12 @@
 import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Badge, Button, Card, EmptyState, Label, Screen } from '@/src/components/ui';
+import { Badge, Card, EmptyState, Label, Screen } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
@@ -27,43 +28,73 @@ export default function FinanceHome() {
 
   return (
     <Screen>
-      <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
-      <View style={styles.actions}>
-        {canMutate ? (
-          <Button
-            title="Novo lançamento"
-            variant="finance"
-            onPress={() => router.push(`/(app)/trip/${trip.id}/finance/new`)}
-          />
-        ) : null}
-        <Button
-          title="Relatório / acerto"
-          variant="secondary"
-          onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
-        />
-      </View>
+      <Stack.Screen
+        options={{
+          title: 'Finanças',
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
+              hitSlop={10}
+              style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="document-text-outline" size={18} color={colors.finance} />
+              <Text style={styles.headerActionText}>Relatório</Text>
+            </Pressable>
+          ),
+        }}
+      />
 
-      <Card style={{ marginBottom: spacing.md }}>
-        <PaymentTimeline
-          total={totals.total}
-          paid={totals.paid}
-          payments={payments}
-          members={members}
-        />
-      </Card>
-
-      <Label>Lançamentos</Label>
       <FlatList
         data={expenses}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ gap: spacing.sm, paddingVertical: spacing.sm, paddingBottom: 80 }}
+        contentContainerStyle={styles.list}
+        ListHeaderComponent={
+          <View style={styles.headerBlock}>
+            <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+            <Card>
+              <PaymentTimeline
+                total={totals.total}
+                paid={totals.paid}
+                payments={payments}
+                members={members}
+              />
+            </Card>
+            <View style={styles.sectionHeader}>
+              <Label>Lançamentos</Label>
+              {canMutate ? (
+                <Pressable
+                  onPress={() => router.push(`/(app)/trip/${trip.id}/finance/new`)}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.newAction,
+                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+                  ]}
+                >
+                  <Ionicons name="add" size={18} color={colors.white} />
+                  <Text style={styles.newActionText}>Novo</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
+        }
         ListEmptyComponent={
-          <EmptyState title="Sem lançamentos" subtitle="Adicione despesas previstas ou reais." />
+          <EmptyState
+            title="Sem lançamentos"
+            subtitle={
+              canMutate
+                ? 'Toque em Novo para registrar uma despesa prevista ou real.'
+                : 'Ainda não há despesas nesta viagem.'
+            }
+          />
         }
         renderItem={({ item }) => {
           const paid = item.splits.reduce((s, sp) => s + sp.paidAmount, 0);
           return (
-            <Pressable onPress={() => router.push(`/(app)/trip/${trip.id}/finance/expense/${item.id}`)}>
+            <Pressable
+              onPress={() =>
+                router.push(`/(app)/trip/${trip.id}/finance/expense/${item.id}`)
+              }
+            >
               <Card style={styles.row}>
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={styles.title}>{item.title}</Text>
@@ -93,7 +124,47 @@ export default function FinanceHome() {
 }
 
 const styles = StyleSheet.create({
-  actions: { gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.md },
+  list: {
+    gap: spacing.sm,
+    paddingBottom: spacing.xxl,
+  },
+  headerBlock: {
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+    marginTop: spacing.xs,
+  },
+  headerAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  headerActionText: {
+    color: colors.finance,
+    fontFamily: fonts.uiSemi,
+    fontSize: 14,
+  },
+  newAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.finance,
+    borderRadius: radii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  newActionText: {
+    color: colors.white,
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+  },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   title: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
   meta: { color: colors.inkSoft, fontSize: 12, fontFamily: fonts.ui },
