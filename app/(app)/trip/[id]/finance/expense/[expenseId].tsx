@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
@@ -16,6 +16,7 @@ import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { nextOpenInstallment } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
@@ -25,10 +26,20 @@ import {
   requestConsolidation,
   subscribeConsolidationRequests,
 } from '@/src/services/expenses';
-import type { ConsolidationRequest } from '@/src/types';
+import type { ConsolidationRequest, ExpenseInstallment } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, spacing } from '@/src/theme';
+import { colors, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
+
+function installmentLabel(item: ExpenseInstallment) {
+  const remaining = Math.max(0, Math.round((item.amount - item.paidAmount) * 100) / 100);
+  return `${item.index}ª · ${formatCurrency(remaining)} restante`;
+}
+
+function remainingOf(item?: ExpenseInstallment | null) {
+  if (!item) return 0;
+  return Math.max(0, Math.round((item.amount - item.paidAmount) * 100) / 100);
+}
 
 export default function ExpenseDetailScreen() {
   const { expenseId } = useLocalSearchParams<{ expenseId: string }>();
@@ -37,6 +48,9 @@ export default function ExpenseDetailScreen() {
   const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
   const [amount, setAmount] = useState('');
   const [proxyUid, setProxyUid] = useState<string>('');
+  const [myInstallmentId, setMyInstallmentId] = useState<string>('');
+  const [proxyInstallmentId, setProxyInstallmentId] = useState<string>('');
+  const [proofUri, setProofUri] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
 
@@ -61,6 +75,69 @@ export default function ExpenseDetailScreen() {
     );
   }, [expense, canManageFinance]);
 
+  const effectiveProxyUid = proxyUid || unpaidManagedSplits[0]?.uid || '';
+
+  const myOpenInstallments = useMemo(() => {
+    if (!expense?.installments?.length || !user?.uid) return [];
+    return expense.installments
+      .filter((i) => i.uid === user.uid && i.status !== 'paid')
+      .sort((a, b) => a.index - b.index);
+  }, [expense?.installments, user?.uid]);
+
+  const proxyOpenInstallments = useMemo(() => {
+    if (!expense?.installments?.length || !effectiveProxyUid) return [];
+    return expense.installments
+      .filter((i) => i.uid === effectiveProxyUid && i.status !== 'paid')
+      .sort((a, b) => a.index - b.index);
+  }, [expense?.installments, effectiveProxyUid]);
+
+  const installmentsByUser = useMemo(() => {
+    const map = new Map<string, ExpenseInstallment[]>();
+    for (const item of expense?.installments || []) {
+      const list = map.get(item.uid) || [];
+      list.push(item);
+      map.set(item.uid, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.index - b.index);
+    }
+    return map;
+  }, [expense?.installments]);
+
+  useEffect(() => {
+    if (!myOpenInstallments.length) {
+      setMyInstallmentId('');
+      return;
+    }
+    setMyInstallmentId((prev) =>
+      myOpenInstallments.some((i) => i.id === prev) ? prev : myOpenInstallments[0]!.id
+    );
+  }, [myOpenInstallments]);
+
+  useEffect(() => {
+    if (!proxyOpenInstallments.length) {
+      setProxyInstallmentId('');
+      return;
+    }
+    setProxyInstallmentId((prev) =>
+      proxyOpenInstallments.some((i) => i.id === prev)
+        ? prev
+        : proxyOpenInstallments[0]!.id
+    );
+  }, [proxyOpenInstallments]);
+
+  useEffect(() => {
+    if (!expense?.installments?.length) return;
+    const selected =
+      expense.installments.find((i) => i.id === myInstallmentId) ||
+      expense.installments.find((i) => i.id === proxyInstallmentId);
+    if (!selected) return;
+    const remaining = remainingOf(selected);
+    setAmount(remaining ? String(remaining) : '');
+    // Only autofill when the chosen installment changes — not on every snapshot.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myInstallmentId, proxyInstallmentId]);
+
   if (!trip || !expense || !user) return null;
 
   const currentTrip = trip;
@@ -73,8 +150,28 @@ export default function ExpenseDetailScreen() {
   };
 
   const paidTotal = currentExpense.splits.reduce((s, sp) => s + sp.paidAmount, 0);
+  const mySelectedInstallment =
+    currentExpense.installments?.find((i) => i.id === myInstallmentId) ||
+    nextOpenInstallment(currentExpense.installments, currentUser.uid);
+  const proxySelectedInstallment =
+    currentExpense.installments?.find((i) => i.id === proxyInstallmentId) ||
+    nextOpenInstallment(currentExpense.installments, effectiveProxyUid);
 
-  async function registerFor(fromUid: string, owedLeft: number) {
+  async function pickProof() {
+    const pick = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!pick.canceled) {
+      setProofUri(pick.assets[0]?.uri);
+    }
+  }
+
+  async function registerFor(
+    fromUid: string,
+    owedLeft: number,
+    chosenInstallmentId?: string
+  ) {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
@@ -86,20 +183,22 @@ export default function ExpenseDetailScreen() {
     }
     try {
       setLoading(true);
-      const pick = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      const proofUri = pick.canceled ? undefined : pick.assets[0]?.uri;
+      const targetInstallment =
+        currentExpense.installments?.find(
+          (i) => i.id === chosenInstallmentId && i.uid === fromUid
+        ) || nextOpenInstallment(currentExpense.installments, fromUid);
       await registerPayment({
         tripId: currentTrip.id,
         expenseId: currentExpense.id,
         fromUid,
         toUid: currentExpense.paidByUid,
         amount: value,
+        installmentId: targetInstallment?.id,
         proofUri,
+        expense: currentExpense,
       });
       setAmount('');
+      setProofUri(undefined);
       showSuccess('Pagamento registrado', 'Aguardando consolidação.');
     } catch (e) {
       showError(e, 'Falha ao registrar pagamento');
@@ -110,17 +209,21 @@ export default function ExpenseDetailScreen() {
 
   async function onPay() {
     if (!mySplit) return;
-    await registerFor(currentUser.uid, mySplit.amount - mySplit.paidAmount);
+    await registerFor(
+      currentUser.uid,
+      mySplit.amount - mySplit.paidAmount,
+      myInstallmentId
+    );
   }
 
   async function onProxyPay() {
-    const targetUid = proxyUid || unpaidManagedSplits[0]?.uid;
+    const targetUid = effectiveProxyUid;
     const split = unpaidManagedSplits.find((s) => s.uid === targetUid);
     if (!split) {
       showError('Selecione quem está pagando.', 'Pagamento');
       return;
     }
-    await registerFor(split.uid, split.amount - split.paidAmount);
+    await registerFor(split.uid, split.amount - split.paidAmount, proxyInstallmentId);
   }
 
   async function onConfirm(paymentId: string) {
@@ -167,6 +270,59 @@ export default function ExpenseDetailScreen() {
     (p) => p.status === 'pending' && (p.toUid === currentUser.uid || isFinanceLead)
   );
 
+  function installmentRef(paymentInstallmentId?: string) {
+    if (!paymentInstallmentId || !currentExpense.installments) return null;
+    return currentExpense.installments.find((i) => i.id === paymentInstallmentId) || null;
+  }
+
+  function renderInstallmentPicker(
+    openItems: ExpenseInstallment[],
+    selectedId: string,
+    onSelect: (id: string) => void
+  ) {
+    if (!openItems.length) return null;
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <Label>Parcela</Label>
+        <Body muted>Escolha qual parcela este pagamento cobre.</Body>
+        <View style={styles.chips}>
+          {openItems.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => onSelect(item.id)}
+              style={[styles.chip, selectedId === item.id && styles.chipOn]}
+            >
+              <Text
+                style={[styles.chipText, selectedId === item.id && styles.chipTextOn]}
+              >
+                {installmentLabel(item)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+    );
+  }
+
+  function renderProofControls() {
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <Button
+          title={proofUri ? 'Comprovante anexado' : 'Anexar comprovante (opcional)'}
+          variant="secondary"
+          onPress={pickProof}
+        />
+        {proofUri ? (
+          <Button
+            title="Remover comprovante"
+            variant="ghost"
+            onPress={() => setProofUri(undefined)}
+          />
+        ) : null}
+      </View>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
@@ -190,20 +346,53 @@ export default function ExpenseDetailScreen() {
 
         <Card style={{ gap: spacing.sm }}>
           <Label>Divisão</Label>
-          {expense.splits.map((s) => (
-            <View key={s.uid} style={styles.splitRow}>
-              <Text style={styles.splitName}>{nameOf(s.uid)}</Text>
-              <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={styles.splitValue}>
-                  {formatCurrency(s.paidAmount)} / {formatCurrency(s.amount)}
-                </Text>
-                <Badge
-                  text={s.status === 'paid' ? 'Pago' : s.status === 'partial' ? 'Parcial' : 'Pendente'}
-                  tone={s.status === 'paid' ? 'success' : s.status === 'partial' ? 'warn' : 'danger'}
-                />
+          {expense.splits.map((s) => {
+            const userInstallments = installmentsByUser.get(s.uid) || [];
+            return (
+              <View key={s.uid} style={styles.splitBlock}>
+                <View style={styles.splitRow}>
+                  <Text style={styles.splitName}>{nameOf(s.uid)}</Text>
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Text style={styles.splitValue}>
+                      {formatCurrency(s.paidAmount)} / {formatCurrency(s.amount)}
+                    </Text>
+                    <Badge
+                      text={
+                        s.status === 'paid'
+                          ? 'Pago'
+                          : s.status === 'partial'
+                            ? 'Parcial'
+                            : 'Pendente'
+                      }
+                      tone={
+                        s.status === 'paid'
+                          ? 'success'
+                          : s.status === 'partial'
+                            ? 'warn'
+                            : 'danger'
+                      }
+                    />
+                  </View>
+                </View>
+                {userInstallments.length > 1 ||
+                (userInstallments.length === 1 && s.uid !== expense.paidByUid) ? (
+                  <View style={styles.installmentList}>
+                    {userInstallments.map((item) => (
+                      <Text key={item.id} style={styles.installmentLine}>
+                        {item.index}ª parcela · {formatCurrency(item.paidAmount)} /{' '}
+                        {formatCurrency(item.amount)}
+                        {item.status === 'paid'
+                          ? ' · paga'
+                          : item.status === 'partial'
+                            ? ' · parcial'
+                            : ''}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
               </View>
-            </View>
-          ))}
+            );
+          })}
         </Card>
 
         {canMutate &&
@@ -212,15 +401,23 @@ export default function ExpenseDetailScreen() {
         mySplit.uid !== expense.paidByUid ? (
           <Card style={{ gap: spacing.sm }}>
             <Label>Registrar meu pagamento</Label>
+            {renderInstallmentPicker(
+              myOpenInstallments,
+              myInstallmentId,
+              setMyInstallmentId
+            )}
             <Input
               label="Valor"
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
-              placeholder={String(mySplit.amount - mySplit.paidAmount)}
+              placeholder={String(
+                remainingOf(mySelectedInstallment) || mySplit.amount - mySplit.paidAmount
+              )}
             />
+            {renderProofControls()}
             <Button
-              title="Pagar com comprovante"
+              title="Registrar pagamento"
               variant="finance"
               onPress={onPay}
               loading={loading}
@@ -237,7 +434,7 @@ export default function ExpenseDetailScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
               {unpaidManagedSplits.map((s) => {
                 const member = members.find((m) => m.uid === s.uid);
-                const selected = (proxyUid || unpaidManagedSplits[0]?.uid) === s.uid;
+                const selected = effectiveProxyUid === s.uid;
                 return (
                   <Button
                     key={s.uid}
@@ -248,19 +445,25 @@ export default function ExpenseDetailScreen() {
                 );
               })}
             </View>
+            {renderInstallmentPicker(
+              proxyOpenInstallments,
+              proxyInstallmentId,
+              setProxyInstallmentId
+            )}
             <Input
               label="Valor"
               keyboardType="decimal-pad"
               value={amount}
               onChangeText={setAmount}
               placeholder={String(
-                (() => {
-                  const uid = proxyUid || unpaidManagedSplits[0]?.uid;
-                  const split = unpaidManagedSplits.find((s) => s.uid === uid);
-                  return split ? split.amount - split.paidAmount : 0;
-                })()
+                remainingOf(proxySelectedInstallment) ||
+                  (() => {
+                    const split = unpaidManagedSplits.find((s) => s.uid === effectiveProxyUid);
+                    return split ? split.amount - split.paidAmount : 0;
+                  })()
               )}
             />
+            {renderProofControls()}
             <Button
               title="Registrar pagamento"
               variant="finance"
@@ -273,40 +476,44 @@ export default function ExpenseDetailScreen() {
         {canMutate && pendingForMe.length > 0 ? (
           <Card style={{ gap: spacing.sm }}>
             <Label>Consolidar pagamentos</Label>
-            {pendingForMe.map((p) => (
-              <View key={p.id} style={{ gap: spacing.sm }}>
-                <Text>
-                  {nameOf(p.fromUid)} enviou {formatCurrency(p.amount)}
-                  {p.proofUrl ? ' (com comprovante)' : ''}
-                </Text>
-                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <Button title="Confirmar" variant="finance" onPress={() => onConfirm(p.id)} />
+            {pendingForMe.map((p) => {
+              const installment = installmentRef(p.installmentId);
+              return (
+                <View key={p.id} style={{ gap: spacing.sm }}>
+                  <Text>
+                    {nameOf(p.fromUid)} enviou {formatCurrency(p.amount)}
+                    {installment ? ` · ${installment.index}ª parcela` : ''}
+                    {p.proofUrl ? ' (com comprovante)' : ' (sem comprovante)'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <Button title="Confirmar" variant="finance" onPress={() => onConfirm(p.id)} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Button
+                        title="Rejeitar"
+                        variant="danger"
+                        onPress={async () => {
+                          try {
+                            await rejectPayment(trip.id, p.id);
+                            showSuccess('Pagamento rejeitado');
+                          } catch (e) {
+                            showError(e, 'Falha ao rejeitar');
+                          }
+                        }}
+                      />
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
+                  {p.fromUid === user.uid ? (
                     <Button
-                      title="Rejeitar"
-                      variant="danger"
-                      onPress={async () => {
-                        try {
-                          await rejectPayment(trip.id, p.id);
-                          showSuccess('Pagamento rejeitado');
-                        } catch (e) {
-                          showError(e, 'Falha ao rejeitar');
-                        }
-                      }}
+                      title="Pedir consolidação ao resp. financeiro"
+                      variant="secondary"
+                      onPress={() => onRequestConsolidation(p.id)}
                     />
-                  </View>
+                  ) : null}
                 </View>
-                {p.fromUid === user.uid ? (
-                  <Button
-                    title="Pedir consolidação ao resp. financeiro"
-                    variant="secondary"
-                    onPress={() => onRequestConsolidation(p.id)}
-                  />
-                ) : null}
-              </View>
-            ))}
+              );
+            })}
           </Card>
         ) : null}
 
@@ -339,12 +546,34 @@ const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
   amount: { fontSize: 28, fontWeight: '700', color: colors.finance, marginBottom: spacing.sm },
+  splitBlock: {
+    gap: 4,
+    paddingVertical: 6,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.border,
+  },
   splitRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
   },
   splitName: { fontWeight: '600', color: colors.ink },
   splitValue: { color: colors.inkSoft, fontSize: 13 },
+  installmentList: { gap: 2, paddingLeft: 2 },
+  installmentLine: { color: colors.inkMuted, fontSize: 12 },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipOn: {
+    backgroundColor: colors.finance,
+    borderColor: colors.finance,
+  },
+  chipText: { color: colors.ink, fontWeight: '600', fontSize: 13 },
+  chipTextOn: { color: colors.white },
 });

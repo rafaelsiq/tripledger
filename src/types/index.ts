@@ -54,6 +54,18 @@ export interface ExpenseSplit {
   amount: number;
   paidAmount: number;
   status: SplitStatus;
+  /** How many installments this debtor should use (informational; see installments[]). */
+  installmentCount?: number;
+}
+
+export interface ExpenseInstallment {
+  id: string;
+  uid: string;
+  index: number;
+  amount: number;
+  paidAmount: number;
+  status: SplitStatus;
+  dueDate?: string;
 }
 
 export interface Expense {
@@ -65,6 +77,8 @@ export interface Expense {
   amount: number;
   paidByUid: string;
   splits: ExpenseSplit[];
+  /** Planned repayment schedule per debtor (optional for legacy expenses). */
+  installments?: ExpenseInstallment[];
   note?: string;
   receiptUrl?: string;
   dueDate?: string;
@@ -80,6 +94,8 @@ export interface Payment {
   fromUid: string;
   toUid: string;
   amount: number;
+  /** Which planned installment this payment targets, when applicable. */
+  installmentId?: string;
   proofUrl?: string;
   paidAt: number;
   status: PaymentStatus;

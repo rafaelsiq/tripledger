@@ -1,4 +1,10 @@
-import type { Expense, ExpenseSplit, Payment, Settlement } from '@/src/types';
+import type {
+  Expense,
+  ExpenseInstallment,
+  ExpenseSplit,
+  Payment,
+  Settlement,
+} from '@/src/types';
 
 export function generateInviteCode(length = 6) {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -9,27 +15,72 @@ export function generateInviteCode(length = 6) {
   return code;
 }
 
-export function equalSplits(memberIds: string[], total: number): ExpenseSplit[] {
-  if (memberIds.length === 0) return [];
-  const cents = Math.round(total * 100);
-  const base = Math.floor(cents / memberIds.length);
-  let remainder = cents - base * memberIds.length;
-  return memberIds.map((uid) => {
+/** Split total cents as evenly as possible across n parts. */
+export function distributeCents(totalCents: number, parts: number): number[] {
+  if (parts <= 0) return [];
+  const safeTotal = Math.max(0, Math.round(totalCents));
+  const base = Math.floor(safeTotal / parts);
+  let remainder = safeTotal - base * parts;
+  return Array.from({ length: parts }, () => {
     const extra = remainder > 0 ? 1 : 0;
     if (remainder > 0) remainder -= 1;
-    return {
-      uid,
-      amount: (base + extra) / 100,
-      paidAmount: 0,
-      status: 'pending' as const,
-    };
+    return base + extra;
   });
+}
+
+export function equalSplits(memberIds: string[], total: number): ExpenseSplit[] {
+  if (memberIds.length === 0) return [];
+  const parts = distributeCents(Math.round(total * 100), memberIds.length);
+  return memberIds.map((uid, index) => ({
+    uid,
+    amount: (parts[index] || 0) / 100,
+    paidAmount: 0,
+    status: 'pending' as const,
+  }));
 }
 
 export function splitStatus(paid: number, owed: number): ExpenseSplit['status'] {
   if (paid <= 0) return 'pending';
   if (paid + 0.009 >= owed) return 'paid';
   return 'partial';
+}
+
+export function buildInstallments(input: {
+  uid: string;
+  total: number;
+  count: number;
+  idPrefix: string;
+  dueDates?: (string | undefined)[];
+}): ExpenseInstallment[] {
+  const count = Math.max(1, Math.floor(input.count) || 1);
+  const parts = distributeCents(Math.round(input.total * 100), count);
+  return parts.map((cents, index) => ({
+    id: `${input.idPrefix}_${index + 1}`,
+    uid: input.uid,
+    index: index + 1,
+    amount: cents / 100,
+    paidAmount: 0,
+    status: 'pending' as const,
+    dueDate: input.dueDates?.[index],
+  }));
+}
+
+export function sumAmounts(values: number[]): number {
+  return Math.round(values.reduce((s, v) => s + v, 0) * 100) / 100;
+}
+
+export function amountsMatchTotal(parts: number[], total: number, tolerance = 0.02): boolean {
+  return Math.abs(sumAmounts(parts) - total) <= tolerance;
+}
+
+export function nextOpenInstallment(
+  installments: ExpenseInstallment[] | undefined,
+  uid: string
+): ExpenseInstallment | undefined {
+  if (!installments?.length) return undefined;
+  return installments
+    .filter((i) => i.uid === uid && i.status !== 'paid')
+    .sort((a, b) => a.index - b.index)[0];
 }
 
 export function memberBalance(uid: string, expenses: Expense[], payments: Payment[]) {

@@ -1,4 +1,4 @@
-import type { Expense, ExpenseSplit, TripMember } from '@/src/types';
+import type { Expense, ExpenseInstallment, ExpenseSplit, TripMember } from '@/src/types';
 import { splitStatus } from '@/src/lib/finance';
 
 export function isDummyMember(member?: TripMember | null): boolean {
@@ -27,6 +27,10 @@ export function remapSplits(
 
   const amount = (dummy?.amount || 0) + (real?.amount || 0);
   const paidAmount = Math.min(amount, (dummy?.paidAmount || 0) + (real?.paidAmount || 0));
+  const installmentCount =
+    dummy?.installmentCount || real?.installmentCount
+      ? Math.max(dummy?.installmentCount || 1, real?.installmentCount || 1)
+      : undefined;
   return [
     ...others,
     {
@@ -34,8 +38,20 @@ export function remapSplits(
       amount,
       paidAmount,
       status: splitStatus(paidAmount, amount),
+      ...(installmentCount ? { installmentCount } : {}),
     },
   ];
+}
+
+function remapInstallments(
+  installments: ExpenseInstallment[] | undefined,
+  dummyUid: string,
+  realUid: string
+): ExpenseInstallment[] | undefined {
+  if (!installments?.length) return installments;
+  return installments.map((item) =>
+    item.uid === dummyUid ? { ...item, uid: realUid } : item
+  );
 }
 
 export function remapExpenseUids(
@@ -47,6 +63,7 @@ export function remapExpenseUids(
     ...expense,
     paidByUid: expense.paidByUid === dummyUid ? realUid : expense.paidByUid,
     splits: remapSplits(expense.splits, dummyUid, realUid),
+    installments: remapInstallments(expense.installments, dummyUid, realUid),
   };
 }
 

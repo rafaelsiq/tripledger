@@ -11,11 +11,18 @@ import {
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/src/lib/firebase';
-import { equalSplits, splitStatus } from '@/src/lib/finance';
+import {
+  amountsMatchTotal,
+  buildInstallments,
+  equalSplits,
+  nextOpenInstallment,
+  splitStatus,
+} from '@/src/lib/finance';
 import type {
   ConsolidationRequest,
   Expense,
   ExpenseCategory,
+  ExpenseInstallment,
   ExpenseKind,
   Payment,
   Settlement,
@@ -75,6 +82,26 @@ export function subscribeSettlements(
   });
 }
 
+function clampInstallmentCount(value?: number, fallback = 1) {
+  const n = Math.round(value ?? fallback);
+  return Math.max(1, Math.min(24, Number.isFinite(n) ? n : fallback));
+}
+
+function applyPaymentToInstallment(
+  installment: ExpenseInstallment,
+  paymentAmount: number
+): ExpenseInstallment {
+  const paidAmount = Math.min(
+    installment.amount,
+    Math.round((installment.paidAmount + paymentAmount) * 100) / 100
+  );
+  return {
+    ...installment,
+    paidAmount,
+    status: splitStatus(paidAmount, installment.amount),
+  };
+}
+
 export async function createExpense(input: {
   tripId: string;
   kind: ExpenseKind;
@@ -83,33 +110,67 @@ export async function createExpense(input: {
   amount: number;
   paidByUid: string;
   memberIds: string[];
-  customSplits?: { uid: string; amount: number }[];
+  customSplits?: { uid: string; amount: number; installmentCount?: number }[];
+  defaultInstallmentCount?: number;
   note?: string;
   receiptUrl?: string;
   dueDate?: string;
   createdByUid: string;
 }) {
+  const defaultCount = clampInstallmentCount(input.defaultInstallmentCount, 1);
+
+  if (input.customSplits?.length) {
+    if (!amountsMatchTotal(input.customSplits.map((s) => s.amount), input.amount)) {
+      throw new Error('A soma das partes deve ser igual ao valor total.');
+    }
+  }
+
   const splits = input.customSplits
-    ? input.customSplits.map((s) => ({
-        uid: s.uid,
-        amount: s.amount,
-        paidAmount: s.uid === input.paidByUid ? s.amount : 0,
-        status: splitStatus(s.uid === input.paidByUid ? s.amount : 0, s.amount),
-      }))
+    ? input.customSplits.map((s) => {
+        const installmentCount =
+          s.uid === input.paidByUid
+            ? 1
+            : clampInstallmentCount(s.installmentCount, defaultCount);
+        return {
+          uid: s.uid,
+          amount: Math.round(s.amount * 100) / 100,
+          paidAmount: s.uid === input.paidByUid ? Math.round(s.amount * 100) / 100 : 0,
+          status: splitStatus(
+            s.uid === input.paidByUid ? s.amount : 0,
+            s.amount
+          ),
+          installmentCount,
+        };
+      })
     : equalSplits(input.memberIds, input.amount).map((s) => ({
         ...s,
         paidAmount: s.uid === input.paidByUid ? s.amount : 0,
         status: splitStatus(s.uid === input.paidByUid ? s.amount : 0, s.amount),
+        installmentCount: s.uid === input.paidByUid ? 1 : defaultCount,
       }));
 
   if (input.kind === 'income') {
     splits.forEach((s) => {
       s.paidAmount = s.amount;
       s.status = 'paid';
+      s.installmentCount = 1;
     });
   }
 
   const refDoc = doc(collection(db, 'trips', input.tripId, 'expenses'));
+  const installments =
+    input.kind === 'income'
+      ? []
+      : splits.flatMap((s) => {
+          if (s.uid === input.paidByUid || s.amount <= 0) return [];
+          return buildInstallments({
+            uid: s.uid,
+            total: s.amount,
+            count: s.installmentCount ?? defaultCount,
+            idPrefix: `${refDoc.id}_${s.uid}`,
+          });
+        });
+
   const now = Date.now();
   // Firestore rejects `undefined` fields — only persist defined optionals.
   const expense = Object.fromEntries(
@@ -122,6 +183,7 @@ export async function createExpense(input: {
       amount: input.amount,
       paidByUid: input.paidByUid,
       splits,
+      installments: installments.length ? installments : undefined,
       note: input.note?.trim() || undefined,
       receiptUrl: input.receiptUrl,
       dueDate: input.dueDate || undefined,
@@ -140,9 +202,25 @@ export async function registerPayment(input: {
   fromUid: string;
   toUid: string;
   amount: number;
+  installmentId?: string;
   proofUri?: string;
   note?: string;
+  /** Optional expense snapshot to validate installment without an extra read. */
+  expense?: Expense;
 }) {
+  let installmentId = input.installmentId;
+  const expense = input.expense;
+  if (expense?.installments?.length) {
+    if (installmentId) {
+      const installment = expense.installments.find((i) => i.id === installmentId);
+      if (!installment || installment.uid !== input.fromUid) {
+        throw new Error('Parcela inválida para este pagamento.');
+      }
+    } else {
+      installmentId = nextOpenInstallment(expense.installments, input.fromUid)?.id;
+    }
+  }
+
   let proofUrl: string | undefined;
   if (input.proofUri) {
     proofUrl = await uploadTripFile(input.tripId, 'proofs', input.proofUri);
@@ -156,6 +234,7 @@ export async function registerPayment(input: {
       fromUid: input.fromUid,
       toUid: input.toUid,
       amount: input.amount,
+      installmentId,
       proofUrl,
       paidAt: Date.now(),
       status: 'pending' as const,
@@ -193,10 +272,38 @@ export async function confirmPayment(input: {
     };
   });
 
-  await updateDoc(doc(db, 'trips', input.tripId, 'expenses', input.expense.id), {
-    splits,
-    updatedAt: Date.now(),
-  });
+  let installments = input.expense.installments;
+  if (installments?.length) {
+    if (input.payment.installmentId) {
+      installments = installments.map((item) =>
+        item.id === input.payment.installmentId
+          ? applyPaymentToInstallment(item, input.payment.amount)
+          : item
+      );
+    } else {
+      let remaining = input.payment.amount;
+      installments = installments.map((item) => {
+        if (item.uid !== input.payment.fromUid || remaining <= 0 || item.status === 'paid') {
+          return item;
+        }
+        const open = Math.round((item.amount - item.paidAmount) * 100) / 100;
+        const applied = Math.min(open, remaining);
+        remaining = Math.round((remaining - applied) * 100) / 100;
+        return applyPaymentToInstallment(item, applied);
+      });
+    }
+  }
+
+  await updateDoc(
+    doc(db, 'trips', input.tripId, 'expenses', input.expense.id),
+    Object.fromEntries(
+      Object.entries({
+        splits,
+        installments,
+        updatedAt: Date.now(),
+      }).filter(([, v]) => v !== undefined)
+    )
+  );
 }
 
 export async function rejectPayment(tripId: string, paymentId: string) {
