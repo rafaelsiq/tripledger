@@ -50,12 +50,6 @@ function digitsOnly(value: string) {
   return String(value).replace(/[^\d]/g, '');
 }
 
-function parseInstallmentCount(value: string, fallback = 1) {
-  const digits = digitsOnly(value);
-  if (!digits) return fallback;
-  return clampInstallmentCount(Number(digits), fallback);
-}
-
 function installmentPreview(total: number, count: number) {
   const safeCount = clampInstallmentCount(count, 1);
   const parts = distributeCents(Math.round(total * 100), safeCount);
