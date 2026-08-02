@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import {
@@ -29,7 +30,7 @@ import {
 } from '@/src/services/expenses';
 import type { ConsolidationRequest, ExpenseInstallment } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 
 function installmentLabel(item: ExpenseInstallment) {
@@ -366,6 +367,24 @@ export default function ExpenseDetailScreen() {
 
   return (
     <Screen>
+      <Stack.Screen
+        options={{
+          title: 'Despesa',
+          headerRight: canMutate
+            ? () => (
+                <Pressable
+                  onPress={onEdit}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.finance} />
+                  <Text style={styles.headerActionText}>Editar</Text>
+                </Pressable>
+              )
+            : undefined,
+        }}
+      />
+
       <ScrollView contentContainerStyle={styles.content}>
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
         <View style={{ gap: 4 }}>
@@ -374,22 +393,6 @@ export default function ExpenseDetailScreen() {
             {CATEGORY_LABELS[expense.category]} · pago por {nameOf(expense.paidByUid)}
           </Body>
         </View>
-
-        {canMutate ? (
-          <View style={styles.manageRow}>
-            <View style={{ flex: 1 }}>
-              <Button title="Editar" variant="secondary" onPress={onEdit} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Button
-                title="Excluir"
-                variant="danger"
-                onPress={onDelete}
-                loading={deleting}
-              />
-            </View>
-          </View>
-        ) : null}
 
         <Card>
           <Text style={styles.amount}>{formatCurrency(expense.amount)}</Text>
@@ -594,6 +597,18 @@ export default function ExpenseDetailScreen() {
               })}
           </Card>
         ) : null}
+
+        {canMutate ? (
+          <View style={styles.deleteBlock}>
+            <Body muted>Remove o lançamento e os pagamentos ligados a ele.</Body>
+            <Button
+              title="Excluir lançamento"
+              variant="danger"
+              onPress={onDelete}
+              loading={deleting}
+            />
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -602,7 +617,25 @@ export default function ExpenseDetailScreen() {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  manageRow: { flexDirection: 'row', gap: spacing.sm },
+  headerAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  headerActionText: {
+    color: colors.finance,
+    fontFamily: fonts.uiSemi,
+    fontSize: 14,
+  },
+  deleteBlock: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   amount: { fontSize: 28, fontWeight: '700', color: colors.finance, marginBottom: spacing.sm },
   splitBlock: {
     gap: 4,
