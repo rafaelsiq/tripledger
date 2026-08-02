@@ -1,5 +1,6 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
@@ -57,6 +58,17 @@ export default function MembersScreen() {
         data={members}
         keyExtractor={(item) => item.uid}
         contentContainerStyle={{ gap: spacing.sm, paddingBottom: 40 }}
+        ListHeaderComponent={
+          isAdmin ? (
+            <View style={{ marginBottom: spacing.sm }}>
+              <InviteShareCard
+                tripName={trip.name}
+                inviteCode={trip.inviteCode}
+                isAdmin
+              />
+            </View>
+          ) : null
+        }
         ListEmptyComponent={<EmptyState title="Sem membros" />}
         renderItem={({ item }) => {
           const isFinance = item.uid === trip.financeLeadUid;

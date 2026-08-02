@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { datesBetween, generateInviteCode } from '@/src/lib/finance';
+import { normalizeInviteCode } from '@/src/lib/invite';
 import type { Trip, TripMember, TripPhase } from '@/src/types';
 
 function tripsCol() {
@@ -89,7 +90,11 @@ export async function joinTripByCode(
   code: string,
   user: { uid: string; displayName: string; email: string }
 ) {
-  const inviteSnap = await getDoc(doc(db, 'inviteCodes', code.trim().toUpperCase()));
+  const normalized = normalizeInviteCode(code);
+  if (!normalized) {
+    throw new Error('Código de convite inválido');
+  }
+  const inviteSnap = await getDoc(doc(db, 'inviteCodes', normalized));
   if (!inviteSnap.exists()) {
     throw new Error('Código de convite inválido');
   }

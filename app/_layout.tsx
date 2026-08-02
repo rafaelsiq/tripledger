@@ -1,6 +1,12 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import {
+  Stack,
+  useGlobalSearchParams,
+  usePathname,
+  useRouter,
+  useSegments,
+} from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import {
   useFonts,
@@ -15,6 +21,11 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/src/hooks/useAuth';
 import { ToastProvider } from '@/src/hooks/useToast';
+import {
+  consumePendingInviteCode,
+  normalizeInviteCode,
+  stashPendingInviteCode,
+} from '@/src/lib/invite';
 import { colors } from '@/src/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -25,16 +36,45 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams<{ code?: string | string[] }>();
 
   React.useEffect(() => {
     if (loading) return;
     const inAuth = segments[0] === '(auth)';
+    const rawCode = Array.isArray(params.code) ? params.code[0] : params.code;
+    const inviteCode = normalizeInviteCode(rawCode);
+    const onJoinRoute = pathname.includes('/trip/join');
+
     if (!user && !inAuth) {
+      if (onJoinRoute && inviteCode) {
+        stashPendingInviteCode(inviteCode).catch(() => undefined);
+      }
       router.replace('/(auth)/login');
-    } else if (user && inAuth) {
-      router.replace('/(app)');
+      return;
     }
-  }, [user, loading, segments, router]);
+
+    if (user && inAuth) {
+      let cancelled = false;
+      (async () => {
+        const pending = await consumePendingInviteCode();
+        if (cancelled) return;
+        if (pending) {
+          router.replace({
+            pathname: '/(app)/trip/join',
+            params: { code: pending },
+          });
+          return;
+        }
+        router.replace('/(app)');
+      })().catch(() => {
+        if (!cancelled) router.replace('/(app)');
+      });
+      return () => {
+        cancelled = true;
+      };
+    }
+  }, [user, loading, segments, router, pathname, params.code]);
 
   if (loading) {
     return (
