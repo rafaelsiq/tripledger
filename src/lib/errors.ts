@@ -19,6 +19,7 @@ const FIREBASE_MESSAGES: Record<string, string> = {
   'unavailable': 'Serviço temporariamente indisponível.',
   'not-found': 'Registro não encontrado.',
   'already-exists': 'Este registro já existe.',
+  'invalid-argument': 'Dados incompletos ou inválidos. Tente novamente.',
   'storage/unauthorized': 'Sem permissão para enviar arquivos.',
   'storage/canceled': 'Upload cancelado.',
   'storage/unknown': 'Erro ao enviar arquivo.',

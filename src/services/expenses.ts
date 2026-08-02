@@ -13,6 +13,7 @@ import {
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/src/lib/firebase';
+import { omitUndefinedDeep } from '@/src/lib/firestore';
 import {
   amountsMatchTotal,
   applyPaidToInstallments,
@@ -176,26 +177,24 @@ export async function createExpense(input: {
         });
 
   const now = Date.now();
-  // Firestore rejects `undefined` fields — only persist defined optionals.
-  const expense = Object.fromEntries(
-    Object.entries({
-      id: refDoc.id,
-      tripId: input.tripId,
-      kind: input.kind,
-      title: input.title.trim(),
-      category: input.category,
-      amount: input.amount,
-      paidByUid: input.paidByUid,
-      splits,
-      installments: installments.length ? installments : undefined,
-      note: input.note?.trim() || undefined,
-      receiptUrl: input.receiptUrl,
-      dueDate: input.dueDate || undefined,
-      createdByUid: input.createdByUid,
-      createdAt: now,
-      updatedAt: now,
-    }).filter(([, v]) => v !== undefined)
-  ) as unknown as Expense;
+  // Firestore rejects `undefined` fields (including nested) — omit them.
+  const expense = omitUndefinedDeep({
+    id: refDoc.id,
+    tripId: input.tripId,
+    kind: input.kind,
+    title: input.title.trim(),
+    category: input.category,
+    amount: input.amount,
+    paidByUid: input.paidByUid,
+    splits,
+    installments: installments.length ? installments : undefined,
+    note: input.note?.trim() || undefined,
+    receiptUrl: input.receiptUrl,
+    dueDate: input.dueDate || undefined,
+    createdByUid: input.createdByUid,
+    createdAt: now,
+    updatedAt: now,
+  }) as unknown as Expense;
   await setDoc(refDoc, expense);
   return expense;
 }
@@ -230,21 +229,19 @@ export async function registerPayment(input: {
     proofUrl = await uploadTripFile(input.tripId, 'proofs', input.proofUri);
   }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'payments'));
-  const payment = Object.fromEntries(
-    Object.entries({
-      id: refDoc.id,
-      tripId: input.tripId,
-      expenseId: input.expenseId,
-      fromUid: input.fromUid,
-      toUid: input.toUid,
-      amount: input.amount,
-      installmentId,
-      proofUrl,
-      paidAt: Date.now(),
-      status: 'pending' as const,
-      note: input.note?.trim() || undefined,
-    }).filter(([, v]) => v !== undefined)
-  ) as unknown as Payment;
+  const payment = omitUndefinedDeep({
+    id: refDoc.id,
+    tripId: input.tripId,
+    expenseId: input.expenseId,
+    fromUid: input.fromUid,
+    toUid: input.toUid,
+    amount: input.amount,
+    installmentId,
+    proofUrl,
+    paidAt: Date.now(),
+    status: 'pending' as const,
+    note: input.note?.trim() || undefined,
+  }) as unknown as Payment;
   await setDoc(refDoc, payment);
   return payment;
 }
@@ -257,12 +254,12 @@ export async function confirmPayment(input: {
 }) {
   await setDoc(
     doc(db, 'trips', input.tripId, 'payments', input.payment.id),
-    {
+    omitUndefinedDeep({
       ...input.payment,
       status: 'confirmed',
       confirmedByUid: input.confirmedByUid,
       confirmedAt: Date.now(),
-    },
+    }),
     { merge: true }
   );
 
@@ -300,13 +297,11 @@ export async function confirmPayment(input: {
 
   await updateDoc(
     doc(db, 'trips', input.tripId, 'expenses', input.expense.id),
-    Object.fromEntries(
-      Object.entries({
-        splits,
-        installments,
-        updatedAt: Date.now(),
-      }).filter(([, v]) => v !== undefined)
-    )
+    omitUndefinedDeep({
+      splits,
+      installments,
+      updatedAt: Date.now(),
+    })
   );
 }
 
@@ -377,11 +372,14 @@ export async function markSettlementSettled(
   if (proofUri) {
     proofUrl = await uploadTripFile(tripId, 'settlements', proofUri);
   }
-  await updateDoc(doc(db, 'trips', tripId, 'settlements', settlementId), {
-    status: 'settled',
-    settledAt: Date.now(),
-    proofUrl,
-  });
+  await updateDoc(
+    doc(db, 'trips', tripId, 'settlements', settlementId),
+    omitUndefinedDeep({
+      status: 'settled',
+      settledAt: Date.now(),
+      proofUrl,
+    })
+  );
 }
 
 function buildSplitsForExpense(input: {
@@ -533,10 +531,7 @@ export async function updateExpense(input: {
       const next = { ...payment };
       if (fallback) next.installmentId = fallback;
       else delete next.installmentId;
-      await setDoc(
-        paymentDoc.ref,
-        Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
-      );
+      await setDoc(paymentDoc.ref, omitUndefinedDeep(next));
     })
   );
 
@@ -546,21 +541,19 @@ export async function updateExpense(input: {
       ? input.receiptUrl
       : input.existing.receiptUrl;
 
-  const payload = Object.fromEntries(
-    Object.entries({
-      kind: input.kind,
-      title: input.title.trim(),
-      category: input.category,
-      amount: input.amount,
-      paidByUid: input.paidByUid,
-      splits,
-      installments: installments.length ? installments : null,
-      note: input.note?.trim() || null,
-      receiptUrl: receiptUrl || null,
-      dueDate: input.dueDate || null,
-      updatedAt: Date.now(),
-    }).filter(([, v]) => v !== undefined)
-  );
+  const payload = omitUndefinedDeep({
+    kind: input.kind,
+    title: input.title.trim(),
+    category: input.category,
+    amount: input.amount,
+    paidByUid: input.paidByUid,
+    splits,
+    installments: installments.length ? installments : null,
+    note: input.note?.trim() || null,
+    receiptUrl: receiptUrl || null,
+    dueDate: input.dueDate || null,
+    updatedAt: Date.now(),
+  });
 
   await setDoc(doc(db, 'trips', input.tripId, 'expenses', input.expenseId), payload, {
     merge: true,

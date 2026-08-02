@@ -54,15 +54,18 @@ export function buildInstallments(input: {
 }): ExpenseInstallment[] {
   const count = Math.max(1, Math.floor(input.count) || 1);
   const parts = distributeCents(Math.round(input.total * 100), count);
-  return parts.map((cents, index) => ({
-    id: `${input.idPrefix}_${index + 1}`,
-    uid: input.uid,
-    index: index + 1,
-    amount: cents / 100,
-    paidAmount: 0,
-    status: 'pending' as const,
-    dueDate: input.dueDates?.[index],
-  }));
+  return parts.map((cents, index) => {
+    const dueDate = input.dueDates?.[index];
+    return {
+      id: `${input.idPrefix}_${index + 1}`,
+      uid: input.uid,
+      index: index + 1,
+      amount: cents / 100,
+      paidAmount: 0,
+      status: 'pending' as const,
+      ...(dueDate ? { dueDate } : {}),
+    };
+  });
 }
 
 export function sumAmounts(values: number[]): number {

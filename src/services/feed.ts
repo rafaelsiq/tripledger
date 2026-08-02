@@ -12,6 +12,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
+import { omitUndefinedDeep } from '@/src/lib/firestore';
 import { uploadTripFile } from '@/src/services/expenses';
 import type { FeedComment, FeedPost } from '@/src/types';
 
@@ -51,18 +52,18 @@ export async function createFeedPost(input: {
   const contentType = input.mediaType === 'video' ? 'video/mp4' : 'image/jpeg';
   const mediaUrl = await uploadTripFile(input.tripId, 'feed', input.mediaUri, contentType);
   const refDoc = doc(collection(db, 'trips', input.tripId, 'feedPosts'));
-  const post: FeedPost = {
+  const post = omitUndefinedDeep({
     id: refDoc.id,
     tripId: input.tripId,
     authorUid: input.authorUid,
     authorName: input.authorName,
-    caption: input.caption,
+    caption: input.caption?.trim() || undefined,
     mediaUrl,
     mediaType: input.mediaType,
     dayId: input.dayId,
     likes: [],
     createdAt: Date.now(),
-  };
+  }) as FeedPost;
   await setDoc(refDoc, post);
   return post;
 }

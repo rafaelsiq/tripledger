@@ -9,6 +9,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
+import { omitUndefinedDeep } from '@/src/lib/firestore';
 import { uploadTripFile } from '@/src/services/expenses';
 import type { ItineraryDay, ItineraryItem, ItineraryVoteValue } from '@/src/types';
 
@@ -41,13 +42,6 @@ function optionalText(value?: string): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
-/** Firestore rejects `undefined` field values — omit them from the payload. */
-function omitUndefined<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(
-    Object.entries(value).filter(([, v]) => v !== undefined)
-  ) as T;
-}
-
 export async function createItineraryItem(input: {
   tripId: string;
   dayId: string;
@@ -65,7 +59,7 @@ export async function createItineraryItem(input: {
     imageUrl = await uploadTripFile(input.tripId, 'itinerary', input.imageUri);
   }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items'));
-  const item = omitUndefined({
+  const item = omitUndefinedDeep({
     id: refDoc.id,
     dayId: input.dayId,
     title: input.title.trim(),

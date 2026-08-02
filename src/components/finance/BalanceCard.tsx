@@ -29,7 +29,7 @@ export function BalanceCard({ status, netOwed, pendingFromMe }: Props) {
           ? 'Nenhum valor em aberto nesta viagem.'
           : pendingFromMe > 0
             ? `${formatCurrency(pendingFromMe)} aguardando consolidação.`
-            : 'Registre um pagamento com comprovante para quitar.'}
+            : 'Registre um pagamento para quitar (comprovante opcional).'}
       </Text>
     </Card>
   );

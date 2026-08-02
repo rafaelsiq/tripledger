@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
@@ -77,22 +77,42 @@ export default function FinanceReportScreen() {
     }
   }
 
-  async function onSettle(settlement: Settlement) {
+  async function settle(settlement: Settlement, proofUri?: string) {
+    try {
+      await markSettlementSettled(trip!.id, settlement.id, proofUri);
+      showSuccess('Acerto quitado', proofUri ? 'Com comprovante.' : 'Sem comprovante.');
+    } catch (e) {
+      showError(e, 'Falha ao quitar acerto');
+    }
+  }
+
+  function onSettle(settlement: Settlement) {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
-    try {
-      const pick = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      const proofUri = pick.canceled ? undefined : pick.assets[0]?.uri;
-      await markSettlementSettled(trip!.id, settlement.id, proofUri);
-      showSuccess('Acerto quitado');
-    } catch (e) {
-      showError(e, 'Falha ao quitar acerto');
-    }
+    Alert.alert('Quitar acerto', 'Comprovante é opcional.', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Sem comprovante',
+        onPress: () => settle(settlement),
+      },
+      {
+        text: 'Anexar comprovante',
+        onPress: async () => {
+          const pick = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+          });
+          if (pick.canceled) {
+            // User aborted the picker — still allow settling without proof.
+            await settle(settlement);
+            return;
+          }
+          await settle(settlement, pick.assets[0]?.uri);
+        },
+      },
+    ]);
   }
 
   return (
