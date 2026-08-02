@@ -36,6 +36,18 @@ export function subscribeDayItems(
   });
 }
 
+function optionalText(value?: string): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
+}
+
+/** Firestore rejects `undefined` field values — omit them from the payload. */
+function omitUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v !== undefined)
+  ) as T;
+}
+
 export async function createItineraryItem(input: {
   tripId: string;
   dayId: string;
@@ -53,21 +65,21 @@ export async function createItineraryItem(input: {
     imageUrl = await uploadTripFile(input.tripId, 'itinerary', input.imageUri);
   }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items'));
-  const item: ItineraryItem = {
+  const item = omitUndefined({
     id: refDoc.id,
     dayId: input.dayId,
     title: input.title.trim(),
-    description: input.description,
+    description: optionalText(input.description),
     imageUrl,
-    time: input.time,
-    location: input.location,
-    mapUrl: input.mapUrl,
+    time: optionalText(input.time),
+    location: optionalText(input.location),
+    mapUrl: optionalText(input.mapUrl),
     order: input.order,
     done: false,
     attendees: [],
     createdByUid: input.createdByUid,
     createdAt: Date.now(),
-  };
+  }) as ItineraryItem;
   await setDoc(refDoc, item);
   return item;
 }
