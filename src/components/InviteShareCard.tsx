@@ -49,17 +49,34 @@ export function InviteShareCard({ tripName, inviteCode, isAdmin = false }: Props
   }
 
   async function shareInvite() {
+    const message = buildInviteShareMessage(tripName, code);
     try {
       setBusy('share');
-      await Share.share({
-        message: buildInviteShareMessage(tripName, code),
+      const canNativeShare =
+        typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+      if (canNativeShare) {
+        await navigator.share({
+          title: `Convite — ${tripName}`,
+          text: message,
+          url: inviteUrl,
+        });
+        return;
+      }
+      const result = await Share.share({
+        message,
         url: inviteUrl,
         title: `Convite — ${tripName}`,
       });
+      if (result.action === Share.dismissedAction) return;
     } catch (e) {
-      // User dismissing the sheet is not an error on some platforms.
-      const message = e instanceof Error ? e.message : '';
-      if (!/cancel|dismiss/i.test(message)) {
+      const errMessage = e instanceof Error ? e.message : '';
+      if (/cancel|dismiss|AbortError/i.test(errMessage) || (e as { name?: string })?.name === 'AbortError') {
+        return;
+      }
+      try {
+        await Clipboard.setStringAsync(message);
+        showSuccess('Convite copiado', 'Cole no WhatsApp, e-mail ou onde preferir');
+      } catch {
         showError(e, 'Não foi possível compartilhar');
       }
     } finally {
