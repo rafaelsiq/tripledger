@@ -18,6 +18,7 @@ import {
   Fraunces_600SemiBold,
   Fraunces_700Bold,
 } from '@expo-google-fonts/fraunces';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider, useAuth } from '@/src/hooks/useAuth';
 import { ToastProvider } from '@/src/hooks/useToast';
@@ -94,11 +95,13 @@ export default function RootLayout() {
     Manrope_700Bold,
     Fraunces_600SemiBold,
     Fraunces_700Bold,
+    ...Ionicons.font,
   });
   const [fontsTimedOut, setFontsTimedOut] = React.useState(false);
 
   React.useEffect(() => {
-    const timer = setTimeout(() => setFontsTimedOut(true), 2500);
+    // Keep UI usable if a remote font stalls, but prefer waiting for icon fonts.
+    const timer = setTimeout(() => setFontsTimedOut(true), 4000);
     return () => clearTimeout(timer);
   }, []);
 
