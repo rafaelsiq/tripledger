@@ -10,8 +10,10 @@ import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import {
   amountsMatchTotal,
+  clampInstallmentCount,
   distributeCents,
   equalSplits,
+  MAX_INSTALLMENT_COUNT,
   sumAmounts,
 } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
@@ -29,16 +31,41 @@ const KINDS: { id: ExpenseKind; label: string }[] = [
 ];
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as ExpenseCategory[];
-const INSTALLMENT_PRESETS = [1, 2, 3, 4, 6];
+/** Quick shortcuts only — any count from 1 to MAX is allowed via the number field. */
+const INSTALLMENT_PRESETS = [1, 2, 3, 6, 12];
 
 type SplitDraft = {
   amount: string;
   installmentCount: number;
+  /** Free-text while typing so the field can be cleared mid-edit. */
+  installmentText?: string;
 };
 
 function parseMoney(value: string) {
   const n = Number(String(value).replace(',', '.'));
   return Number.isFinite(n) ? n : 0;
+}
+
+function digitsOnly(value: string) {
+  return String(value).replace(/[^\d]/g, '');
+}
+
+function parseInstallmentCount(value: string, fallback = 1) {
+  const digits = digitsOnly(value);
+  if (!digits) return fallback;
+  return clampInstallmentCount(Number(digits), fallback);
+}
+
+function installmentPreview(total: number, count: number) {
+  const safeCount = clampInstallmentCount(count, 1);
+  const parts = distributeCents(Math.round(total * 100), safeCount);
+  if (safeCount === 1) return `1 parcela de ${formatCurrency(total)}`;
+  const first = (parts[0] || 0) / 100;
+  const last = (parts[parts.length - 1] || 0) / 100;
+  if (Math.abs(first - last) < 0.001) {
+    return `${safeCount} parcelas de ${formatCurrency(first)}`;
+  }
+  return `${safeCount} parcelas · ${formatCurrency(first)} cada (última ${formatCurrency(last)})`;
 }
 
 function buildEqualDrafts(
@@ -134,6 +161,9 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
   const [defaultInstallments, setDefaultInstallments] = useState(
     mode === 'edit' ? seeded.defaultInstallments : 1
   );
+  const [defaultInstallmentsText, setDefaultInstallmentsText] = useState(
+    String(mode === 'edit' ? seeded.defaultInstallments : 1)
+  );
   const [receiptUri, setReceiptUri] = useState<string | undefined>();
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | undefined>(
     initialExpense?.receiptUrl
@@ -155,6 +185,7 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
     setSelected(next.selected);
     setSplitDrafts(next.drafts);
     setDefaultInstallments(next.defaultInstallments);
+    setDefaultInstallmentsText(String(next.defaultInstallments));
     setExistingReceiptUrl(initialExpense.receiptUrl);
     setReady(true);
   }, [mode, initialExpense, ready]);
@@ -218,33 +249,72 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
     }));
   }
 
-  function setMemberInstallments(uid: string, count: number) {
+  function setMemberInstallments(uid: string, count: number, text?: string) {
     if (uid === paidByUid) return;
+    const nextCount = clampInstallmentCount(count, defaultInstallments);
     setSplitDrafts((prev) => ({
       ...prev,
       [uid]: {
         amount: prev[uid]?.amount || '0',
-        installmentCount: count,
+        installmentCount: nextCount,
+        installmentText: text ?? String(nextCount),
       },
     }));
   }
 
-  function applyDefaultInstallments(count: number) {
-    setDefaultInstallments(count);
+  function onMemberInstallmentText(uid: string, value: string) {
+    const digits = digitsOnly(value);
+    setSplitDrafts((prev) => {
+      const current = prev[uid];
+      if (!current) return prev;
+      if (!digits) {
+        return {
+          ...prev,
+          [uid]: { ...current, installmentText: '' },
+        };
+      }
+      const nextCount = clampInstallmentCount(Number(digits), current.installmentCount);
+      return {
+        ...prev,
+        [uid]: {
+          ...current,
+          installmentCount: nextCount,
+          installmentText: digits,
+        },
+      };
+    });
+  }
+
+  function applyDefaultInstallments(count: number, text?: string) {
+    const nextCount = clampInstallmentCount(count, 1);
+    setDefaultInstallments(nextCount);
+    setDefaultInstallmentsText(text ?? String(nextCount));
     setSplitDrafts((prev) => {
       const next = { ...prev };
       for (const uid of selected) {
         if (uid === paidByUid) {
-          next[uid] = { amount: next[uid]?.amount || '0', installmentCount: 1 };
+          next[uid] = {
+            amount: next[uid]?.amount || '0',
+            installmentCount: 1,
+            installmentText: '1',
+          };
         } else {
           next[uid] = {
             amount: next[uid]?.amount || '0',
-            installmentCount: count,
+            installmentCount: nextCount,
+            installmentText: text ?? String(nextCount),
           };
         }
       }
       return next;
     });
+  }
+
+  function onDefaultInstallmentText(value: string) {
+    const digits = digitsOnly(value);
+    setDefaultInstallmentsText(digits);
+    if (!digits) return;
+    applyDefaultInstallments(Number(digits), digits);
   }
 
   async function pickReceipt() {
@@ -507,8 +577,16 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
           <View style={styles.section}>
             <Label>Parcelas de quem te deve</Label>
             <Body muted>
-              Sugestão inicial igual para todos; você pode mudar por pessoa.
+              Defina quantas parcelas quiser (1 a {MAX_INSTALLMENT_COUNT}). A sugestão
+              vale para todos; você pode ajustar por pessoa.
             </Body>
+            <Input
+              label="Parcelas (padrão do grupo)"
+              keyboardType="number-pad"
+              value={defaultInstallmentsText}
+              onChangeText={onDefaultInstallmentText}
+              placeholder={`1 a ${MAX_INSTALLMENT_COUNT}`}
+            />
             <View style={styles.chips}>
               {INSTALLMENT_PRESETS.map((count) => (
                 <Pressable
@@ -533,12 +611,19 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
               const draft = splitDrafts[uid];
               const partAmount = parseMoney(draft?.amount || '0');
               const count = draft?.installmentCount || defaultInstallments;
-              const parts = distributeCents(Math.round(partAmount * 100), count);
+              const countText = draft?.installmentText ?? String(count);
               return (
                 <View key={uid} style={styles.debtorBlock}>
                   <Text style={styles.debtorName}>
                     {member ? memberLabel(member) : uid}
                   </Text>
+                  <Input
+                    label="Parcelas"
+                    keyboardType="number-pad"
+                    value={countText}
+                    onChangeText={(value) => onMemberInstallmentText(uid, value)}
+                    placeholder={`1 a ${MAX_INSTALLMENT_COUNT}`}
+                  />
                   <View style={styles.chips}>
                     {INSTALLMENT_PRESETS.map((preset) => (
                       <Pressable
@@ -554,13 +639,7 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
                       </Pressable>
                     ))}
                   </View>
-                  <Body muted>
-                    {count === 1
-                      ? `1 parcela de ${formatCurrency(partAmount)}`
-                      : parts
-                          .map((cents, index) => `${index + 1}ª: ${formatCurrency(cents / 100)}`)
-                          .join(' · ')}
-                  </Body>
+                  <Body muted>{installmentPreview(partAmount, count)}</Body>
                 </View>
               );
             })}

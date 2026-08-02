@@ -16,6 +16,7 @@ import {
   amountsMatchTotal,
   applyPaidToInstallments,
   buildInstallments,
+  clampInstallmentCount,
   equalSplits,
   nextOpenInstallment,
   splitStatus,
@@ -83,11 +84,6 @@ export function subscribeSettlements(
   return onSnapshot(collection(db, 'trips', tripId, 'settlements'), (snap) => {
     cb(snap.docs.map((d) => d.data() as Settlement));
   });
-}
-
-function clampInstallmentCount(value?: number, fallback = 1) {
-  const n = Math.round(value ?? fallback);
-  return Math.max(1, Math.min(24, Number.isFinite(n) ? n : fallback));
 }
 
 function applyPaymentToInstallment(

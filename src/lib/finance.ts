@@ -15,6 +15,14 @@ export function generateInviteCode(length = 6) {
   return code;
 }
 
+/** Upper bound for repayment installment schedules. */
+export const MAX_INSTALLMENT_COUNT = 48;
+
+export function clampInstallmentCount(value?: number, fallback = 1) {
+  const n = Math.round(value ?? fallback);
+  return Math.max(1, Math.min(MAX_INSTALLMENT_COUNT, Number.isFinite(n) ? n : fallback));
+}
+
 /** Split total cents as evenly as possible across n parts. */
 export function distributeCents(totalCents: number, parts: number): number[] {
   if (parts <= 0) return [];
@@ -52,7 +60,7 @@ export function buildInstallments(input: {
   idPrefix: string;
   dueDates?: (string | undefined)[];
 }): ExpenseInstallment[] {
-  const count = Math.max(1, Math.floor(input.count) || 1);
+  const count = clampInstallmentCount(input.count, 1);
   const parts = distributeCents(Math.round(input.total * 100), count);
   return parts.map((cents, index) => {
     const dueDate = input.dueDates?.[index];
