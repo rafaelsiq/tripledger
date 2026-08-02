@@ -3,6 +3,7 @@ import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-nat
 import { useRouter } from 'expo-router';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
+import { formatDateLabel } from '@/src/lib/dates';
 import { logout } from '@/src/services/auth';
 import { subscribeUserTrips } from '@/src/services/trips';
 import type { Trip } from '@/src/types';
@@ -48,7 +49,7 @@ function TripRow({
           </View>
           {item.destination ? <Text style={styles.dest}>{item.destination}</Text> : null}
           <Text style={styles.dates}>
-            {item.startDate} → {item.endDate}
+            {formatDateLabel(item.startDate)} → {formatDateLabel(item.endDate)}
           </Text>
         </Card>
       </Pressable>
