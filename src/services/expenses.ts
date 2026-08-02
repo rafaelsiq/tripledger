@@ -2,17 +2,20 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   orderBy,
   query,
   setDoc,
   updateDoc,
+  where,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/src/lib/firebase';
 import {
   amountsMatchTotal,
+  applyPaidToInstallments,
   buildInstallments,
   equalSplits,
   nextOpenInstallment,
@@ -24,6 +27,7 @@ import type {
   ExpenseCategory,
   ExpenseInstallment,
   ExpenseKind,
+  ExpenseSplit,
   Payment,
   Settlement,
 } from '@/src/types';
@@ -380,6 +384,208 @@ export async function markSettlementSettled(
   });
 }
 
+function buildSplitsForExpense(input: {
+  kind: ExpenseKind;
+  amount: number;
+  paidByUid: string;
+  memberIds: string[];
+  customSplits?: { uid: string; amount: number; installmentCount?: number }[];
+  defaultInstallmentCount: number;
+  previousPaid?: Record<string, number>;
+}): ExpenseSplit[] {
+  const defaultCount = input.defaultInstallmentCount;
+  const previousPaid = input.previousPaid || {};
+
+  const splits = input.customSplits
+    ? input.customSplits.map((s) => {
+        const amount = Math.round(s.amount * 100) / 100;
+        const installmentCount =
+          s.uid === input.paidByUid
+            ? 1
+            : clampInstallmentCount(s.installmentCount, defaultCount);
+        const preserved =
+          s.uid === input.paidByUid
+            ? amount
+            : Math.min(amount, Math.max(0, previousPaid[s.uid] || 0));
+        return {
+          uid: s.uid,
+          amount,
+          paidAmount: preserved,
+          status: splitStatus(preserved, amount),
+          installmentCount,
+        };
+      })
+    : equalSplits(input.memberIds, input.amount).map((s) => {
+        const preserved =
+          s.uid === input.paidByUid
+            ? s.amount
+            : Math.min(s.amount, Math.max(0, previousPaid[s.uid] || 0));
+        return {
+          ...s,
+          paidAmount: preserved,
+          status: splitStatus(preserved, s.amount),
+          installmentCount: s.uid === input.paidByUid ? 1 : defaultCount,
+        };
+      });
+
+  if (input.kind === 'income') {
+    splits.forEach((s) => {
+      s.paidAmount = s.amount;
+      s.status = 'paid';
+      s.installmentCount = 1;
+    });
+  }
+
+  return splits;
+}
+
+function buildInstallmentsForExpense(input: {
+  expenseId: string;
+  kind: ExpenseKind;
+  paidByUid: string;
+  splits: ExpenseSplit[];
+  defaultInstallmentCount: number;
+}): ExpenseInstallment[] {
+  if (input.kind === 'income') return [];
+  return input.splits.flatMap((s) => {
+    if (s.uid === input.paidByUid || s.amount <= 0) return [];
+    return buildInstallments({
+      uid: s.uid,
+      total: s.amount,
+      count: s.installmentCount ?? input.defaultInstallmentCount,
+      idPrefix: `${input.expenseId}_${s.uid}`,
+    });
+  });
+}
+
+export async function updateExpense(input: {
+  tripId: string;
+  expenseId: string;
+  existing: Expense;
+  kind: ExpenseKind;
+  title: string;
+  category: ExpenseCategory;
+  amount: number;
+  paidByUid: string;
+  memberIds: string[];
+  customSplits?: { uid: string; amount: number; installmentCount?: number }[];
+  defaultInstallmentCount?: number;
+  note?: string;
+  receiptUrl?: string;
+  clearReceipt?: boolean;
+  dueDate?: string;
+}) {
+  const defaultCount = clampInstallmentCount(input.defaultInstallmentCount, 1);
+
+  if (input.customSplits?.length) {
+    if (!amountsMatchTotal(input.customSplits.map((s) => s.amount), input.amount)) {
+      throw new Error('A soma das partes deve ser igual ao valor total.');
+    }
+  }
+
+  const previousPaid = Object.fromEntries(
+    input.existing.splits.map((s) => [s.uid, s.paidAmount])
+  );
+
+  const splits = buildSplitsForExpense({
+    kind: input.kind,
+    amount: input.amount,
+    paidByUid: input.paidByUid,
+    memberIds: input.memberIds,
+    customSplits: input.customSplits,
+    defaultInstallmentCount: defaultCount,
+    previousPaid,
+  });
+
+  let installments = buildInstallmentsForExpense({
+    expenseId: input.expenseId,
+    kind: input.kind,
+    paidByUid: input.paidByUid,
+    splits,
+    defaultInstallmentCount: defaultCount,
+  });
+
+  if (installments.length) {
+    const paidForInstallments = Object.fromEntries(
+      splits
+        .filter((s) => s.uid !== input.paidByUid)
+        .map((s) => [s.uid, s.paidAmount])
+    );
+    installments = applyPaidToInstallments(installments, paidForInstallments);
+  }
+
+  const validInstallmentIds = new Set(installments.map((i) => i.id));
+  const paymentsSnap = await getDocs(
+    query(
+      collection(db, 'trips', input.tripId, 'payments'),
+      where('expenseId', '==', input.expenseId)
+    )
+  );
+
+  await Promise.all(
+    paymentsSnap.docs.map(async (paymentDoc) => {
+      const payment = paymentDoc.data() as Payment;
+      if (payment.status !== 'pending') return;
+      const stillValid =
+        !!payment.installmentId && validInstallmentIds.has(payment.installmentId);
+      if (stillValid) return;
+      const fallback = nextOpenInstallment(installments, payment.fromUid)?.id;
+      const next = { ...payment };
+      if (fallback) next.installmentId = fallback;
+      else delete next.installmentId;
+      await setDoc(
+        paymentDoc.ref,
+        Object.fromEntries(Object.entries(next).filter(([, v]) => v !== undefined))
+      );
+    })
+  );
+
+  const receiptUrl = input.clearReceipt
+    ? undefined
+    : input.receiptUrl !== undefined
+      ? input.receiptUrl
+      : input.existing.receiptUrl;
+
+  const payload = Object.fromEntries(
+    Object.entries({
+      kind: input.kind,
+      title: input.title.trim(),
+      category: input.category,
+      amount: input.amount,
+      paidByUid: input.paidByUid,
+      splits,
+      installments: installments.length ? installments : null,
+      note: input.note?.trim() || null,
+      receiptUrl: receiptUrl || null,
+      dueDate: input.dueDate || null,
+      updatedAt: Date.now(),
+    }).filter(([, v]) => v !== undefined)
+  );
+
+  await setDoc(doc(db, 'trips', input.tripId, 'expenses', input.expenseId), payload, {
+    merge: true,
+  });
+}
+
 export async function deleteExpense(tripId: string, expenseId: string) {
-  await deleteDoc(doc(db, 'trips', tripId, 'expenses', expenseId));
+  const paymentsSnap = await getDocs(
+    query(
+      collection(db, 'trips', tripId, 'payments'),
+      where('expenseId', '==', expenseId)
+    )
+  );
+  const paymentIds = new Set(paymentsSnap.docs.map((d) => d.id));
+
+  const consolidationSnap = await getDocs(
+    collection(db, 'trips', tripId, 'consolidationRequests')
+  );
+  const relatedConsolidation = consolidationSnap.docs.filter((d) =>
+    paymentIds.has((d.data() as ConsolidationRequest).paymentId)
+  );
+
+  await Promise.all([
+    ...paymentsSnap.docs.map((d) => deleteDoc(d.ref)),
+    ...relatedConsolidation.map((d) => deleteDoc(d.ref)),
+    deleteDoc(doc(db, 'trips', tripId, 'expenses', expenseId)),
+  ]);
 }

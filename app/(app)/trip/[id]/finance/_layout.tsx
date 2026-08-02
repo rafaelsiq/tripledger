@@ -14,6 +14,10 @@ export default function FinanceLayout() {
     >
       <Stack.Screen name="index" options={{ title: 'Finanças' }} />
       <Stack.Screen name="new" options={{ title: 'Novo lançamento', presentation: 'modal' }} />
+      <Stack.Screen
+        name="edit/[expenseId]"
+        options={{ title: 'Editar lançamento', presentation: 'modal' }}
+      />
       <Stack.Screen name="expense/[expenseId]" options={{ title: 'Despesa' }} />
       <Stack.Screen name="report" options={{ title: 'Relatório final' }} />
     </Stack>

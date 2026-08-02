@@ -83,6 +83,27 @@ export function nextOpenInstallment(
     .sort((a, b) => a.index - b.index)[0];
 }
 
+/** Apply a paid total onto a fresh installment schedule, in index order. */
+export function applyPaidToInstallments(
+  installments: ExpenseInstallment[],
+  paidByUid: Record<string, number>
+): ExpenseInstallment[] {
+  const remainingPaid: Record<string, number> = { ...paidByUid };
+  return installments
+    .slice()
+    .sort((a, b) => a.uid.localeCompare(b.uid) || a.index - b.index)
+    .map((item) => {
+      const available = Math.max(0, remainingPaid[item.uid] || 0);
+      const applied = Math.min(item.amount, available);
+      remainingPaid[item.uid] = Math.round((available - applied) * 100) / 100;
+      return {
+        ...item,
+        paidAmount: applied,
+        status: splitStatus(applied, item.amount),
+      };
+    });
+}
+
 export function memberBalance(uid: string, expenses: Expense[], payments: Payment[]) {
   let owed = 0;
   let paid = 0;

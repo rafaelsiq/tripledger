@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import {
@@ -21,6 +21,7 @@ import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   confirmPayment,
+  deleteExpense,
   registerPayment,
   rejectPayment,
   requestConsolidation,
@@ -43,6 +44,7 @@ function remainingOf(item?: ExpenseInstallment | null) {
 
 export default function ExpenseDetailScreen() {
   const { expenseId } = useLocalSearchParams<{ expenseId: string }>();
+  const router = useRouter();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
@@ -52,6 +54,7 @@ export default function ExpenseDetailScreen() {
   const [proxyInstallmentId, setProxyInstallmentId] = useState<string>('');
   const [proofUri, setProofUri] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
 
   const expense = expenses.find((e) => e.id === expenseId);
@@ -266,6 +269,44 @@ export default function ExpenseDetailScreen() {
     }
   }
 
+  function onEdit() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    router.push(`/(app)/trip/${currentTrip.id}/finance/edit/${currentExpense.id}`);
+  }
+
+  function onDelete() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    Alert.alert(
+      'Excluir lançamento',
+      'Isso remove o lançamento e os pagamentos ligados a ele. Essa ação não pode ser desfeita.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Excluir',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              await deleteExpense(currentTrip.id, currentExpense.id);
+              showSuccess('Lançamento excluído');
+              router.back();
+            } catch (e) {
+              showError(e, 'Falha ao excluir');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  }
+
   const pendingForMe = expensePayments.filter(
     (p) => p.status === 'pending' && (p.toUid === currentUser.uid || isFinanceLead)
   );
@@ -333,6 +374,22 @@ export default function ExpenseDetailScreen() {
             {CATEGORY_LABELS[expense.category]} · pago por {nameOf(expense.paidByUid)}
           </Body>
         </View>
+
+        {canMutate ? (
+          <View style={styles.manageRow}>
+            <View style={{ flex: 1 }}>
+              <Button title="Editar" variant="secondary" onPress={onEdit} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Button
+                title="Excluir"
+                variant="danger"
+                onPress={onDelete}
+                loading={deleting}
+              />
+            </View>
+          </View>
+        ) : null}
 
         <Card>
           <Text style={styles.amount}>{formatCurrency(expense.amount)}</Text>
@@ -545,6 +602,7 @@ export default function ExpenseDetailScreen() {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  manageRow: { flexDirection: 'row', gap: spacing.sm },
   amount: { fontSize: 28, fontWeight: '700', color: colors.finance, marginBottom: spacing.sm },
   splitBlock: {
     gap: 4,
