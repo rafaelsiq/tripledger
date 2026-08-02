@@ -160,28 +160,3 @@ export async function toggleRsvp(
     vote: 'yes',
   });
 }
-
-export async function addTemplateSlots(
-  tripId: string,
-  dayId: string,
-  createdByUid: string,
-  startOrder: number
-) {
-  const templates = [
-    { title: 'Manhã', time: '09:00', description: 'Atividade da manhã' },
-    { title: 'Tarde', time: '14:00', description: 'Atividade da tarde' },
-    { title: 'Noite', time: '20:00', description: 'Atividade da noite' },
-  ];
-  for (let i = 0; i < templates.length; i += 1) {
-    const t = templates[i]!;
-    await createItineraryItem({
-      tripId,
-      dayId,
-      title: t.title,
-      description: t.description,
-      time: t.time,
-      order: startOrder + i,
-      createdByUid,
-    });
-  }
-}
