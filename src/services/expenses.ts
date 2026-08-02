@@ -129,7 +129,7 @@ export async function createExpense(input: {
       createdAt: now,
       updatedAt: now,
     }).filter(([, v]) => v !== undefined)
-  ) as Expense;
+  ) as unknown as Expense;
   await setDoc(refDoc, expense);
   return expense;
 }
@@ -161,7 +161,7 @@ export async function registerPayment(input: {
       status: 'pending' as const,
       note: input.note?.trim() || undefined,
     }).filter(([, v]) => v !== undefined)
-  ) as Payment;
+  ) as unknown as Payment;
   await setDoc(refDoc, payment);
   return payment;
 }
