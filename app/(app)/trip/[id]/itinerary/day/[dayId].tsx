@@ -9,12 +9,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useTrip } from '@/src/hooks/useTrip';
 import { useToast } from '@/src/hooks/useToast';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
-import {
-  addTemplateSlots,
-  subscribeDayItems,
-  toggleItemDone,
-  toggleRsvp,
-} from '@/src/services/itinerary';
+import { addTemplateSlots, subscribeDayItems } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
@@ -34,15 +29,6 @@ export default function DayDetailScreen() {
   if (!trip || !user) return null;
 
   const currentTrip = trip;
-  const currentUser = user;
-
-  function guardMutate(action: () => void) {
-    if (!canMutate) {
-      showError(closedTripMemberMessage(), 'Viagem concluída');
-      return;
-    }
-    action();
-  }
 
   async function onAddTemplate() {
     if (!canMutate) {
@@ -53,7 +39,7 @@ export default function DayDetailScreen() {
       await addTemplateSlots(
         currentTrip.id,
         String(dayId),
-        currentUser.uid,
+        user.uid,
         items.length
       );
       showSuccess('Template adicionado', 'Manhã, tarde e noite.');
@@ -129,16 +115,11 @@ export default function DayDetailScreen() {
         renderItem={({ item }) => (
           <ItineraryCard
             item={item}
-            attending={item.attendees.includes(currentUser.uid)}
-            onToggleDone={() =>
-              guardMutate(() =>
-                toggleItemDone(currentTrip.id, String(dayId), item.id, !item.done)
-              )
-            }
-            onToggleRsvp={() =>
-              guardMutate(() =>
-                toggleRsvp(currentTrip.id, String(dayId), item, currentUser.uid)
-              )
+            onPress={() =>
+              router.push({
+                pathname: `/(app)/trip/${currentTrip.id}/itinerary/item/[itemId]` as never,
+                params: { itemId: item.id, dayId: String(dayId) },
+              })
             }
           />
         )}

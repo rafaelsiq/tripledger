@@ -362,17 +362,34 @@ export async function linkDummyToRealMember(input: {
     await commitIfNeeded();
   }
 
-  // Remap itinerary RSVP attendees that still point at the dummy.
+  // Remap itinerary RSVP attendees / votes that still point at the dummy.
   const daysSnap = await getDocs(collection(db, 'trips', tripId, 'itineraryDays'));
   for (const dayDoc of daysSnap.docs) {
     const itemsSnap = await getDocs(collection(db, 'trips', tripId, 'itineraryDays', dayDoc.id, 'items'));
     for (const itemDoc of itemsSnap.docs) {
-      const attendees = (itemDoc.data().attendees || []) as string[];
-      if (!attendees.includes(dummyUid)) continue;
-      const next = Array.from(
+      const data = itemDoc.data() as {
+        attendees?: string[];
+        votes?: Record<string, string>;
+      };
+      const attendees = data.attendees || [];
+      const votes = data.votes || {};
+      const hasAttendee = attendees.includes(dummyUid);
+      const hasVote = Object.prototype.hasOwnProperty.call(votes, dummyUid);
+      if (!hasAttendee && !hasVote) continue;
+
+      const nextAttendees = Array.from(
         new Set(attendees.map((uid) => (uid === dummyUid ? realUid : uid)))
       );
-      batch.update(itemDoc.ref, { attendees: next });
+      const nextVotes = { ...votes };
+      if (hasVote) {
+        const dummyVote = nextVotes[dummyUid];
+        delete nextVotes[dummyUid];
+        // Prefer the real member's existing vote if both voted.
+        if (dummyVote && !nextVotes[realUid]) {
+          nextVotes[realUid] = dummyVote;
+        }
+      }
+      batch.update(itemDoc.ref, { attendees: nextAttendees, votes: nextVotes });
       ops += 1;
       await commitIfNeeded();
     }
