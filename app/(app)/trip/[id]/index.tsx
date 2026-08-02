@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
 import { BalanceCard } from '@/src/components/finance/BalanceCard';
+import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { memberBalance } from '@/src/lib/finance';
@@ -72,11 +73,11 @@ export default function TripSummaryScreen() {
           ) : null}
         </Card>
 
-        <Card>
-          <Label>Convite</Label>
-          <Text style={styles.code}>{trip.inviteCode}</Text>
-          <Body muted>Compartilhe este código para novos membros entrarem.</Body>
-        </Card>
+        <InviteShareCard
+          tripName={trip.name}
+          inviteCode={trip.inviteCode}
+          isAdmin={isAdmin}
+        />
 
         {isAdmin ? (
           <Card style={{ gap: spacing.sm }}>
@@ -100,11 +101,4 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', gap: spacing.md },
   statLabel: { color: colors.inkSoft, fontSize: 13, fontFamily: fonts.ui },
   statValue: { ...typography.number, fontSize: 22 },
-  code: {
-    fontSize: 30,
-    fontFamily: fonts.uiBold,
-    letterSpacing: 5,
-    color: colors.accent,
-    marginVertical: spacing.sm,
-  },
 });
