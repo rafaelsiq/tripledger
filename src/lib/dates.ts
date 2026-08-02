@@ -29,7 +29,7 @@ export function toDateValue(date: Date): string {
 export function formatDateLabel(value?: string | null, fallback = 'Selecionar data'): string {
   const date = parseDateValue(value);
   if (!date) return fallback;
-  return format(date, "d 'de' MMM yyyy", { locale: ptBR });
+  return format(date, "d 'de' MMMM 'de' yyyy", { locale: ptBR });
 }
 
 export function todayValue(): string {

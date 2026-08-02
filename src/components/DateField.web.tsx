@@ -226,11 +226,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.ink,
     fontFamily: fonts.ui,
-    textTransform: 'capitalize',
   },
   placeholder: {
     color: colors.inkMuted,
-    textTransform: 'none',
   },
   helper: {
     color: colors.inkMuted,
