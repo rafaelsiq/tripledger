@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteDoc,
   doc,
   onSnapshot,
   orderBy,
@@ -8,8 +9,36 @@ import {
 } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { omitUndefinedDeep, safeSetDoc, safeUpdateDoc } from '@/src/lib/firestore';
+import { closedTripMemberMessage, canMutateTrip } from '@/src/lib/tripPhase';
 import { uploadTripFile } from '@/src/services/expenses';
+import { getTrip } from '@/src/services/trips';
 import type { ItineraryDay, ItineraryItem, ItineraryVoteValue } from '@/src/types';
+
+/** Author can manage their own item; admin can manage any. */
+export function canManageItineraryItem(
+  item: Pick<ItineraryItem, 'createdByUid'>,
+  actor: { uid: string; isAdmin: boolean }
+) {
+  return actor.isAdmin || item.createdByUid === actor.uid;
+}
+
+async function assertCanManageItineraryItem(input: {
+  tripId: string;
+  item: ItineraryItem;
+  actorUid: string;
+}) {
+  const trip = await getTrip(input.tripId);
+  if (!trip) throw new Error('Viagem não encontrada.');
+  const isAdmin = trip.adminUid === input.actorUid;
+  const isFinanceLead = trip.financeLeadUid === input.actorUid;
+  if (!canMutateTrip(trip, { isAdmin, isFinanceLead })) {
+    throw new Error(closedTripMemberMessage());
+  }
+  if (!canManageItineraryItem(input.item, { uid: input.actorUid, isAdmin })) {
+    throw new Error('Apenas o autor ou o administrador podem alterar esta atividade.');
+  }
+  return trip;
+}
 
 export function subscribeItineraryDays(
   tripId: string,
@@ -159,4 +188,69 @@ export async function toggleRsvp(
     uid,
     vote: 'yes',
   });
+}
+
+export async function updateItineraryItem(input: {
+  tripId: string;
+  dayId: string;
+  item: ItineraryItem;
+  actorUid: string;
+  title: string;
+  description?: string;
+  time?: string;
+  location?: string;
+  mapUrl?: string;
+  imageUri?: string;
+  clearImage?: boolean;
+}) {
+  await assertCanManageItineraryItem({
+    tripId: input.tripId,
+    item: input.item,
+    actorUid: input.actorUid,
+  });
+
+  let imageUrl: string | null | undefined = input.item.imageUrl;
+  if (input.clearImage) {
+    imageUrl = null;
+  } else if (input.imageUri) {
+    imageUrl = await uploadTripFile(input.tripId, 'itinerary', input.imageUri);
+  }
+
+  // Use null for cleared optionals so merge updates remove old values.
+  await safeSetDoc(
+    doc(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items', input.item.id),
+    {
+      id: input.item.id,
+      dayId: input.dayId,
+      title: input.title.trim(),
+      description: optionalText(input.description) ?? null,
+      time: optionalText(input.time) ?? null,
+      location: optionalText(input.location) ?? null,
+      mapUrl: optionalText(input.mapUrl) ?? null,
+      imageUrl: imageUrl ?? null,
+      order: input.item.order,
+      done: input.item.done,
+      attendees: input.item.attendees || [],
+      votes: input.item.votes || {},
+      createdByUid: input.item.createdByUid,
+      createdAt: input.item.createdAt,
+    },
+    { merge: true }
+  );
+}
+
+export async function deleteItineraryItem(input: {
+  tripId: string;
+  dayId: string;
+  item: ItineraryItem;
+  actorUid: string;
+}) {
+  await assertCanManageItineraryItem({
+    tripId: input.tripId,
+    item: input.item,
+    actorUid: input.actorUid,
+  });
+  await deleteDoc(
+    doc(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items', input.item.id)
+  );
 }

@@ -19,6 +19,10 @@ export default function ItineraryLayout() {
         name="new-item"
         options={{ title: 'Nova atividade', presentation: 'modal' }}
       />
+      <Stack.Screen
+        name="edit-item"
+        options={{ title: 'Editar atividade', presentation: 'modal' }}
+      />
     </Stack>
   );
 }

@@ -9,16 +9,20 @@ import {
   View,
   type DimensionValue,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Body, Button, Card, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { memberLabel } from '@/src/lib/members';
+import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
+  canManageItineraryItem,
   countVotes,
+  deleteItineraryItem,
   setItemVote,
   subscribeDayItem,
   toggleItemDone,
@@ -39,11 +43,13 @@ const VOTE_OPTIONS: {
 
 export default function ItineraryItemDetailScreen() {
   const { itemId, dayId } = useLocalSearchParams<{ itemId: string; dayId?: string }>();
+  const router = useRouter();
   const { trip, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const [item, setItem] = useState<ItineraryItem | null>(null);
   const [voting, setVoting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const resolvedDayId = dayId || item?.dayId;
 
@@ -51,6 +57,15 @@ export default function ItineraryItemDetailScreen() {
     if (!trip || !resolvedDayId || !itemId) return;
     return subscribeDayItem(trip.id, String(resolvedDayId), String(itemId), setItem);
   }, [trip, resolvedDayId, itemId]);
+
+  const canManage = useMemo(
+    () =>
+      !!user &&
+      !!item &&
+      canMutate &&
+      canManageItineraryItem(item, { uid: user.uid, isAdmin }),
+    [user, item, canMutate, isAdmin]
+  );
 
   const counts = useMemo(() => (item ? countVotes(item) : null), [item]);
   const myVote = user && item ? item.votes?.[user.uid] : undefined;
@@ -139,8 +154,73 @@ export default function ItineraryItemDetailScreen() {
     }
   }
 
+  function onEdit() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    if (!canManage) {
+      showError('Apenas o autor ou o administrador podem editar.', 'Sem permissão');
+      return;
+    }
+    router.push({
+      pathname: `/(app)/trip/${currentTrip.id}/itinerary/edit-item` as never,
+      params: { dayId: currentDayId, itemId: currentItem.id },
+    });
+  }
+
+  async function onDelete() {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    if (!canManage) {
+      showError('Apenas o autor ou o administrador podem excluir.', 'Sem permissão');
+      return;
+    }
+    const confirmed = await confirmAction({
+      title: 'Excluir atividade',
+      message: `Remover "${currentItem.title}" do roteiro? Os votos desta atividade também serão apagados.`,
+      confirmText: 'Excluir',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      setDeleting(true);
+      await deleteItineraryItem({
+        tripId: currentTrip.id,
+        dayId: currentDayId,
+        item: currentItem,
+        actorUid: currentUser.uid,
+      });
+      showSuccess('Atividade excluída');
+      router.back();
+    } catch (e) {
+      showError(e, 'Falha ao excluir');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <Screen>
+      <Stack.Screen
+        options={{
+          title: 'Atividade',
+          headerRight: canManage
+            ? () => (
+                <Pressable
+                  onPress={onEdit}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+                >
+                  <Ionicons name="create-outline" size={18} color={colors.accent} />
+                  <Text style={styles.headerActionText}>Editar</Text>
+                </Pressable>
+              )
+            : undefined,
+        }}
+      />
       <ScrollView contentContainerStyle={styles.content}>
         <TripClosedBanner
           trip={currentTrip}
@@ -253,6 +333,18 @@ export default function ItineraryItemDetailScreen() {
             onPress={onToggleDone}
           />
         ) : null}
+
+        {canManage ? (
+          <View style={styles.deleteBlock}>
+            <Body muted>Remove a atividade e os votos ligados a ela.</Body>
+            <Button
+              title="Excluir atividade"
+              variant="danger"
+              onPress={onDelete}
+              loading={deleting}
+            />
+          </View>
+        ) : null}
       </ScrollView>
     </Screen>
   );
@@ -260,6 +352,25 @@ export default function ItineraryItemDetailScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
+  headerAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  headerActionText: {
+    color: colors.accent,
+    fontFamily: fonts.uiSemi,
+    fontSize: 14,
+  },
+  deleteBlock: {
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
   hero: {
     width: '100%',
     height: 220,
