@@ -18,7 +18,6 @@ export default function NewTripScreen() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState(todayValue);
   const [endDate, setEndDate] = useState(() => daysFromTodayValue(7));
-  const [budgetTotal, setBudgetTotal] = useState('5000');
   const [loading, setLoading] = useState(false);
 
   function onStartDateChange(next: string) {
@@ -53,7 +52,6 @@ export default function NewTripScreen() {
         description,
         startDate,
         endDate,
-        budgetTotal: Number(budgetTotal) || 0,
         admin: {
           uid: user.uid,
           displayName: profile.displayName,
@@ -74,7 +72,8 @@ export default function NewTripScreen() {
       <ScrollView contentContainerStyle={styles.form}>
         <Title>Nova viagem</Title>
         <Body muted>
-          Você será o administrador e responsável financeiro. Depois pode transferir o cargo.
+          Você será o administrador e responsável financeiro. O orçamento nasce das despesas
+          previstas que você lançar depois.
         </Body>
         <Input label="Nome" value={name} onChangeText={setName} placeholder="Réveillon Floripa" />
         <Input
@@ -101,12 +100,6 @@ export default function NewTripScreen() {
           onChange={setEndDate}
           minimumDate={startDate}
           helperText="Não pode ser antes do início"
-        />
-        <Input
-          label="Orçamento total (R$)"
-          keyboardType="decimal-pad"
-          value={budgetTotal}
-          onChangeText={setBudgetTotal}
         />
         <Button title="Criar viagem" onPress={onCreate} loading={loading} />
       </ScrollView>

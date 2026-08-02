@@ -5,7 +5,7 @@ import { BalanceCard } from '@/src/components/finance/BalanceCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
-import { memberBalance } from '@/src/lib/finance';
+import { expenseTotals, memberBalance } from '@/src/lib/finance';
 import { formatDateLabel } from '@/src/lib/dates';
 import { updateTripPhase } from '@/src/services/trips';
 import { PHASE_LABELS } from '@/src/types';
@@ -23,9 +23,7 @@ export default function TripSummaryScreen() {
     return memberBalance(user.uid, expenses, payments);
   }, [user, expenses, payments]);
 
-  const spent = expenses
-    .filter((e) => e.kind !== 'income')
-    .reduce((sum, e) => sum + e.amount, 0);
+  const totals = useMemo(() => expenseTotals(expenses), [expenses]);
 
   if (!trip || !balance) return null;
 
@@ -57,19 +55,20 @@ export default function TripSummaryScreen() {
         />
 
         <Card style={styles.stats}>
-          <Label>Orçamento</Label>
+          <Label>Contabilidade</Label>
+          <Body muted>Soma das despesas previstas e realizadas lançadas na viagem.</Body>
           <View style={styles.statRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.statLabel}>Planejado</Text>
-              <Text style={styles.statValue}>{formatCurrency(trip.budgetTotal)}</Text>
+              <Text style={styles.statLabel}>Previsto</Text>
+              <Text style={styles.statValue}>{formatCurrency(totals.planned)}</Text>
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.statLabel}>Lançado</Text>
-              <Text style={styles.statValue}>{formatCurrency(spent)}</Text>
+              <Text style={styles.statLabel}>Realizado</Text>
+              <Text style={styles.statValue}>{formatCurrency(totals.actual)}</Text>
             </View>
           </View>
-          {trip.budgetTotal > 0 && spent > trip.budgetTotal ? (
-            <Badge text="Atenção: orçamento estourado" tone="warn" />
+          {totals.planned > 0 && totals.actual > totals.planned ? (
+            <Badge text="Atenção: realizado acima do previsto" tone="warn" />
           ) : null}
         </Card>
 
