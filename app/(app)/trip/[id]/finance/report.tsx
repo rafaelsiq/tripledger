@@ -6,7 +6,7 @@ import { SettlementList } from '@/src/components/finance/SettlementList';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
-import { computeNetBalances, simplifyDebts } from '@/src/lib/finance';
+import { computeNetBalances, expenseTotals, simplifyDebts } from '@/src/lib/finance';
 import {
   markSettlementSettled,
   saveSettlements,
@@ -30,17 +30,17 @@ export default function FinanceReportScreen() {
   }, [trip]);
 
   const report = useMemo(() => {
-    const actual = expenses.filter((e) => e.kind !== 'income');
-    const planned = expenses.filter((e) => e.kind === 'planned');
+    const totals = expenseTotals(expenses);
+    const billable = expenses.filter((e) => e.kind !== 'income');
     const byCategory: Record<string, number> = {};
-    for (const e of actual) {
+    for (const e of billable) {
       byCategory[e.category] = (byCategory[e.category] || 0) + e.amount;
     }
-    const nets = computeNetBalances(actual);
+    const nets = computeNetBalances(billable);
     const suggested = simplifyDebts(nets);
     return {
-      totalActual: actual.reduce((s, e) => s + e.amount, 0),
-      totalPlanned: planned.reduce((s, e) => s + e.amount, 0),
+      totalActual: totals.actual,
+      totalPlanned: totals.planned,
       byCategory,
       nets,
       suggested,
@@ -89,17 +89,17 @@ export default function FinanceReportScreen() {
           <Label>Visão geral</Label>
           <Text style={styles.number}>{formatCurrency(report.totalActual)}</Text>
           <Body muted>
-            Previsto: {formatCurrency(report.totalPlanned)} · Orçamento:{' '}
-            {formatCurrency(trip.budgetTotal)}
+            Realizado na viagem · Previsto (planejamento):{' '}
+            {formatCurrency(report.totalPlanned)}
           </Body>
-          {trip.budgetTotal > 0 ? (
+          {report.totalPlanned > 0 ? (
             <Badge
               text={
-                report.totalActual > trip.budgetTotal
-                  ? 'Acima do orçamento'
-                  : 'Dentro do orçamento'
+                report.totalActual > report.totalPlanned
+                  ? 'Realizado acima do previsto'
+                  : 'Dentro do previsto'
               }
-              tone={report.totalActual > trip.budgetTotal ? 'warn' : 'success'}
+              tone={report.totalActual > report.totalPlanned ? 'warn' : 'success'}
             />
           ) : null}
         </Card>

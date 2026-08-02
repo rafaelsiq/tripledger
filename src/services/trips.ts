@@ -24,7 +24,6 @@ export async function createTrip(input: {
   description?: string;
   startDate: string;
   endDate: string;
-  budgetTotal?: number;
   admin: { uid: string; displayName: string; email: string };
 }) {
   const tripRef = doc(tripsCol());
@@ -42,7 +41,8 @@ export async function createTrip(input: {
     adminUid: input.admin.uid,
     financeLeadUid: input.admin.uid,
     inviteCode,
-    budgetTotal: input.budgetTotal || 0,
+    // Kept for backward compatibility; budget is derived from planned expenses.
+    budgetTotal: 0,
     categoryBudgets: {},
     currency: 'BRL',
     createdAt: now,

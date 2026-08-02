@@ -130,6 +130,18 @@ export function computeNetBalances(expenses: Expense[]): Record<string, number> 
   return balances;
 }
 
+export function expenseTotals(expenses: Expense[]) {
+  let planned = 0;
+  let actual = 0;
+  let income = 0;
+  for (const expense of expenses) {
+    if (expense.kind === 'planned') planned += expense.amount;
+    else if (expense.kind === 'actual') actual += expense.amount;
+    else if (expense.kind === 'income') income += expense.amount;
+  }
+  return { planned, actual, income };
+}
+
 export function datesBetween(start: string, end: string): string[] {
   const dates: string[] = [];
   const cursor = new Date(`${start}T12:00:00`);
