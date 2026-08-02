@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { formatDateLabel } from '@/src/lib/dates';
+import { normalizeTripPhase, phaseLabel } from '@/src/lib/tripPhase';
 import { logout } from '@/src/services/auth';
 import { subscribeUserTrips } from '@/src/services/trips';
 import type { Trip } from '@/src/types';
-import { PHASE_LABELS } from '@/src/types';
 import { colors, fonts, spacing } from '@/src/theme';
 
 function TripRow({
@@ -21,6 +22,7 @@ function TripRow({
 }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(10)).current;
+  const phase = normalizeTripPhase(item.phase);
 
   useEffect(() => {
     Animated.parallel([
@@ -45,7 +47,10 @@ function TripRow({
         <Card style={styles.tripCard}>
           <View style={styles.tripTop}>
             <Text style={styles.tripName}>{item.name}</Text>
-            <Badge text={PHASE_LABELS[item.phase]} tone="accent" />
+            <Badge
+              text={phaseLabel(phase)}
+              tone={phase === 'closed' ? 'neutral' : phase === 'in_progress' ? 'success' : 'accent'}
+            />
           </View>
           {item.destination ? <Text style={styles.dest}>{item.destination}</Text> : null}
           <Text style={styles.dates}>
@@ -67,6 +72,11 @@ export default function TripsHome() {
     return subscribeUserTrips(user.uid, setTrips);
   }, [user]);
 
+  const adminTrips = useMemo(
+    () => trips.filter((t) => user && t.adminUid === user.uid),
+    [trips, user]
+  );
+
   return (
     <Screen ambient style={{ paddingTop: spacing.sm }}>
       <View style={styles.header}>
@@ -87,6 +97,18 @@ export default function TripsHome() {
           onPress={() => router.push('/(app)/trip/join')}
         />
       </View>
+
+      {user
+        ? adminTrips.map((trip) => (
+            <TripPhasePromptBanner
+              key={`prompt-${trip.id}`}
+              trip={trip}
+              adminUid={trip.adminUid}
+              currentUid={user.uid}
+              compact
+            />
+          ))
+        : null}
 
       <FlatList
         data={trips}

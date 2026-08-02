@@ -3,6 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { EmptyState } from '@/src/components/ui';
 import { subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay } from '@/src/types';
@@ -10,7 +11,7 @@ import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
 export default function ItineraryHome() {
-  const { trip } = useTrip();
+  const { trip, isAdmin, isFinanceLead } = useTrip();
   const router = useRouter();
   const [days, setDays] = useState<ItineraryDay[]>([]);
 
@@ -25,6 +26,9 @@ export default function ItineraryHome() {
     <View style={styles.screen}>
       <Text style={styles.hero}>Roteiro</Text>
       <Text style={styles.sub}>Cada dia, uma história visual da viagem.</Text>
+      <View style={{ marginBottom: spacing.md }}>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+      </View>
       <FlatList
         data={days}
         keyExtractor={(item) => item.id}

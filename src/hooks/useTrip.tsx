@@ -1,5 +1,5 @@
 import React, { createContext, useContext } from 'react';
-import type { Expense, Payment, Trip, TripMember } from '@/src/types';
+import type { Expense, Payment, Trip, TripMember, TripPhase } from '@/src/types';
 
 export type TripContextValue = {
   tripId: string;
@@ -9,6 +9,10 @@ export type TripContextValue = {
   payments: Payment[];
   isAdmin: boolean;
   isFinanceLead: boolean;
+  phase: TripPhase;
+  isClosed: boolean;
+  /** False for regular members when the trip is closed. */
+  canMutate: boolean;
 };
 
 const TripContext = createContext<TripContextValue | null>(null);

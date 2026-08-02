@@ -1,4 +1,4 @@
-export type TripPhase = 'planning' | 'active' | 'closed';
+export type TripPhase = 'planning' | 'in_progress' | 'closed';
 export type MemberRole = 'admin' | 'member';
 export type ExpenseKind = 'planned' | 'actual' | 'income';
 export type ExpenseCategory =
@@ -175,6 +175,9 @@ export const CATEGORY_LABELS: Record<ExpenseCategory, string> = {
 
 export const PHASE_LABELS: Record<TripPhase, string> = {
   planning: 'Planejamento',
-  active: 'Em execução',
+  in_progress: 'Em progresso',
   closed: 'Concluída',
 };
+
+/** All selectable phases for admin status changes. */
+export const TRIP_PHASES: TripPhase[] = ['planning', 'in_progress', 'closed'];

@@ -12,7 +12,15 @@ import {
 import { db } from '@/src/lib/firebase';
 import { datesBetween, generateInviteCode } from '@/src/lib/finance';
 import { normalizeInviteCode } from '@/src/lib/invite';
+import { normalizeTripPhase } from '@/src/lib/tripPhase';
 import type { Trip, TripMember, TripPhase } from '@/src/types';
+
+function hydrateTrip(data: Trip): Trip {
+  return {
+    ...data,
+    phase: normalizeTripPhase(data.phase),
+  };
+}
 
 function tripsCol() {
   return collection(db, 'trips');
@@ -131,7 +139,7 @@ export function subscribeUserTrips(uid: string, cb: (trips: Trip[]) => void) {
       const tripId = membership.id;
       const tripSnap = await getDoc(doc(db, 'trips', tripId));
       if (tripSnap.exists()) {
-        trips.push(tripSnap.data() as Trip);
+        trips.push(hydrateTrip(tripSnap.data() as Trip));
       }
     }
     trips.sort((a, b) => b.updatedAt - a.updatedAt);
@@ -141,7 +149,7 @@ export function subscribeUserTrips(uid: string, cb: (trips: Trip[]) => void) {
 
 export function subscribeTrip(tripId: string, cb: (trip: Trip | null) => void) {
   return onSnapshot(doc(db, 'trips', tripId), (snap) => {
-    cb(snap.exists() ? (snap.data() as Trip) : null);
+    cb(snap.exists() ? hydrateTrip(snap.data() as Trip) : null);
   });
 }
 
@@ -153,8 +161,24 @@ export function subscribeMembers(tripId: string, cb: (members: TripMember[]) => 
   });
 }
 
-export async function updateTripPhase(tripId: string, phase: TripPhase) {
-  await updateDoc(doc(db, 'trips', tripId), { phase, updatedAt: Date.now() });
+export async function updateTripPhase(
+  tripId: string,
+  phase: TripPhase,
+  actorUid: string
+) {
+  const tripSnap = await getDoc(doc(db, 'trips', tripId));
+  if (!tripSnap.exists()) {
+    throw new Error('Viagem não encontrada');
+  }
+  const trip = hydrateTrip(tripSnap.data() as Trip);
+  if (trip.adminUid !== actorUid) {
+    throw new Error('Apenas o administrador pode alterar o status da viagem');
+  }
+  const next = normalizeTripPhase(phase);
+  await updateDoc(doc(db, 'trips', tripId), {
+    phase: next,
+    updatedAt: Date.now(),
+  });
 }
 
 export async function transferFinanceLead(tripId: string, uid: string) {
@@ -182,7 +206,7 @@ export async function removeMember(tripId: string, uid: string) {
 
 export async function getTrip(tripId: string) {
   const snap = await getDoc(doc(db, 'trips', tripId));
-  return snap.exists() ? (snap.data() as Trip) : null;
+  return snap.exists() ? hydrateTrip(snap.data() as Trip) : null;
 }
 
 export async function listMembers(tripId: string) {

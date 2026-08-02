@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Button, Card, EmptyState, Label, Screen } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { CATEGORY_LABELS } from '@/src/types';
@@ -10,7 +11,7 @@ import { useTrip } from '@/src/hooks/useTrip';
 
 export default function FinanceHome() {
   const router = useRouter();
-  const { trip, expenses, payments, members } = useTrip();
+  const { trip, expenses, payments, members, canMutate, isAdmin, isFinanceLead } = useTrip();
 
   const totals = useMemo(() => {
     const relevant = expenses.filter((e) => e.kind !== 'income');
@@ -26,8 +27,15 @@ export default function FinanceHome() {
 
   return (
     <Screen>
+      <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
       <View style={styles.actions}>
-        <Button title="Novo lançamento" variant="finance" onPress={() => router.push(`/(app)/trip/${trip.id}/finance/new`)} />
+        {canMutate ? (
+          <Button
+            title="Novo lançamento"
+            variant="finance"
+            onPress={() => router.push(`/(app)/trip/${trip.id}/finance/new`)}
+          />
+        ) : null}
         <Button
           title="Relatório / acerto"
           variant="secondary"
@@ -85,7 +93,7 @@ export default function FinanceHome() {
 }
 
 const styles = StyleSheet.create({
-  actions: { gap: spacing.sm, marginBottom: spacing.md },
+  actions: { gap: spacing.sm, marginTop: spacing.sm, marginBottom: spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   title: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
   meta: { color: colors.inkSoft, fontSize: 12, fontFamily: fonts.ui },

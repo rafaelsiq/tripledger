@@ -2,16 +2,18 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Button, Input, Screen } from '@/src/components/ui';
+import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
+import { Body, Button, Input, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { createItineraryItem } from '@/src/services/itinerary';
 import { spacing } from '@/src/theme';
 
 export default function NewItineraryItem() {
   const { dayId, order } = useLocalSearchParams<{ dayId: string; order?: string }>();
-  const { trip } = useTrip();
+  const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const router = useRouter();
@@ -34,6 +36,10 @@ export default function NewItineraryItem() {
   async function onSave() {
     if (!trip || !user || !dayId) {
       showError('Sessão ou dia indisponível.', 'Não foi possível salvar');
+      return;
+    }
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
     if (!title.trim()) {
@@ -63,9 +69,22 @@ export default function NewItineraryItem() {
     }
   }
 
+  if (trip && !canMutate) {
+    return (
+      <Screen>
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        <Body muted>{closedTripMemberMessage()}</Body>
+        <Button title="Voltar" variant="secondary" onPress={() => router.back()} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.form}>
+        {trip ? (
+          <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+        ) : null}
         <Input label="Título" value={title} onChangeText={setTitle} placeholder="Trilha da Lagoinha" />
         <Input
           label="Descrição"

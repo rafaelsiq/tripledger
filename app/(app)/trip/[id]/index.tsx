@@ -1,22 +1,21 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
+import { Badge, Body, Card, Label, Screen } from '@/src/components/ui';
 import { BalanceCard } from '@/src/components/finance/BalanceCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
+import { TripPhaseAdminActions } from '@/src/components/TripPhaseAdminActions';
+import { TripClosedBanner, TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
 import { useAuth } from '@/src/hooks/useAuth';
-import { useToast } from '@/src/hooks/useToast';
 import { expenseTotals, memberBalance } from '@/src/lib/finance';
 import { formatDateLabel } from '@/src/lib/dates';
-import { updateTripPhase } from '@/src/services/trips';
-import { PHASE_LABELS } from '@/src/types';
+import { phaseLabel } from '@/src/lib/tripPhase';
 import { colors, fonts, spacing, typography } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
 export default function TripSummaryScreen() {
   const { user } = useAuth();
-  const { showError, showSuccess } = useToast();
-  const { trip, expenses, payments, isAdmin } = useTrip();
+  const { trip, expenses, payments, isAdmin, isFinanceLead, phase } = useTrip();
 
   const balance = useMemo(() => {
     if (!user) return null;
@@ -25,28 +24,29 @@ export default function TripSummaryScreen() {
 
   const totals = useMemo(() => expenseTotals(expenses), [expenses]);
 
-  if (!trip || !balance) return null;
-
-  async function setPhase(phase: 'planning' | 'active' | 'closed') {
-    try {
-      await updateTripPhase(trip!.id, phase);
-      showSuccess('Fase atualizada', PHASE_LABELS[phase]);
-    } catch (e) {
-      showError(e, 'Não foi possível atualizar a fase');
-    }
-  }
+  if (!trip || !balance || !user) return null;
 
   return (
     <Screen ambient>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
-          <Badge text={PHASE_LABELS[trip.phase]} tone="accent" />
+          <Badge
+            text={phaseLabel(phase)}
+            tone={phase === 'closed' ? 'neutral' : phase === 'in_progress' ? 'success' : 'accent'}
+          />
           <Text style={styles.title}>{trip.name}</Text>
           {trip.destination ? <Body muted>{trip.destination}</Body> : null}
           <Text style={styles.dates}>
             {formatDateLabel(trip.startDate)} → {formatDateLabel(trip.endDate)}
           </Text>
         </View>
+
+        <TripPhasePromptBanner
+          trip={trip}
+          adminUid={trip.adminUid}
+          currentUid={user.uid}
+        />
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
 
         <BalanceCard
           status={balance.status}
@@ -78,14 +78,11 @@ export default function TripSummaryScreen() {
           isAdmin={isAdmin}
         />
 
-        {isAdmin ? (
-          <Card style={{ gap: spacing.sm }}>
-            <Label>Fase da viagem</Label>
-            <Button title="Planejamento" variant="secondary" onPress={() => setPhase('planning')} />
-            <Button title="Em execução" variant="secondary" onPress={() => setPhase('active')} />
-            <Button title="Concluir" variant="finance" onPress={() => setPhase('closed')} />
-          </Card>
-        ) : null}
+        <TripPhaseAdminActions
+          trip={trip}
+          adminUid={trip.adminUid}
+          currentUid={user.uid}
+        />
       </ScrollView>
     </Screen>
   );
