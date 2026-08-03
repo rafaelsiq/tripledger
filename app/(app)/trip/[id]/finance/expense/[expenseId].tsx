@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +18,11 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { nextOpenInstallment } from '@/src/lib/finance';
+import {
+  buildExpenseWhatsAppSummary,
+  FinanceShareCancelledError,
+  shareFinanceSummary,
+} from '@/src/lib/financeShare';
 import { memberLabel } from '@/src/lib/members';
 import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
@@ -58,6 +63,7 @@ export default function ExpenseDetailScreen() {
   const [proofUri, setProofUri] = useState<string | undefined>();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
 
   const expense = expenses.find((e) => e.id === expenseId);
@@ -328,6 +334,30 @@ export default function ExpenseDetailScreen() {
     }
   }
 
+  async function onShareWhatsApp() {
+    if (sharing) return;
+    try {
+      setSharing(true);
+      const message = buildExpenseWhatsAppSummary({
+        trip: currentTrip,
+        expense: currentExpense,
+        members,
+      });
+      const result = await shareFinanceSummary({
+        title: currentExpense.title,
+        message,
+      });
+      if (result === 'copied') {
+        showSuccess('Resumo copiado', 'Cole no WhatsApp do grupo');
+      }
+    } catch (e) {
+      if (e instanceof FinanceShareCancelledError) return;
+      showError(e, 'Não foi possível compartilhar o resumo');
+    } finally {
+      setSharing(false);
+    }
+  }
+
   const pendingForMe = expensePayments.filter(
     (p) => p.status === 'pending' && (p.toUid === currentUser.uid || isFinanceLead)
   );
@@ -390,8 +420,27 @@ export default function ExpenseDetailScreen() {
       <Stack.Screen
         options={{
           title: 'Despesa',
-          headerRight: canManageThisExpense
-            ? () => (
+          headerRight: () => (
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={onShareWhatsApp}
+                disabled={sharing}
+                hitSlop={10}
+                accessibilityLabel="Exportar esta despesa para WhatsApp"
+                style={({ pressed }) => [
+                  styles.headerAction,
+                  pressed && { opacity: 0.7 },
+                  sharing && { opacity: 0.55 },
+                ]}
+              >
+                {sharing ? (
+                  <ActivityIndicator size="small" color={colors.finance} />
+                ) : (
+                  <Ionicons name="logo-whatsapp" size={18} color={colors.finance} />
+                )}
+                <Text style={styles.headerActionText}>WhatsApp</Text>
+              </Pressable>
+              {canManageThisExpense ? (
                 <Pressable
                   onPress={onEdit}
                   hitSlop={10}
@@ -400,8 +449,9 @@ export default function ExpenseDetailScreen() {
                   <Ionicons name="create-outline" size={18} color={colors.finance} />
                   <Text style={styles.headerActionText}>Editar</Text>
                 </Pressable>
-              )
-            : undefined,
+              ) : null}
+            </View>
+          ),
         }}
       />
 
@@ -637,6 +687,12 @@ export default function ExpenseDetailScreen() {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingRight: 4,
+  },
   headerAction: {
     flexDirection: 'row',
     alignItems: 'center',

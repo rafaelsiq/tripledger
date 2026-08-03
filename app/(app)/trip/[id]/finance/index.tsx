@@ -9,6 +9,11 @@ import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { exportCsvFile } from '@/src/lib/exportCsv';
 import { buildFinanceCsv, financeCsvFilename } from '@/src/lib/financeCsv';
+import {
+  buildTripExpensesWhatsAppSummary,
+  FinanceShareCancelledError,
+  shareFinanceSummary,
+} from '@/src/lib/financeShare';
 import { CATEGORY_LABELS } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
@@ -18,6 +23,7 @@ export default function FinanceHome() {
   const { showError, showSuccess } = useToast();
   const { trip, expenses, payments, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const [exporting, setExporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
 
   const totals = useMemo(() => {
     const relevant = expenses.filter((e) => e.kind !== 'income');
@@ -44,6 +50,26 @@ export default function FinanceHome() {
     }
   }
 
+  async function onShareWhatsApp() {
+    if (!trip || sharing) return;
+    try {
+      setSharing(true);
+      const message = buildTripExpensesWhatsAppSummary({ trip, expenses, members });
+      const result = await shareFinanceSummary({
+        title: `Despesas — ${trip.name}`,
+        message,
+      });
+      if (result === 'copied') {
+        showSuccess('Resumo copiado', 'Cole no WhatsApp do grupo');
+      }
+    } catch (e) {
+      if (e instanceof FinanceShareCancelledError) return;
+      showError(e, 'Não foi possível compartilhar o resumo');
+    } finally {
+      setSharing(false);
+    }
+  }
+
   if (!trip) return null;
 
   return (
@@ -53,6 +79,24 @@ export default function FinanceHome() {
           title: 'Finanças',
           headerRight: () => (
             <View style={styles.headerActions}>
+              <Pressable
+                onPress={onShareWhatsApp}
+                disabled={sharing}
+                hitSlop={10}
+                accessibilityLabel="Exportar resumo para WhatsApp"
+                style={({ pressed }) => [
+                  styles.headerAction,
+                  pressed && { opacity: 0.7 },
+                  sharing && { opacity: 0.55 },
+                ]}
+              >
+                {sharing ? (
+                  <ActivityIndicator size="small" color={colors.finance} />
+                ) : (
+                  <Ionicons name="logo-whatsapp" size={18} color={colors.finance} />
+                )}
+                <Text style={styles.headerActionText}>WhatsApp</Text>
+              </Pressable>
               <Pressable
                 onPress={onExportCsv}
                 disabled={exporting}

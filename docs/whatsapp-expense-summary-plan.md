@@ -32,3 +32,9 @@ Income lançamentos are omitted from payment-status summaries (same as CSV/total
 - Changing Firestore models or payment flows
 - CSV format changes
 - Auto-posting into a specific WhatsApp group without the share sheet
+
+## Status
+Implemented on branch `cursor/whatsapp-expense-summary-bc5d`:
+- `src/lib/financeShare.ts`
+- WhatsApp header action on `finance/index.tsx` (all lançamentos)
+- WhatsApp header action on `finance/expense/[expenseId].tsx` (single expense)
