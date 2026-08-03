@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Card, EmptyState, Label, Screen } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
+import { WhatsAppShareButton } from '@/src/components/finance/WhatsAppShareButton';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { exportCsvFile } from '@/src/lib/exportCsv';
@@ -80,24 +81,6 @@ export default function FinanceHome() {
           headerRight: () => (
             <View style={styles.headerActions}>
               <Pressable
-                onPress={onShareWhatsApp}
-                disabled={sharing}
-                hitSlop={10}
-                accessibilityLabel="Exportar resumo para WhatsApp"
-                style={({ pressed }) => [
-                  styles.headerAction,
-                  pressed && { opacity: 0.7 },
-                  sharing && { opacity: 0.55 },
-                ]}
-              >
-                {sharing ? (
-                  <ActivityIndicator size="small" color={colors.finance} />
-                ) : (
-                  <Ionicons name="logo-whatsapp" size={18} color={colors.finance} />
-                )}
-                <Text style={styles.headerActionText}>WhatsApp</Text>
-              </Pressable>
-              <Pressable
                 onPress={onExportCsv}
                 disabled={exporting}
                 hitSlop={10}
@@ -144,6 +127,7 @@ export default function FinanceHome() {
                 members={members}
               />
             </Card>
+            <WhatsAppShareButton onPress={onShareWhatsApp} loading={sharing} />
             <View style={styles.sectionHeader}>
               <Label>Lançamentos</Label>
               {canMutate ? (

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -14,6 +14,7 @@ import {
   Screen,
 } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
+import { WhatsAppShareButton } from '@/src/components/finance/WhatsAppShareButton';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -420,27 +421,8 @@ export default function ExpenseDetailScreen() {
       <Stack.Screen
         options={{
           title: 'Despesa',
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={onShareWhatsApp}
-                disabled={sharing}
-                hitSlop={10}
-                accessibilityLabel="Exportar esta despesa para WhatsApp"
-                style={({ pressed }) => [
-                  styles.headerAction,
-                  pressed && { opacity: 0.7 },
-                  sharing && { opacity: 0.55 },
-                ]}
-              >
-                {sharing ? (
-                  <ActivityIndicator size="small" color={colors.finance} />
-                ) : (
-                  <Ionicons name="logo-whatsapp" size={18} color={colors.finance} />
-                )}
-                <Text style={styles.headerActionText}>WhatsApp</Text>
-              </Pressable>
-              {canManageThisExpense ? (
+          headerRight: canManageThisExpense
+            ? () => (
                 <Pressable
                   onPress={onEdit}
                   hitSlop={10}
@@ -449,9 +431,8 @@ export default function ExpenseDetailScreen() {
                   <Ionicons name="create-outline" size={18} color={colors.finance} />
                   <Text style={styles.headerActionText}>Editar</Text>
                 </Pressable>
-              ) : null}
-            </View>
-          ),
+              )
+            : undefined,
         }}
       />
 
@@ -473,6 +454,8 @@ export default function ExpenseDetailScreen() {
             members={members}
           />
         </Card>
+
+        <WhatsAppShareButton onPress={onShareWhatsApp} loading={sharing} />
 
         <Card style={{ gap: spacing.sm }}>
           <Label>Divisão</Label>
@@ -687,12 +670,6 @@ export default function ExpenseDetailScreen() {
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
   title: { fontSize: 24, fontWeight: '700', color: colors.ink },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingRight: 4,
-  },
   headerAction: {
     flexDirection: 'row',
     alignItems: 'center',
