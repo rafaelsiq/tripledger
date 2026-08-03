@@ -21,7 +21,7 @@ import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { canManageExpense, createExpense, updateExpense, uploadTripFile } from '@/src/services/expenses';
 import type { Expense, ExpenseCategory, ExpenseKind } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, radii, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 
 const KINDS: { id: ExpenseKind; label: string }[] = [
@@ -31,15 +31,6 @@ const KINDS: { id: ExpenseKind; label: string }[] = [
 ];
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as ExpenseCategory[];
-/** Quick shortcuts only — any count from 1 to MAX is allowed via the number field. */
-const INSTALLMENT_PRESETS = [1, 2, 3, 6, 12];
-
-type SplitDraft = {
-  amount: string;
-  installmentCount: number;
-  /** Free-text while typing so the field can be cleared mid-edit. */
-  installmentText?: string;
-};
 
 function parseMoney(value: string) {
   const n = Number(String(value).replace(',', '.'));
@@ -62,62 +53,92 @@ function installmentPreview(total: number, count: number) {
   return `${safeCount} parcelas · ${formatCurrency(first)} cada (última ${formatCurrency(last)})`;
 }
 
-function buildEqualDrafts(
-  memberIds: string[],
+/** Equal split of remaining total after custom overrides. */
+function resolveAmounts(
+  selected: string[],
   total: number,
-  defaultInstallments: number,
-  paidByUid: string
-): Record<string, SplitDraft> {
-  const equal = equalSplits(memberIds, total);
-  const next: Record<string, SplitDraft> = {};
-  for (const split of equal) {
-    next[split.uid] = {
-      amount: String(split.amount),
-      installmentCount: split.uid === paidByUid ? 1 : defaultInstallments,
-    };
+  customAmounts: Record<string, string>
+): Record<string, number> {
+  const customUids = selected.filter((uid) => customAmounts[uid] !== undefined);
+  const customSum = sumAmounts(customUids.map((uid) => parseMoney(customAmounts[uid] || '0')));
+  const freeUids = selected.filter((uid) => !customUids.includes(uid));
+  const remaining = Math.max(0, Math.round((total - customSum) * 100) / 100);
+  const equal = equalSplits(freeUids, remaining);
+  const result: Record<string, number> = {};
+  for (const uid of customUids) {
+    result[uid] = parseMoney(customAmounts[uid] || '0');
   }
-  return next;
+  for (const split of equal) {
+    result[split.uid] = split.amount;
+  }
+  return result;
 }
 
-function draftsFromExpense(expense: Expense): {
+function seedFromExpense(expense: Expense): {
   selected: string[];
-  drafts: Record<string, SplitDraft>;
+  customAmounts: Record<string, string>;
   defaultInstallments: number;
+  customInstallments: Record<string, number>;
+  equalMode: boolean;
 } {
   const selected = expense.splits.map((s) => s.uid);
-  const drafts: Record<string, SplitDraft> = {};
-  const debtorCounts: number[] = [];
+  const equal = equalSplits(selected, expense.amount);
+  const equalByUid = Object.fromEntries(equal.map((s) => [s.uid, s.amount]));
+  const customAmounts: Record<string, string> = {};
+  let equalMode = true;
   for (const split of expense.splits) {
-    const count =
-      split.uid === expense.paidByUid
-        ? 1
-        : split.installmentCount ||
-          expense.installments?.filter((i) => i.uid === split.uid).length ||
-          1;
-    drafts[split.uid] = {
-      amount: String(split.amount),
-      installmentCount: count,
-    };
-    if (split.uid !== expense.paidByUid) debtorCounts.push(count);
+    const expected = equalByUid[split.uid] ?? 0;
+    if (Math.abs(split.amount - expected) > 0.02) {
+      equalMode = false;
+      customAmounts[split.uid] = String(split.amount);
+    }
   }
-  const defaultInstallments = debtorCounts.sort((a, b) => a - b)[
-    Math.floor(debtorCounts.length / 2)
-  ] || 1;
-  return { selected, drafts, defaultInstallments };
+
+  const debtorCounts: number[] = [];
+  const customInstallments: Record<string, number> = {};
+  for (const split of expense.splits) {
+    if (split.uid === expense.paidByUid) continue;
+    const count =
+      split.installmentCount ||
+      expense.installments?.filter((i) => i.uid === split.uid).length ||
+      1;
+    debtorCounts.push(count);
+  }
+  const defaultInstallments =
+    debtorCounts.sort((a, b) => a - b)[Math.floor(debtorCounts.length / 2)] || 1;
+  for (const split of expense.splits) {
+    if (split.uid === expense.paidByUid) continue;
+    const count =
+      split.installmentCount ||
+      expense.installments?.filter((i) => i.uid === split.uid).length ||
+      1;
+    if (count !== defaultInstallments) {
+      customInstallments[split.uid] = count;
+    }
+  }
+
+  return {
+    selected,
+    customAmounts: equalMode ? {} : customAmounts,
+    defaultInstallments,
+    customInstallments,
+    equalMode,
+  };
 }
 
 type Props = {
   mode: 'create' | 'edit';
   initialExpense?: Expense;
+  initialKind?: ExpenseKind;
 };
 
-export function ExpenseForm({ mode, initialExpense }: Props) {
+export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
   const { trip, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const router = useRouter();
 
-  const seeded = draftsFromExpense(
+  const seeded = seedFromExpense(
     initialExpense || {
       id: '',
       tripId: '',
@@ -133,7 +154,9 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
     }
   );
 
-  const [kind, setKind] = useState<ExpenseKind>(initialExpense?.kind || 'planned');
+  const [kind, setKind] = useState<ExpenseKind>(
+    initialExpense?.kind || initialKind || 'planned'
+  );
   const [category, setCategory] = useState<ExpenseCategory>(
     initialExpense?.category || 'food'
   );
@@ -149,8 +172,8 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
   const [selected, setSelected] = useState<string[]>(
     mode === 'edit' ? seeded.selected : []
   );
-  const [splitDrafts, setSplitDrafts] = useState<Record<string, SplitDraft>>(
-    mode === 'edit' ? seeded.drafts : {}
+  const [customAmounts, setCustomAmounts] = useState<Record<string, string>>(
+    mode === 'edit' ? seeded.customAmounts : {}
   );
   const [defaultInstallments, setDefaultInstallments] = useState(
     mode === 'edit' ? seeded.defaultInstallments : 1
@@ -158,6 +181,14 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
   const [defaultInstallmentsText, setDefaultInstallmentsText] = useState(
     String(mode === 'edit' ? seeded.defaultInstallments : 1)
   );
+  const [customInstallments, setCustomInstallments] = useState<Record<string, number>>(
+    mode === 'edit' ? seeded.customInstallments : {}
+  );
+  const [customInstallmentText, setCustomInstallmentText] = useState<Record<string, string>>(
+    {}
+  );
+  const [showPersonAmountPicker, setShowPersonAmountPicker] = useState(false);
+  const [showPersonInstallmentPicker, setShowPersonInstallmentPicker] = useState(false);
   const [receiptUri, setReceiptUri] = useState<string | undefined>();
   const [existingReceiptUrl, setExistingReceiptUrl] = useState<string | undefined>(
     initialExpense?.receiptUrl
@@ -168,7 +199,7 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
 
   useEffect(() => {
     if (mode !== 'edit' || !initialExpense || ready) return;
-    const next = draftsFromExpense(initialExpense);
+    const next = seedFromExpense(initialExpense);
     setKind(initialExpense.kind);
     setCategory(initialExpense.category);
     setTitle(initialExpense.title);
@@ -177,9 +208,10 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
     setDueDate(initialExpense.dueDate || '');
     setPaidByUid(initialExpense.paidByUid);
     setSelected(next.selected);
-    setSplitDrafts(next.drafts);
+    setCustomAmounts(next.customAmounts);
     setDefaultInstallments(next.defaultInstallments);
     setDefaultInstallmentsText(String(next.defaultInstallments));
+    setCustomInstallments(next.customInstallments);
     setExistingReceiptUrl(initialExpense.receiptUrl);
     setReady(true);
   }, [mode, initialExpense, ready]);
@@ -191,124 +223,86 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
     setPaidByUid((prev) => prev || user?.uid || members[0]?.uid || '');
   }, [members, user?.uid, mode]);
 
+  useEffect(() => {
+    if (mode === 'edit' || !initialKind) return;
+    setKind(initialKind);
+  }, [initialKind, mode]);
+
   const totalValue = parseMoney(amount);
 
-  useEffect(() => {
-    if (!ready) return;
-    if (!selected.length) {
-      setSplitDrafts({});
-      return;
-    }
-    setSplitDrafts((prev) => {
-      const sameSet =
-        selected.length === Object.keys(prev).length &&
-        selected.every((uid) => !!prev[uid]);
-      if (sameSet) {
-        const kept: Record<string, SplitDraft> = {};
-        for (const uid of selected) {
-          kept[uid] = {
-            amount: prev[uid]!.amount,
-            installmentCount:
-              uid === paidByUid ? 1 : prev[uid]!.installmentCount || defaultInstallments,
-          };
-        }
-        return kept;
-      }
-      return buildEqualDrafts(selected, totalValue, defaultInstallments, paidByUid);
-    });
-  }, [selected, paidByUid, defaultInstallments, totalValue, ready]);
+  const resolvedAmounts = useMemo(
+    () => resolveAmounts(selected, totalValue, customAmounts),
+    [selected, totalValue, customAmounts]
+  );
 
   const splitSum = useMemo(
-    () => sumAmounts(selected.map((uid) => parseMoney(splitDrafts[uid]?.amount || '0'))),
-    [selected, splitDrafts]
+    () => sumAmounts(selected.map((uid) => resolvedAmounts[uid] || 0)),
+    [selected, resolvedAmounts]
   );
   const splitsMatch = amountsMatchTotal(
-    selected.map((uid) => parseMoney(splitDrafts[uid]?.amount || '0')),
+    selected.map((uid) => resolvedAmounts[uid] || 0),
     totalValue
   );
 
-  function redistributeEqual() {
-    setSplitDrafts(buildEqualDrafts(selected, totalValue, defaultInstallments, paidByUid));
-  }
+  const equalShare = useMemo(() => {
+    if (!selected.length) return 0;
+    const freeCount = selected.filter((uid) => customAmounts[uid] === undefined).length;
+    if (!freeCount) return 0;
+    const customSum = sumAmounts(
+      Object.entries(customAmounts)
+        .filter(([uid]) => selected.includes(uid))
+        .map(([, value]) => parseMoney(value))
+    );
+    return Math.max(0, Math.round(((totalValue - customSum) / freeCount) * 100) / 100);
+  }, [selected, customAmounts, totalValue]);
 
-  function setMemberAmount(uid: string, value: string) {
-    setSplitDrafts((prev) => ({
-      ...prev,
-      [uid]: {
-        amount: value,
-        installmentCount:
-          prev[uid]?.installmentCount ??
-          (uid === paidByUid ? 1 : defaultInstallments),
-      },
-    }));
-  }
+  const customizedAmountUids = selected.filter((uid) => customAmounts[uid] !== undefined);
+  const customizedInstallmentUids = selected.filter(
+    (uid) => uid !== paidByUid && customInstallments[uid] !== undefined
+  );
+  const debtors = selected.filter((uid) => uid !== paidByUid);
 
-  function setMemberInstallments(uid: string, count: number, text?: string) {
-    if (uid === paidByUid) return;
-    const nextCount = clampInstallmentCount(count, defaultInstallments);
-    setSplitDrafts((prev) => ({
-      ...prev,
-      [uid]: {
-        amount: prev[uid]?.amount || '0',
-        installmentCount: nextCount,
-        installmentText: text ?? String(nextCount),
-      },
-    }));
-  }
-
-  function onMemberInstallmentText(uid: string, value: string) {
-    const digits = digitsOnly(value);
-    setSplitDrafts((prev) => {
-      const current = prev[uid];
-      if (!current) return prev;
-      if (!digits) {
-        return {
-          ...prev,
-          [uid]: { ...current, installmentText: '' },
-        };
-      }
-      const nextCount = clampInstallmentCount(Number(digits), current.installmentCount);
-      return {
-        ...prev,
-        [uid]: {
-          ...current,
-          installmentCount: nextCount,
-          installmentText: digits,
-        },
-      };
-    });
-  }
-
-  function applyDefaultInstallments(count: number, text?: string) {
-    const nextCount = clampInstallmentCount(count, 1);
-    setDefaultInstallments(nextCount);
-    setDefaultInstallmentsText(text ?? String(nextCount));
-    setSplitDrafts((prev) => {
+  function clearAmountOverride(uid: string) {
+    setCustomAmounts((prev) => {
       const next = { ...prev };
-      for (const uid of selected) {
-        if (uid === paidByUid) {
-          next[uid] = {
-            amount: next[uid]?.amount || '0',
-            installmentCount: 1,
-            installmentText: '1',
-          };
-        } else {
-          next[uid] = {
-            amount: next[uid]?.amount || '0',
-            installmentCount: nextCount,
-            installmentText: text ?? String(nextCount),
-          };
-        }
-      }
+      delete next[uid];
       return next;
     });
+  }
+
+  function clearInstallmentOverride(uid: string) {
+    setCustomInstallments((prev) => {
+      const next = { ...prev };
+      delete next[uid];
+      return next;
+    });
+    setCustomInstallmentText((prev) => {
+      const next = { ...prev };
+      delete next[uid];
+      return next;
+    });
+  }
+
+  function resetEqualAmounts() {
+    setCustomAmounts({});
+    setShowPersonAmountPicker(false);
   }
 
   function onDefaultInstallmentText(value: string) {
     const digits = digitsOnly(value);
     setDefaultInstallmentsText(digits);
     if (!digits) return;
-    applyDefaultInstallments(Number(digits), digits);
+    setDefaultInstallments(clampInstallmentCount(Number(digits), 1));
+  }
+
+  function onCustomInstallmentText(uid: string, value: string) {
+    const digits = digitsOnly(value);
+    setCustomInstallmentText((prev) => ({ ...prev, [uid]: digits }));
+    if (!digits) return;
+    setCustomInstallments((prev) => ({
+      ...prev,
+      [uid]: clampInstallmentCount(Number(digits), defaultInstallments),
+    }));
   }
 
   async function pickReceipt() {
@@ -375,11 +369,11 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
       }
       const customSplits = selected.map((uid) => ({
         uid,
-        amount: parseMoney(splitDrafts[uid]?.amount || '0'),
+        amount: resolvedAmounts[uid] || 0,
         installmentCount:
           uid === paidByUid
             ? 1
-            : splitDrafts[uid]?.installmentCount ?? defaultInstallments,
+            : customInstallments[uid] ?? defaultInstallments,
       }));
 
       if (mode === 'edit' && initialExpense) {
@@ -429,13 +423,31 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
   }
 
   function toggleMember(uid: string) {
-    setSelected((prev) =>
-      prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid]
-    );
+    setSelected((prev) => {
+      const next = prev.includes(uid) ? prev.filter((id) => id !== uid) : [...prev, uid];
+      setCustomAmounts((amounts) => {
+        const kept: Record<string, string> = {};
+        for (const id of next) {
+          if (amounts[id] !== undefined) kept[id] = amounts[id]!;
+        }
+        return kept;
+      });
+      setCustomInstallments((counts) => {
+        const kept: Record<string, number> = {};
+        for (const id of next) {
+          if (counts[id] !== undefined) kept[id] = counts[id]!;
+        }
+        return kept;
+      });
+      return next;
+    });
   }
 
-  const debtors = selected.filter((uid) => uid !== paidByUid);
   const hasReceipt = !!receiptUri || (!!existingReceiptUrl && !clearReceipt);
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   if (trip && !canMutate) {
     return (
@@ -501,11 +513,7 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
           label="Valor (R$)"
           keyboardType="decimal-pad"
           value={amount}
-          onChangeText={(value) => {
-            setAmount(value);
-            const nextTotal = parseMoney(value);
-            setSplitDrafts(buildEqualDrafts(selected, nextTotal, defaultInstallments, paidByUid));
-          }}
+          onChangeText={setAmount}
           placeholder="1200"
         />
         <DateField
@@ -551,108 +559,170 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
 
         {kind !== 'income' && selected.length > 0 ? (
           <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Label>Valor por pessoa</Label>
-              <Pressable onPress={redistributeEqual}>
-                <Text style={styles.link}>Dividir igualmente</Text>
-              </Pressable>
+            <Label>Divisão por pessoa</Label>
+            <View style={styles.equalCard}>
+              <Text style={styles.equalTitle}>Divisão igualitária</Text>
+              <Body muted>
+                {selected.length === 1
+                  ? `${formatCurrency(totalValue)} para ${nameOf(selected[0]!)}`
+                  : customizedAmountUids.length
+                    ? `Demais pessoas: cerca de ${formatCurrency(equalShare)} cada · soma ${formatCurrency(splitSum)}`
+                    : `${formatCurrency(equalShare)} para cada um dos ${selected.length}`}
+                {!splitsMatch && totalValue > 0
+                  ? ` · ajuste necessário (${formatCurrency(totalValue - splitSum)})`
+                  : ''}
+              </Body>
             </View>
-            <Body muted>
-              Ajuste quanto cada um deve. Soma atual: {formatCurrency(splitSum)}
-              {!splitsMatch && totalValue > 0
-                ? ` · falta ${formatCurrency(totalValue - splitSum)}`
-                : ''}
-            </Body>
-            {selected.map((uid) => {
-              const member = members.find((m) => m.uid === uid);
-              return (
-                <Input
-                  key={uid}
-                  label={
-                    member
-                      ? `${memberLabel(member)}${uid === paidByUid ? ' (pagador)' : ''}`
-                      : uid
-                  }
-                  keyboardType="decimal-pad"
-                  value={splitDrafts[uid]?.amount || ''}
-                  onChangeText={(value) => setMemberAmount(uid, value)}
-                  placeholder="0"
+
+            {customizedAmountUids.map((uid) => (
+              <View key={uid} style={styles.overrideRow}>
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={styles.overrideName}>
+                    {nameOf(uid)}
+                    {uid === paidByUid ? ' (pagador)' : ''}
+                  </Text>
+                  <Input
+                    keyboardType="decimal-pad"
+                    value={customAmounts[uid] || ''}
+                    onChangeText={(value) =>
+                      setCustomAmounts((prev) => ({ ...prev, [uid]: value }))
+                    }
+                    placeholder="0"
+                  />
+                </View>
+                <Pressable onPress={() => clearAmountOverride(uid)} hitSlop={8}>
+                  <Text style={styles.link}>Igualar</Text>
+                </Pressable>
+              </View>
+            ))}
+
+            {showPersonAmountPicker ? (
+              <View style={styles.pickerBlock}>
+                <Body muted>Escolha quem terá um valor diferente:</Body>
+                <View style={styles.chips}>
+                  {selected
+                    .filter((uid) => customAmounts[uid] === undefined)
+                    .map((uid) => (
+                      <Pressable
+                        key={uid}
+                        onPress={() => {
+                          setCustomAmounts((prev) => ({
+                            ...prev,
+                            [uid]: String(resolvedAmounts[uid] || equalShare || 0),
+                          }));
+                          setShowPersonAmountPicker(false);
+                        }}
+                        style={styles.chip}
+                      >
+                        <Text style={styles.chipText}>{nameOf(uid)}</Text>
+                      </Pressable>
+                    ))}
+                </View>
+                <Button
+                  title="Cancelar"
+                  variant="ghost"
+                  onPress={() => setShowPersonAmountPicker(false)}
                 />
-              );
-            })}
+              </View>
+            ) : (
+              <View style={styles.inlineActions}>
+                {selected.some((uid) => customAmounts[uid] === undefined) ? (
+                  <Pressable onPress={() => setShowPersonAmountPicker(true)}>
+                    <Text style={styles.link}>Ajustar alguém</Text>
+                  </Pressable>
+                ) : null}
+                {customizedAmountUids.length ? (
+                  <Pressable onPress={resetEqualAmounts}>
+                    <Text style={styles.link}>Voltar à divisão igual</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )}
           </View>
         ) : null}
 
         {kind !== 'income' && debtors.length > 0 ? (
           <View style={styles.section}>
-            <Label>Parcelas de quem te deve</Label>
+            <Label>Parcelas</Label>
             <Body muted>
-              Defina quantas parcelas quiser (1 a {MAX_INSTALLMENT_COUNT}). A sugestão
-              vale para todos; você pode ajustar por pessoa.
+              Quantas vezes quem deve vai pagar (1 a {MAX_INSTALLMENT_COUNT}). Vale para
+              todo o grupo; ajuste alguém só se for diferente.
             </Body>
             <Input
-              label="Parcelas (padrão do grupo)"
+              label="Número de parcelas"
               keyboardType="number-pad"
               value={defaultInstallmentsText}
               onChangeText={onDefaultInstallmentText}
-              placeholder={`1 a ${MAX_INSTALLMENT_COUNT}`}
+              placeholder={`Ex.: 1, 8, 24… (máx. ${MAX_INSTALLMENT_COUNT})`}
             />
-            <View style={styles.chips}>
-              {INSTALLMENT_PRESETS.map((count) => (
-                <Pressable
-                  key={count}
-                  onPress={() => applyDefaultInstallments(count)}
-                  style={[styles.chip, defaultInstallments === count && styles.chipOn]}
-                >
-                  <Text
-                    style={[
-                      styles.chipText,
-                      defaultInstallments === count && styles.chipTextOn,
-                    ]}
-                  >
-                    {count}x
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
+            <Body muted>
+              {installmentPreview(
+                equalShare || (totalValue / Math.max(selected.length, 1)),
+                defaultInstallments
+              )}
+            </Body>
 
-            {debtors.map((uid) => {
-              const member = members.find((m) => m.uid === uid);
-              const draft = splitDrafts[uid];
-              const partAmount = parseMoney(draft?.amount || '0');
-              const count = draft?.installmentCount || defaultInstallments;
-              const countText = draft?.installmentText ?? String(count);
+            {customizedInstallmentUids.map((uid) => {
+              const count = customInstallments[uid] || defaultInstallments;
+              const countText = customInstallmentText[uid] ?? String(count);
+              const partAmount = resolvedAmounts[uid] || 0;
               return (
-                <View key={uid} style={styles.debtorBlock}>
-                  <Text style={styles.debtorName}>
-                    {member ? memberLabel(member) : uid}
-                  </Text>
-                  <Input
-                    label="Parcelas"
-                    keyboardType="number-pad"
-                    value={countText}
-                    onChangeText={(value) => onMemberInstallmentText(uid, value)}
-                    placeholder={`1 a ${MAX_INSTALLMENT_COUNT}`}
-                  />
-                  <View style={styles.chips}>
-                    {INSTALLMENT_PRESETS.map((preset) => (
-                      <Pressable
-                        key={preset}
-                        onPress={() => setMemberInstallments(uid, preset)}
-                        style={[styles.chip, count === preset && styles.chipOn]}
-                      >
-                        <Text
-                          style={[styles.chipText, count === preset && styles.chipTextOn]}
-                        >
-                          {preset}x
-                        </Text>
-                      </Pressable>
-                    ))}
+                <View key={uid} style={styles.overrideRow}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={styles.overrideName}>{nameOf(uid)}</Text>
+                    <Input
+                      label="Parcelas"
+                      keyboardType="number-pad"
+                      value={countText}
+                      onChangeText={(value) => onCustomInstallmentText(uid, value)}
+                      placeholder={`1 a ${MAX_INSTALLMENT_COUNT}`}
+                    />
+                    <Body muted>{installmentPreview(partAmount, count)}</Body>
                   </View>
-                  <Body muted>{installmentPreview(partAmount, count)}</Body>
+                  <Pressable onPress={() => clearInstallmentOverride(uid)} hitSlop={8}>
+                    <Text style={styles.link}>Padrão</Text>
+                  </Pressable>
                 </View>
               );
             })}
+
+            {showPersonInstallmentPicker ? (
+              <View style={styles.pickerBlock}>
+                <Body muted>Escolha quem terá parcelas diferentes:</Body>
+                <View style={styles.chips}>
+                  {debtors
+                    .filter((uid) => customInstallments[uid] === undefined)
+                    .map((uid) => (
+                      <Pressable
+                        key={uid}
+                        onPress={() => {
+                          setCustomInstallments((prev) => ({
+                            ...prev,
+                            [uid]: defaultInstallments,
+                          }));
+                          setCustomInstallmentText((prev) => ({
+                            ...prev,
+                            [uid]: String(defaultInstallments),
+                          }));
+                          setShowPersonInstallmentPicker(false);
+                        }}
+                        style={styles.chip}
+                      >
+                        <Text style={styles.chipText}>{nameOf(uid)}</Text>
+                      </Pressable>
+                    ))}
+                </View>
+                <Button
+                  title="Cancelar"
+                  variant="ghost"
+                  onPress={() => setShowPersonInstallmentPicker(false)}
+                />
+              </View>
+            ) : debtors.some((uid) => customInstallments[uid] === undefined) ? (
+              <Pressable onPress={() => setShowPersonInstallmentPicker(true)}>
+                <Text style={styles.link}>Parcelas diferentes para alguém</Text>
+              </Pressable>
+            ) : null}
           </View>
         ) : null}
 
@@ -693,17 +763,33 @@ const styles = StyleSheet.create({
   chipText: { color: colors.ink, fontWeight: '600', fontSize: 13 },
   chipTextOn: { color: colors.white },
   section: { gap: spacing.sm },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  equalCard: {
+    gap: 4,
+    backgroundColor: colors.financeSoft,
+    borderRadius: radii.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#D0DAE4',
   },
-  link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
-  debtorBlock: {
-    gap: spacing.sm,
+  equalTitle: {
+    fontFamily: fonts.uiBold,
+    fontSize: 15,
+    color: colors.finance,
+  },
+  overrideRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
     paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  debtorName: { fontWeight: '700', color: colors.ink },
+  overrideName: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 14 },
+  pickerBlock: { gap: spacing.sm },
+  inlineActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+  },
+  link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
 });

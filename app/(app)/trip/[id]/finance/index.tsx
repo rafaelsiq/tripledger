@@ -4,6 +4,7 @@ import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Card, EmptyState, Label, Screen } from '@/src/components/ui';
+import { FinanceFab } from '@/src/components/finance/FinanceFab';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { WhatsAppShareButton } from '@/src/components/finance/WhatsAppShareButton';
 import { useToast } from '@/src/hooks/useToast';
@@ -16,7 +17,7 @@ import {
   shareFinanceSummary,
 } from '@/src/lib/financeShare';
 import { CATEGORY_LABELS } from '@/src/types';
-import { colors, fonts, radii, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 
 export default function FinanceHome() {
@@ -130,19 +131,6 @@ export default function FinanceHome() {
             <WhatsAppShareButton onPress={onShareWhatsApp} loading={sharing} />
             <View style={styles.sectionHeader}>
               <Label>Lançamentos</Label>
-              {canMutate ? (
-                <Pressable
-                  onPress={() => router.push(`/(app)/trip/${trip.id}/finance/new`)}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.newAction,
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-                  ]}
-                >
-                  <Ionicons name="add" size={18} color={colors.white} />
-                  <Text style={styles.newActionText}>Novo</Text>
-                </Pressable>
-              ) : null}
             </View>
           </View>
         }
@@ -151,7 +139,7 @@ export default function FinanceHome() {
             title="Sem lançamentos"
             subtitle={
               canMutate
-                ? 'Toque em Novo para registrar uma despesa prevista ou real.'
+                ? 'Toque no + para registrar uma despesa ou receita.'
                 : 'Ainda não há despesas nesta viagem.'
             }
           />
@@ -188,6 +176,7 @@ export default function FinanceHome() {
           );
         }}
       />
+      {canMutate ? <FinanceFab tripId={trip.id} /> : null}
     </Screen>
   );
 }
@@ -196,7 +185,7 @@ const styles = StyleSheet.create({
   listFlex: { flex: 1 },
   list: {
     gap: spacing.sm,
-    paddingBottom: spacing.xxl,
+    paddingBottom: 120,
   },
   headerBlock: {
     gap: spacing.md,
@@ -226,20 +215,6 @@ const styles = StyleSheet.create({
     color: colors.finance,
     fontFamily: fonts.uiSemi,
     fontSize: 14,
-  },
-  newAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.finance,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  newActionText: {
-    color: colors.white,
-    fontFamily: fonts.uiBold,
-    fontSize: 13,
   },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   title: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
