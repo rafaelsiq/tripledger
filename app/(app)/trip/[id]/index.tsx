@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Badge, Body, Card, Label, Screen } from '@/src/components/ui';
 import { BalanceCard } from '@/src/components/finance/BalanceCard';
+import { PendingConsolidationCard } from '@/src/components/finance/PendingConsolidationCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { TripPhaseAdminActions } from '@/src/components/TripPhaseAdminActions';
 import { TripClosedBanner, TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
@@ -17,7 +18,16 @@ import { useTrip } from '@/src/hooks/useTrip';
 export default function TripSummaryScreen() {
   const { user } = useAuth();
   const { isWide } = useLayout();
-  const { trip, expenses, payments, isAdmin, isFinanceLead, phase } = useTrip();
+  const {
+    trip,
+    expenses,
+    payments,
+    members,
+    isAdmin,
+    isFinanceLead,
+    canMutate,
+    phase,
+  } = useTrip();
 
   const balance = useMemo(() => {
     if (!user) return null;
@@ -69,6 +79,17 @@ export default function TripSummaryScreen() {
           currentUid={user.uid}
         />
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+
+        <PendingConsolidationCard
+          tripId={trip.id}
+          currentUid={user.uid}
+          isAdmin={isAdmin}
+          isFinanceLead={isFinanceLead}
+          canMutate={canMutate}
+          payments={payments}
+          expenses={expenses}
+          members={members}
+        />
 
         {isWide ? (
           <View style={styles.dashRow}>
