@@ -18,7 +18,7 @@ import {
 } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
-import { createExpense, updateExpense, uploadTripFile } from '@/src/services/expenses';
+import { canManageExpense, createExpense, updateExpense, uploadTripFile } from '@/src/services/expenses';
 import type { Expense, ExpenseCategory, ExpenseKind } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
 import { colors, radii, spacing } from '@/src/theme';
@@ -337,6 +337,21 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
+    if (
+      mode === 'edit' &&
+      initialExpense &&
+      !canManageExpense(initialExpense, {
+        uid: user.uid,
+        isAdmin,
+        isFinanceLead,
+      })
+    ) {
+      showError(
+        'Apenas quem lançou, o admin ou o responsável financeiro podem editar.',
+        'Sem permissão'
+      );
+      return;
+    }
     if (!title.trim() || !totalValue) {
       showError('Preencha título e valor.', 'Campos obrigatórios');
       return;
@@ -372,6 +387,7 @@ export function ExpenseForm({ mode, initialExpense }: Props) {
           tripId: trip.id,
           expenseId: initialExpense.id,
           existing: initialExpense,
+          actorUid: user.uid,
           kind,
           title,
           category,

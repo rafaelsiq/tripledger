@@ -2,6 +2,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
@@ -21,6 +22,8 @@ import {
   nextOpenInstallment,
   splitStatus,
 } from '@/src/lib/finance';
+import { closedTripMemberMessage, canMutateTrip } from '@/src/lib/tripPhase';
+import { getTrip } from '@/src/services/trips';
 import type {
   ConsolidationRequest,
   Expense,
@@ -31,6 +34,39 @@ import type {
   Payment,
   Settlement,
 } from '@/src/types';
+
+/** Author of the lançamento, trip admin, or finance lead. */
+export function canManageExpense(
+  expense: Pick<Expense, 'createdByUid'>,
+  actor: { uid: string; isAdmin: boolean; isFinanceLead?: boolean }
+) {
+  if (actor.isAdmin || actor.isFinanceLead) return true;
+  return !!expense.createdByUid && expense.createdByUid === actor.uid;
+}
+
+async function assertCanManageExpense(input: {
+  tripId: string;
+  expense: Expense;
+  actorUid: string;
+}) {
+  const trip = await getTrip(input.tripId);
+  if (!trip) throw new Error('Viagem não encontrada.');
+  const isAdmin = trip.adminUid === input.actorUid;
+  const isFinanceLead = trip.financeLeadUid === input.actorUid;
+  if (!canMutateTrip(trip, { isAdmin, isFinanceLead })) {
+    throw new Error(closedTripMemberMessage());
+  }
+  if (
+    !canManageExpense(input.expense, {
+      uid: input.actorUid,
+      isAdmin,
+      isFinanceLead,
+    })
+  ) {
+    throw new Error('Apenas quem lançou, o admin ou o responsável financeiro podem alterar este lançamento.');
+  }
+  return trip;
+}
 
 async function uploadTripFile(
   tripId: string,
@@ -454,6 +490,7 @@ export async function updateExpense(input: {
   tripId: string;
   expenseId: string;
   existing: Expense;
+  actorUid: string;
   kind: ExpenseKind;
   title: string;
   category: ExpenseCategory;
@@ -467,6 +504,12 @@ export async function updateExpense(input: {
   clearReceipt?: boolean;
   dueDate?: string;
 }) {
+  await assertCanManageExpense({
+    tripId: input.tripId,
+    expense: input.existing,
+    actorUid: input.actorUid,
+  });
+
   const defaultCount = clampInstallmentCount(input.defaultInstallmentCount, 1);
 
   if (input.customSplits?.length) {
@@ -554,7 +597,12 @@ export async function updateExpense(input: {
   });
 }
 
-export async function deleteExpense(tripId: string, expenseId: string) {
+export async function deleteExpense(tripId: string, expenseId: string, actorUid: string) {
+  const expenseSnap = await getDoc(doc(db, 'trips', tripId, 'expenses', expenseId));
+  if (!expenseSnap.exists()) throw new Error('Lançamento não encontrado.');
+  const expense = { id: expenseSnap.id, ...(expenseSnap.data() as Omit<Expense, 'id'>) };
+  await assertCanManageExpense({ tripId, expense, actorUid });
+
   const paymentsSnap = await getDocs(
     query(
       collection(db, 'trips', tripId, 'payments'),

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Body, Button, Card, EmptyState, Input, Label, Screen } from '@/src/components/ui';
@@ -121,7 +121,9 @@ export default function MembersScreen() {
     }
     const ok = await confirmAction({
       title: 'Vincular placeholder',
-      message: `Tudo que estava em “${dummy.displayName}” (despesas, pagamentos e acertos) passará para ${real.displayName}, e o placeholder será removido.`,
+      message: `Tudo que estava em “${dummy.displayName}” (despesas, pagamentos e acertos) passará para ${real.displayName}${
+        real.email ? ` (${real.email})` : ''
+      }, e o placeholder será removido.`,
       confirmText: 'Vincular',
     });
     if (!ok) return;
@@ -212,16 +214,36 @@ export default function MembersScreen() {
                 {linking && realMembers.length > 0 ? (
                   <View style={styles.linkBox}>
                     <Label>Vincular a</Label>
-                    {realMembers.map((real) => (
-                      <Button
-                        key={real.uid}
-                        title={real.displayName}
-                        variant="secondary"
-                        disabled={busyUid === item.uid}
-                        loading={busyUid === item.uid}
-                        onPress={() => onLink(item, real)}
-                      />
-                    ))}
+                    <Body muted>
+                      Escolha a conta real que herda o que estava em “{item.displayName}”.
+                    </Body>
+                    {realMembers.map((real) => {
+                      const realIsFinance = real.uid === trip.financeLeadUid;
+                      const realIsYou = real.uid === user.uid;
+                      const meta = [
+                        real.email || null,
+                        real.role === 'admin' ? 'Admin' : null,
+                        realIsFinance ? 'Resp. financeiro' : null,
+                        realIsYou ? 'Você' : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ');
+                      return (
+                        <Pressable
+                          key={real.uid}
+                          disabled={busyUid === item.uid}
+                          onPress={() => onLink(item, real)}
+                          style={({ pressed }) => [
+                            styles.linkOption,
+                            pressed && { opacity: 0.88 },
+                            busyUid === item.uid && { opacity: 0.55 },
+                          ]}
+                        >
+                          <Text style={styles.linkOptionName}>{real.displayName}</Text>
+                          {meta ? <Text style={styles.linkOptionMeta}>{meta}</Text> : null}
+                        </Pressable>
+                      );
+                    })}
                     <Button title="Cancelar" variant="ghost" onPress={() => setLinkingUid(null)} />
                   </View>
                 ) : null}
@@ -285,5 +307,24 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderRadius: radii.md,
     backgroundColor: colors.surfaceMuted,
+  },
+  linkOption: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radii.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    gap: 2,
+  },
+  linkOptionName: {
+    fontFamily: fonts.uiBold,
+    color: colors.ink,
+    fontSize: 15,
+  },
+  linkOptionMeta: {
+    fontFamily: fonts.ui,
+    color: colors.inkSoft,
+    fontSize: 12,
   },
 });

@@ -64,8 +64,9 @@ export default function TripLayout() {
     );
   }
 
-  const tabIconArea = isWide ? 52 : 50;
-  const bottomInset = isWide ? 0 : Math.max(insets.bottom, Platform.OS === 'web' ? 8 : 0);
+  const bottomInset = isWide
+    ? 10
+    : Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 0);
 
   return (
     <TripProvider value={value}>
@@ -83,13 +84,20 @@ export default function TripLayout() {
             borderBottomColor: colors.border,
             borderTopWidth: isWide ? 0 : 1,
             borderBottomWidth: isWide ? 1 : 0,
-            height: tabIconArea + bottomInset + (isWide ? 8 : 0),
-            paddingTop: isWide ? 8 : 4,
-            paddingBottom: isWide ? 8 : bottomInset,
+            paddingTop: isWide ? 10 : 8,
+            paddingBottom: bottomInset,
+          },
+          tabBarItemStyle: {
+            paddingTop: 4,
+            paddingBottom: 2,
           },
           tabBarLabelStyle: {
             fontSize: isWide ? 13 : 11,
             fontWeight: '600',
+            lineHeight: isWide ? 16 : 14,
+          },
+          tabBarIconStyle: {
+            marginBottom: 0,
           },
         }}
       >

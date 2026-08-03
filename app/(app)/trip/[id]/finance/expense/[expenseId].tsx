@@ -23,6 +23,7 @@ import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   confirmPayment,
+  canManageExpense,
   deleteExpense,
   registerPayment,
   rejectPayment,
@@ -62,6 +63,15 @@ export default function ExpenseDetailScreen() {
   const expense = expenses.find((e) => e.id === expenseId);
   const expensePayments = payments.filter((p) => p.expenseId === expenseId);
   const canManageFinance = isAdmin || isFinanceLead;
+  const canManageThisExpense =
+    !!user &&
+    !!expense &&
+    canMutate &&
+    canManageExpense(expense, {
+      uid: user.uid,
+      isAdmin,
+      isFinanceLead,
+    });
 
   React.useEffect(() => {
     if (!trip) return;
@@ -276,12 +286,26 @@ export default function ExpenseDetailScreen() {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
+    if (!canManageThisExpense) {
+      showError(
+        'Apenas quem lançou, o admin ou o responsável financeiro podem editar.',
+        'Sem permissão'
+      );
+      return;
+    }
     router.push(`/(app)/trip/${currentTrip.id}/finance/edit/${currentExpense.id}`);
   }
 
   async function onDelete() {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    if (!canManageThisExpense) {
+      showError(
+        'Apenas quem lançou, o admin ou o responsável financeiro podem excluir.',
+        'Sem permissão'
+      );
       return;
     }
     const confirmed = await confirmAction({
@@ -294,7 +318,7 @@ export default function ExpenseDetailScreen() {
     if (!confirmed) return;
     try {
       setDeleting(true);
-      await deleteExpense(currentTrip.id, currentExpense.id);
+      await deleteExpense(currentTrip.id, currentExpense.id, currentUser.uid);
       showSuccess('Lançamento excluído');
       router.back();
     } catch (e) {
@@ -366,7 +390,7 @@ export default function ExpenseDetailScreen() {
       <Stack.Screen
         options={{
           title: 'Despesa',
-          headerRight: canMutate
+          headerRight: canManageThisExpense
             ? () => (
                 <Pressable
                   onPress={onEdit}
@@ -594,7 +618,7 @@ export default function ExpenseDetailScreen() {
           </Card>
         ) : null}
 
-        {canMutate ? (
+        {canManageThisExpense ? (
           <View style={styles.deleteBlock}>
             <Body muted>Remove o lançamento e os pagamentos ligados a ele.</Body>
             <Button
