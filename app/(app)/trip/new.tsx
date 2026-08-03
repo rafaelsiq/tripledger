@@ -6,6 +6,7 @@ import { Button, Input, Screen, Title, Body } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { daysFromTodayValue, todayValue } from '@/src/lib/dates';
+import { getResolvedUserProfile } from '@/src/services/auth';
 import { createTrip } from '@/src/services/trips';
 import { spacing } from '@/src/theme';
 
@@ -46,17 +47,14 @@ export default function NewTripScreen() {
     }
     try {
       setLoading(true);
+      const admin = await getResolvedUserProfile(user);
       const trip = await createTrip({
         name,
         destination,
         description,
         startDate,
         endDate,
-        admin: {
-          uid: user.uid,
-          displayName: profile.displayName,
-          email: profile.email,
-        },
+        admin,
       });
       showSuccess('Viagem criada', trip.name);
       router.replace(`/(app)/trip/${trip.id}`);

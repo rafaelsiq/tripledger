@@ -1,18 +1,23 @@
-import React, { useMemo } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Card, EmptyState, Label, Screen } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
+import { useToast } from '@/src/hooks/useToast';
+import { useTrip } from '@/src/hooks/useTrip';
+import { exportCsvFile } from '@/src/lib/exportCsv';
+import { buildFinanceCsv, financeCsvFilename } from '@/src/lib/financeCsv';
 import { CATEGORY_LABELS } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
-import { useTrip } from '@/src/hooks/useTrip';
 
 export default function FinanceHome() {
   const router = useRouter();
+  const { showError, showSuccess } = useToast();
   const { trip, expenses, payments, members, canMutate, isAdmin, isFinanceLead } = useTrip();
+  const [exporting, setExporting] = useState(false);
 
   const totals = useMemo(() => {
     const relevant = expenses.filter((e) => e.kind !== 'income');
@@ -24,6 +29,21 @@ export default function FinanceHome() {
     return { total, paid };
   }, [expenses]);
 
+  async function onExportCsv() {
+    if (!trip || exporting) return;
+    try {
+      setExporting(true);
+      const csv = buildFinanceCsv({ trip, expenses, payments, members });
+      await exportCsvFile(financeCsvFilename(trip), csv);
+      showSuccess('CSV exportado', 'Lançamentos, pagamentos e totais inclusos.');
+    } catch (e) {
+      if (e instanceof Error && e.message === 'EXPORT_CANCELLED') return;
+      showError(e, 'Não foi possível exportar o CSV');
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (!trip) return null;
 
   return (
@@ -32,14 +52,34 @@ export default function FinanceHome() {
         options={{
           title: 'Finanças',
           headerRight: () => (
-            <Pressable
-              onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
-              hitSlop={10}
-              style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-            >
-              <Ionicons name="document-text-outline" size={18} color={colors.finance} />
-              <Text style={styles.headerActionText}>Relatório</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={onExportCsv}
+                disabled={exporting}
+                hitSlop={10}
+                accessibilityLabel="Exportar CSV"
+                style={({ pressed }) => [
+                  styles.headerAction,
+                  pressed && { opacity: 0.7 },
+                  exporting && { opacity: 0.55 },
+                ]}
+              >
+                {exporting ? (
+                  <ActivityIndicator size="small" color={colors.finance} />
+                ) : (
+                  <Ionicons name="download-outline" size={18} color={colors.finance} />
+                )}
+                <Text style={styles.headerActionText}>CSV</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
+                hitSlop={10}
+                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="document-text-outline" size={18} color={colors.finance} />
+                <Text style={styles.headerActionText}>Relatório</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -140,6 +180,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.md,
     marginTop: spacing.xs,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingRight: 4,
   },
   headerAction: {
     flexDirection: 'row',

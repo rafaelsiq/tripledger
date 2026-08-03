@@ -5,6 +5,7 @@ import { Body, Button, Input, Screen, Title } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { normalizeInviteCode } from '@/src/lib/invite';
+import { getResolvedUserProfile } from '@/src/services/auth';
 import { joinTripByCode } from '@/src/services/trips';
 import { spacing } from '@/src/theme';
 
@@ -35,11 +36,8 @@ export default function JoinTripScreen() {
     }
     try {
       setLoading(true);
-      const tripId = await joinTripByCode(normalized, {
-        uid: user.uid,
-        displayName: profile.displayName,
-        email: profile.email,
-      });
+      const resolved = await getResolvedUserProfile(user);
+      const tripId = await joinTripByCode(normalized, resolved);
       showSuccess('Você entrou na viagem');
       router.replace(`/(app)/trip/${tripId}`);
     } catch (e) {

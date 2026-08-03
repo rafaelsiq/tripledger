@@ -2,15 +2,23 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
-import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
+import { Badge, Button, Card, EmptyState, Input, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { formatDateLabel } from '@/src/lib/dates';
 import { normalizeTripPhase, phaseLabel } from '@/src/lib/tripPhase';
 import { logout } from '@/src/services/auth';
 import { subscribeUserTrips } from '@/src/services/trips';
-import type { Trip } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import type { Trip, TripPhase } from '@/src/types';
+import { PHASE_LABELS, TRIP_PHASES } from '@/src/types';
+import { colors, fonts, radii, spacing } from '@/src/theme';
+
+type PhaseFilter = 'all' | TripPhase;
+
+const PHASE_FILTERS: { id: PhaseFilter; label: string }[] = [
+  { id: 'all', label: 'Todas' },
+  ...TRIP_PHASES.map((id) => ({ id, label: PHASE_LABELS[id] })),
+];
 
 function TripRow({
   item,
@@ -68,6 +76,8 @@ export default function TripsHome() {
   const { isWide } = useLayout();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [query, setQuery] = useState('');
+  const [phaseFilter, setPhaseFilter] = useState<PhaseFilter>('all');
 
   useEffect(() => {
     if (!user) return;
@@ -78,6 +88,22 @@ export default function TripsHome() {
     () => trips.filter((t) => user && t.adminUid === user.uid),
     [trips, user]
   );
+
+  const filteredTrips = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return trips.filter((trip) => {
+      const phase = normalizeTripPhase(trip.phase);
+      if (phaseFilter !== 'all' && phase !== phaseFilter) return false;
+      if (!q) return true;
+      const haystack = [trip.name, trip.destination, trip.description]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
+    });
+  }, [trips, query, phaseFilter]);
+
+  const hasActiveFilter = query.trim().length > 0 || phaseFilter !== 'all';
 
   return (
     <Screen ambient style={{ paddingTop: spacing.sm }}>
@@ -116,9 +142,53 @@ export default function TripsHome() {
           ))
         : null}
 
+      {trips.length > 0 ? (
+        <View style={styles.filters}>
+          <Input
+            label="Buscar"
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Título, destino…"
+            autoCorrect={false}
+            clearButtonMode="while-editing"
+          />
+          <View style={styles.phaseRow}>
+            {PHASE_FILTERS.map((item) => {
+              const active = phaseFilter === item.id;
+              return (
+                <Pressable
+                  key={item.id}
+                  onPress={() => setPhaseFilter(item.id)}
+                  style={({ pressed }) => [
+                    styles.phaseChip,
+                    active && styles.phaseChipActive,
+                    pressed && { opacity: 0.88 },
+                  ]}
+                >
+                  <Text style={[styles.phaseChipText, active && styles.phaseChipTextActive]}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          {hasActiveFilter ? (
+            <Pressable
+              onPress={() => {
+                setQuery('');
+                setPhaseFilter('all');
+              }}
+              hitSlop={8}
+            >
+              <Text style={styles.clearFilters}>Limpar filtros</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
+
       <FlatList
         style={styles.list}
-        data={trips}
+        data={filteredTrips}
         key={isWide ? 'trips-grid' : 'trips-list'}
         keyExtractor={(item) => item.id}
         numColumns={isWide ? 2 : 1}
@@ -126,8 +196,16 @@ export default function TripsHome() {
         contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xxl }}
         ListEmptyComponent={
           <EmptyState
-            title="Nenhuma viagem ainda"
-            subtitle="Crie uma viagem ou entre com um código de convite."
+            title={
+              trips.length === 0
+                ? 'Nenhuma viagem ainda'
+                : 'Nenhuma viagem com esse filtro'
+            }
+            subtitle={
+              trips.length === 0
+                ? 'Crie uma viagem ou entre com um código de convite.'
+                : 'Tente outro título ou status.'
+            }
           />
         }
         renderItem={({ item, index }) => (
@@ -169,6 +247,38 @@ const styles = StyleSheet.create({
   actions: { gap: spacing.sm, marginBottom: spacing.lg },
   actionsWide: { flexDirection: 'row' },
   actionItem: { flex: 1 },
+  filters: { gap: spacing.sm, marginBottom: spacing.lg },
+  phaseRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  phaseChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  phaseChipActive: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  phaseChipText: {
+    fontFamily: fonts.uiSemi,
+    fontSize: 13,
+    color: colors.inkSoft,
+  },
+  phaseChipTextActive: {
+    color: colors.accentDark,
+  },
+  clearFilters: {
+    alignSelf: 'flex-start',
+    color: colors.inkMuted,
+    fontFamily: fonts.uiSemi,
+    fontSize: 13,
+  },
   list: { flex: 1 },
   gridRow: { gap: spacing.md },
   gridItem: { flex: 1 },

@@ -1,6 +1,13 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { subscribeAuth, getUserProfile } from '@/src/services/auth';
+import {
+  getResolvedUserProfile,
+  getUserProfile,
+  isGenericDisplayName,
+  resolveDisplayName,
+  subscribeAuth,
+  syncMembershipDisplayNames,
+} from '@/src/services/auth';
 import type { AppUser } from '@/src/types';
 
 type AuthContextValue = {
@@ -22,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let settled = false;
+    let cancelled = false;
 
     const finish = () => {
       if (!settled) {
@@ -38,22 +46,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(next);
         if (next) {
           try {
-            const p = await getUserProfile(next.uid);
-            setProfile(
-              p || {
-                uid: next.uid,
-                email: next.email || '',
-                displayName: next.displayName || 'Viajante',
-                createdAt: Date.now(),
+            // Registration writes the profile right after createUser; retry so we
+            // don't lock onto the old "Viajante" fallback from a race.
+            let p = await getUserProfile(next.uid);
+            if (!p || isGenericDisplayName(p.displayName)) {
+              for (let i = 0; i < 8 && !cancelled; i++) {
+                await new Promise((r) => setTimeout(r, 150));
+                p = await getUserProfile(next.uid);
+                if (p && !isGenericDisplayName(p.displayName)) break;
               }
-            );
-          } catch {
-            setProfile({
-              uid: next.uid,
-              email: next.email || '',
-              displayName: next.displayName || 'Viajante',
-              createdAt: Date.now(),
+            }
+
+            const displayName = resolveDisplayName({
+              displayName: p?.displayName ?? next.displayName,
+              email: p?.email || next.email,
             });
+            const nextProfile: AppUser = p
+              ? { ...p, displayName }
+              : {
+                  uid: next.uid,
+                  email: next.email || '',
+                  displayName,
+                  createdAt: Date.now(),
+                };
+
+            if (!cancelled) setProfile(nextProfile);
+
+            if (!isGenericDisplayName(displayName)) {
+              void syncMembershipDisplayNames(next.uid, displayName);
+            }
+          } catch {
+            if (!cancelled) {
+              const fallback = await getResolvedUserProfile(next).catch(() => null);
+              setProfile(
+                fallback
+                  ? {
+                      uid: fallback.uid,
+                      email: fallback.email,
+                      displayName: fallback.displayName,
+                      createdAt: Date.now(),
+                    }
+                  : {
+                      uid: next.uid,
+                      email: next.email || '',
+                      displayName: resolveDisplayName({
+                        displayName: next.displayName,
+                        email: next.email,
+                      }),
+                      createdAt: Date.now(),
+                    }
+              );
+            }
           }
         } else {
           setProfile(null);
@@ -65,6 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
+      cancelled = true;
       clearTimeout(timeout);
       unsub();
     };

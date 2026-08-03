@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
@@ -27,8 +28,36 @@ export default function ItineraryHome() {
 
   return (
     <Screen>
-      <Text style={styles.hero}>Roteiro</Text>
-      <Text style={styles.sub}>Cada dia, uma história visual da viagem.</Text>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
+              hitSlop={10}
+              accessibilityLabel="Ver calendário do roteiro"
+              style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+              <Text style={styles.headerActionText}>Calendário</Text>
+            </Pressable>
+          ),
+        }}
+      />
+
+      <View style={styles.heroRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.hero}>Roteiro</Text>
+          <Text style={styles.sub}>Cada dia, uma história visual da viagem.</Text>
+        </View>
+        <Pressable
+          onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
+          style={({ pressed }) => [styles.calendarBtn, pressed && { opacity: 0.88 }]}
+        >
+          <Ionicons name="calendar-outline" size={18} color={colors.white} />
+          <Text style={styles.calendarBtnText}>Calendário</Text>
+        </Pressable>
+      </View>
+
       <View style={{ marginBottom: spacing.md }}>
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
       </View>
@@ -70,6 +99,12 @@ export default function ItineraryHome() {
 }
 
 const styles = StyleSheet.create({
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
+  },
   hero: {
     color: colors.ink,
     fontSize: 34,
@@ -79,8 +114,34 @@ const styles = StyleSheet.create({
   sub: {
     color: colors.inkSoft,
     fontFamily: fonts.ui,
-    marginBottom: spacing.lg,
     marginTop: 6,
+  },
+  headerAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  headerActionText: {
+    color: colors.accent,
+    fontFamily: fonts.uiSemi,
+    fontSize: 14,
+  },
+  calendarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accent,
+    borderRadius: radii.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  calendarBtnText: {
+    color: colors.white,
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
   },
   list: { flex: 1 },
   gridRow: { gap: spacing.md },

@@ -12,6 +12,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { TripProvider } from '@/src/hooks/useTrip';
 import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
+import { TripSwitcher } from '@/src/components/TripSwitcher';
 
 export default function TripLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -75,6 +76,8 @@ export default function TripLayout() {
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
           headerLeft: () => <TripHomeBackButton />,
+          headerTitle: () => <TripSwitcher />,
+          headerTitleAlign: 'left',
           tabBarPosition: isWide ? 'top' : 'bottom',
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.inkMuted,
@@ -104,7 +107,7 @@ export default function TripLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: trip?.name || 'Resumo',
+            title: 'Resumo',
             tabBarLabel: 'Resumo',
             tabBarIcon: ({ color, size }) => (
               <Ionicons name="home-outline" color={color} size={size} />

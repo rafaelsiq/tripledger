@@ -81,11 +81,13 @@ export default function TripSummaryScreen() {
               {accounting}
             </View>
             <View style={styles.dashCol}>
-              <InviteShareCard
-                tripName={trip.name}
-                inviteCode={trip.inviteCode}
-                isAdmin={isAdmin}
-              />
+              {isAdmin ? (
+                <InviteShareCard
+                  tripName={trip.name}
+                  inviteCode={trip.inviteCode}
+                  isAdmin
+                />
+              ) : null}
               <TripPhaseAdminActions
                 trip={trip}
                 adminUid={trip.adminUid}
@@ -101,11 +103,13 @@ export default function TripSummaryScreen() {
               pendingFromMe={balance.pendingFromMe}
             />
             {accounting}
-            <InviteShareCard
-              tripName={trip.name}
-              inviteCode={trip.inviteCode}
-              isAdmin={isAdmin}
-            />
+            {isAdmin ? (
+              <InviteShareCard
+                tripName={trip.name}
+                inviteCode={trip.inviteCode}
+                isAdmin
+              />
+            ) : null}
             <TripPhaseAdminActions
               trip={trip}
               adminUid={trip.adminUid}

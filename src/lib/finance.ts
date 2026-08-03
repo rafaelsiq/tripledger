@@ -225,6 +225,23 @@ export function expenseTotals(expenses: Expense[]) {
   return { planned, actual, income };
 }
 
+/** Billable expense total vs how much members have already paid toward splits. */
+export function paymentProgress(expenses: Expense[]) {
+  const billable = expenses.filter((e) => e.kind !== 'income');
+  let total = 0;
+  let paid = 0;
+  for (const expense of billable) {
+    total += expense.amount;
+    for (const split of expense.splits) {
+      paid += split.paidAmount;
+    }
+  }
+  total = Math.round(total * 100) / 100;
+  paid = Math.round(paid * 100) / 100;
+  const open = Math.max(0, Math.round((total - paid) * 100) / 100);
+  return { total, paid, open, billable };
+}
+
 export function datesBetween(start: string, end: string): string[] {
   const dates: string[] = [];
   const cursor = new Date(`${start}T12:00:00`);

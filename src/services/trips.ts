@@ -76,7 +76,7 @@ export async function createTrip(input: {
 
   const member: TripMember = {
     uid: input.admin.uid,
-    displayName: input.admin.displayName,
+    displayName: input.admin.displayName.trim(),
     email: input.admin.email,
     role: 'admin',
     joinedAt: now,
@@ -145,6 +145,17 @@ export async function joinTripByCode(
       joinedAt: Date.now(),
       role: 'member',
     });
+  } else {
+    const current = existing.data() as TripMember;
+    if (
+      current.displayName !== user.displayName ||
+      (user.email && current.email !== user.email)
+    ) {
+      await safeUpdateDoc(memberRef, {
+        displayName: user.displayName,
+        ...(user.email ? { email: user.email } : {}),
+      });
+    }
   }
   return tripId;
 }

@@ -24,6 +24,8 @@ export function InviteShareCard({ tripName, inviteCode, isAdmin = false }: Props
   const code = useMemo(() => normalizeInviteCode(inviteCode), [inviteCode]);
   const inviteUrl = useMemo(() => buildInviteShareUrl(code), [code]);
 
+  if (!isAdmin) return null;
+
   async function copyCode() {
     try {
       setBusy('code');
@@ -88,61 +90,49 @@ export function InviteShareCard({ tripName, inviteCode, isAdmin = false }: Props
     <Card style={styles.card}>
       <View style={styles.header}>
         <Label>Convite</Label>
-        {isAdmin ? <Text style={styles.adminHint}>Somente você compartilha</Text> : null}
+        <Text style={styles.adminHint}>Somente você compartilha</Text>
       </View>
 
       <Body muted>
-        {isAdmin
-          ? 'Compartilhe o código ou o link para novos membros entrarem na viagem.'
-          : 'Peça o código ou o link de convite ao administrador do grupo.'}
+        Compartilhe o código ou o link para novos membros entrarem na viagem.
       </Body>
 
       <Pressable
-        onPress={isAdmin ? copyCode : undefined}
-        disabled={!isAdmin || busy === 'code'}
-        style={({ pressed }) => [
-          styles.codeBox,
-          isAdmin && pressed && styles.codeBoxPressed,
-          !isAdmin && styles.codeBoxReadonly,
-        ]}
-        accessibilityRole={isAdmin ? 'button' : 'text'}
+        onPress={copyCode}
+        disabled={busy === 'code'}
+        style={({ pressed }) => [styles.codeBox, pressed && styles.codeBoxPressed]}
+        accessibilityRole="button"
         accessibilityLabel={`Código de convite ${code}`}
       >
         <Text style={styles.code}>{code}</Text>
-        {isAdmin ? (
-          <View style={styles.copyHint}>
-            <Ionicons name="copy-outline" size={18} color={colors.accent} />
-            <Text style={styles.copyHintText}>Copiar código</Text>
-          </View>
-        ) : null}
+        <View style={styles.copyHint}>
+          <Ionicons name="copy-outline" size={18} color={colors.accent} />
+          <Text style={styles.copyHintText}>Copiar código</Text>
+        </View>
       </Pressable>
 
-      {isAdmin ? (
-        <>
-          <View style={styles.linkRow}>
-            <Ionicons name="link-outline" size={16} color={colors.inkMuted} />
-            <Text style={styles.linkText} numberOfLines={2}>
-              {inviteUrl}
-            </Text>
-          </View>
+      <View style={styles.linkRow}>
+        <Ionicons name="link-outline" size={16} color={colors.inkMuted} />
+        <Text style={styles.linkText} numberOfLines={2}>
+          {inviteUrl}
+        </Text>
+      </View>
 
-          <View style={styles.actions}>
-            <Button
-              title="Copiar link"
-              variant="secondary"
-              onPress={copyLink}
-              loading={busy === 'link'}
-              disabled={!!busy && busy !== 'link'}
-            />
-            <Button
-              title="Compartilhar"
-              onPress={shareInvite}
-              loading={busy === 'share'}
-              disabled={!!busy && busy !== 'share'}
-            />
-          </View>
-        </>
-      ) : null}
+      <View style={styles.actions}>
+        <Button
+          title="Copiar link"
+          variant="secondary"
+          onPress={copyLink}
+          loading={busy === 'link'}
+          disabled={!!busy && busy !== 'link'}
+        />
+        <Button
+          title="Compartilhar"
+          onPress={shareInvite}
+          loading={busy === 'share'}
+          disabled={!!busy && busy !== 'share'}
+        />
+      </View>
     </Card>
   );
 }
@@ -175,9 +165,6 @@ const styles = StyleSheet.create({
   },
   codeBoxPressed: {
     backgroundColor: '#D7EDE7',
-  },
-  codeBoxReadonly: {
-    opacity: 0.92,
   },
   code: {
     fontSize: 32,

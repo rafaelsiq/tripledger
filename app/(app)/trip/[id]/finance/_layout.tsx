@@ -1,5 +1,6 @@
 import { Stack } from 'expo-router';
 import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
+import { TripSwitcher } from '@/src/components/TripSwitcher';
 import { colors, fonts } from '@/src/theme';
 
 export default function FinanceLayout() {
@@ -11,19 +12,15 @@ export default function FinanceLayout() {
         headerTintColor: colors.ink,
         headerTitleStyle: { fontFamily: fonts.uiSemi },
         contentStyle: { backgroundColor: colors.bg },
+        headerTitle: () => <TripSwitcher />,
+        headerTitleAlign: 'left',
       }}
     >
-      <Stack.Screen
-        name="index"
-        options={{ title: 'Finanças', headerLeft: () => <TripHomeBackButton /> }}
-      />
-      <Stack.Screen name="new" options={{ title: 'Novo lançamento', presentation: 'modal' }} />
-      <Stack.Screen
-        name="edit/[expenseId]"
-        options={{ title: 'Editar lançamento', presentation: 'modal' }}
-      />
-      <Stack.Screen name="expense/[expenseId]" options={{ title: 'Despesa' }} />
-      <Stack.Screen name="report" options={{ title: 'Relatório final' }} />
+      <Stack.Screen name="index" options={{ headerLeft: () => <TripHomeBackButton /> }} />
+      <Stack.Screen name="new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="edit/[expenseId]" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="expense/[expenseId]" />
+      <Stack.Screen name="report" />
     </Stack>
   );
 }
