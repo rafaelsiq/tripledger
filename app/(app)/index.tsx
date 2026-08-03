@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Button, Card, EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useLayout } from '@/src/hooks/useLayout';
 import { formatDateLabel } from '@/src/lib/dates';
 import { normalizeTripPhase, phaseLabel } from '@/src/lib/tripPhase';
 import { logout } from '@/src/services/auth';
@@ -64,6 +65,7 @@ function TripRow({
 
 export default function TripsHome() {
   const { user, profile } = useAuth();
+  const { isWide } = useLayout();
   const router = useRouter();
   const [trips, setTrips] = useState<Trip[]>([]);
 
@@ -89,13 +91,17 @@ export default function TripsHome() {
         </Pressable>
       </View>
 
-      <View style={styles.actions}>
-        <Button title="Criar viagem" onPress={() => router.push('/(app)/trip/new')} />
-        <Button
-          title="Entrar com código"
-          variant="secondary"
-          onPress={() => router.push('/(app)/trip/join')}
-        />
+      <View style={[styles.actions, isWide && styles.actionsWide]}>
+        <View style={isWide ? styles.actionItem : undefined}>
+          <Button title="Criar viagem" onPress={() => router.push('/(app)/trip/new')} />
+        </View>
+        <View style={isWide ? styles.actionItem : undefined}>
+          <Button
+            title="Entrar com código"
+            variant="secondary"
+            onPress={() => router.push('/(app)/trip/join')}
+          />
+        </View>
       </View>
 
       {user
@@ -111,8 +117,12 @@ export default function TripsHome() {
         : null}
 
       <FlatList
+        style={styles.list}
         data={trips}
+        key={isWide ? 'trips-grid' : 'trips-list'}
         keyExtractor={(item) => item.id}
+        numColumns={isWide ? 2 : 1}
+        columnWrapperStyle={isWide ? styles.gridRow : undefined}
         contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xxl }}
         ListEmptyComponent={
           <EmptyState
@@ -121,11 +131,13 @@ export default function TripsHome() {
           />
         }
         renderItem={({ item, index }) => (
-          <TripRow
-            item={item}
-            index={index}
-            onPress={() => router.push(`/(app)/trip/${item.id}`)}
-          />
+          <View style={isWide ? styles.gridItem : undefined}>
+            <TripRow
+              item={item}
+              index={index}
+              onPress={() => router.push(`/(app)/trip/${item.id}`)}
+            />
+          </View>
         )}
       />
     </Screen>
@@ -155,6 +167,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiSemi,
   },
   actions: { gap: spacing.sm, marginBottom: spacing.lg },
+  actionsWide: { flexDirection: 'row' },
+  actionItem: { flex: 1 },
+  list: { flex: 1 },
+  gridRow: { gap: spacing.md },
+  gridItem: { flex: 1 },
   tripCard: { gap: spacing.xs },
   tripTop: {
     flexDirection: 'row',

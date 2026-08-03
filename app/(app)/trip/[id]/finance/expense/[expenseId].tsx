@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -19,6 +19,7 @@ import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { nextOpenInstallment } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
+import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   confirmPayment,
@@ -278,34 +279,29 @@ export default function ExpenseDetailScreen() {
     router.push(`/(app)/trip/${currentTrip.id}/finance/edit/${currentExpense.id}`);
   }
 
-  function onDelete() {
+  async function onDelete() {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
-    Alert.alert(
-      'Excluir lançamento',
-      'Isso remove o lançamento e os pagamentos ligados a ele. Essa ação não pode ser desfeita.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Excluir',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setDeleting(true);
-              await deleteExpense(currentTrip.id, currentExpense.id);
-              showSuccess('Lançamento excluído');
-              router.back();
-            } catch (e) {
-              showError(e, 'Falha ao excluir');
-            } finally {
-              setDeleting(false);
-            }
-          },
-        },
-      ]
-    );
+    const confirmed = await confirmAction({
+      title: 'Excluir lançamento',
+      message:
+        'Isso remove o lançamento e os pagamentos ligados a ele. Essa ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      setDeleting(true);
+      await deleteExpense(currentTrip.id, currentExpense.id);
+      showSuccess('Lançamento excluído');
+      router.back();
+    } catch (e) {
+      showError(e, 'Falha ao excluir');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   const pendingForMe = expensePayments.filter(

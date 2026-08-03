@@ -45,6 +45,7 @@ export default function FinanceHome() {
       />
 
       <FlatList
+        style={styles.listFlex}
         data={expenses}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -124,6 +125,7 @@ export default function FinanceHome() {
 }
 
 const styles = StyleSheet.create({
+  listFlex: { flex: 1 },
   list: {
     gap: spacing.sm,
     paddingBottom: spacing.xxl,

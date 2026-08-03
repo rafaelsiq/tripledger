@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   },
   media: {
     width: '100%',
-    height: 280,
+    aspectRatio: 4 / 3,
     backgroundColor: colors.surfaceMuted,
   },
   caption: {

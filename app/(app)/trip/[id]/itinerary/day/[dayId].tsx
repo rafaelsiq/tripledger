@@ -30,6 +30,7 @@ export default function DayDetailScreen() {
   return (
     <Screen>
       <FlatList
+        style={styles.listFlex}
         data={items}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
@@ -90,6 +91,7 @@ export default function DayDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  listFlex: { flex: 1 },
   list: {
     paddingBottom: spacing.xxl,
   },

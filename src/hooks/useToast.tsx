@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { getErrorMessage } from '@/src/lib/errors';
+import { useLayout } from '@/src/hooks/useLayout';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
 type ToastTone = 'error' | 'success' | 'info';
@@ -25,6 +26,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
   const idRef = useRef(1);
   const opacity = useRef(new Animated.Value(0)).current;
+  const { toastMaxWidth } = useLayout();
 
   const dismiss = useCallback((id: number) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -69,6 +71,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             onPress={() => dismiss(current.id)}
             style={[
               styles.toast,
+              { maxWidth: toastMaxWidth },
               current.tone === 'error' && styles.error,
               current.tone === 'success' && styles.success,
               current.tone === 'info' && styles.info,
@@ -97,13 +100,16 @@ export function useToast() {
 const styles = StyleSheet.create({
   wrap: {
     position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
+    left: 0,
+    right: 0,
     top: 56,
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
     zIndex: 9999,
     elevation: 9999,
   },
   toast: {
+    width: '100%',
     borderRadius: radii.md,
     paddingHorizontal: spacing.md,
     paddingVertical: 14,

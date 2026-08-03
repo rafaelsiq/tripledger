@@ -48,6 +48,18 @@ export const radii = {
   xl: 24,
 };
 
+export const layout = {
+  /** Website content width (not a phone shell). */
+  contentMaxWidth: 1280,
+  /** Auth / dense forms stay readable. */
+  formMaxWidth: 420,
+  toastMaxWidth: 440,
+  breakpointMd: 768,
+  breakpointLg: 1100,
+  pagePadding: 16,
+  pagePaddingWide: 40,
+};
+
 export const shadows = {
   card: {
     shadowColor: colors.ink,

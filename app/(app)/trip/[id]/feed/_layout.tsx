@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 import { colors, fonts } from '@/src/theme';
 
 export default function FeedLayout() {
@@ -12,7 +13,10 @@ export default function FeedLayout() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Feed da viagem' }} />
+      <Stack.Screen
+        name="index"
+        options={{ title: 'Feed da viagem', headerLeft: () => <TripHomeBackButton /> }}
+      />
       <Stack.Screen name="new" options={{ title: 'Novo post', presentation: 'modal' }} />
     </Stack>
   );

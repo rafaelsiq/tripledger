@@ -1,19 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { ActivityIndicator, Platform, View } from 'react-native';
 import { Tabs, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { subscribeExpenses, subscribePayments } from '@/src/services/expenses';
 import { subscribeMembers, subscribeTrip } from '@/src/services/trips';
 import { canMutateTrip, normalizeTripPhase } from '@/src/lib/tripPhase';
 import type { Expense, Payment, Trip, TripMember } from '@/src/types';
 import { colors } from '@/src/theme';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useLayout } from '@/src/hooks/useLayout';
 import { TripProvider } from '@/src/hooks/useTrip';
+import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 
 export default function TripLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const tripId = String(id);
   const { user } = useAuth();
+  const { isWide } = useLayout();
+  const insets = useSafeAreaInsets();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -59,22 +64,31 @@ export default function TripLayout() {
     );
   }
 
+  const tabIconArea = isWide ? 52 : 50;
+  const bottomInset = isWide ? 0 : Math.max(insets.bottom, Platform.OS === 'web' ? 8 : 0);
+
   return (
     <TripProvider value={value}>
       <Tabs
         screenOptions={{
           headerStyle: { backgroundColor: colors.bg },
           headerShadowVisible: false,
+          headerLeft: () => <TripHomeBackButton />,
+          tabBarPosition: isWide ? 'top' : 'bottom',
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.inkMuted,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
-            height: 60,
-            paddingTop: 4,
+            borderBottomColor: colors.border,
+            borderTopWidth: isWide ? 0 : 1,
+            borderBottomWidth: isWide ? 1 : 0,
+            height: tabIconArea + bottomInset + (isWide ? 8 : 0),
+            paddingTop: isWide ? 8 : 4,
+            paddingBottom: isWide ? 8 : bottomInset,
           },
           tabBarLabelStyle: {
-            fontSize: 11,
+            fontSize: isWide ? 13 : 11,
             fontWeight: '600',
           },
         }}

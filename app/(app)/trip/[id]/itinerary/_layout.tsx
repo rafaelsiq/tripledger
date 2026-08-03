@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 import { colors, fonts } from '@/src/theme';
 
 export default function ItineraryLayout() {
@@ -12,7 +13,10 @@ export default function ItineraryLayout() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'Roteiro' }} />
+      <Stack.Screen
+        name="index"
+        options={{ title: 'Roteiro', headerLeft: () => <TripHomeBackButton /> }}
+      />
       <Stack.Screen name="day/[dayId]" options={{ title: 'Dia' }} />
       <Stack.Screen name="item/[itemId]" options={{ title: 'Atividade' }} />
       <Stack.Screen

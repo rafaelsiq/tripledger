@@ -10,30 +10,44 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useLayout } from '@/src/hooks/useLayout';
 import { colors, fonts, radii, shadows, spacing, typography } from '@/src/theme';
 
 export function Screen({
   children,
   style,
   ambient = false,
+  narrow = false,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
   ambient?: boolean;
+  /** Cap to form width (auth / short forms). Default uses full website content width. */
+  narrow?: boolean;
 }) {
-  if (ambient) {
-    return (
-      <View style={[styles.screen, style]}>
+  const { contentMaxWidth, formMaxWidth, pagePadding } = useLayout();
+  const maxWidth = narrow ? formMaxWidth : contentMaxWidth;
+
+  return (
+    <View style={styles.screen}>
+      {ambient ? (
         <LinearGradient
           colors={['#E8F3F0', colors.bg, colors.bg]}
           locations={[0, 0.35, 1]}
           style={StyleSheet.absoluteFill}
         />
-        <View style={styles.screenContent}>{children}</View>
+      ) : null}
+      <View
+        style={[
+          styles.screenContent,
+          { maxWidth, paddingHorizontal: pagePadding, paddingVertical: pagePadding },
+          style,
+        ]}
+      >
+        {children}
       </View>
-    );
-  }
-  return <View style={[styles.screen, style]}>{children}</View>;
+    </View>
+  );
 }
 
 export function Card({
@@ -170,10 +184,11 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: colors.bg,
-    padding: spacing.md,
   },
   screenContent: {
     flex: 1,
+    width: '100%',
+    alignSelf: 'center',
   },
   card: {
     backgroundColor: colors.surface,

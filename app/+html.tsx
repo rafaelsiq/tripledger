@@ -25,6 +25,14 @@ export default function Root({ children }: { children: ReactNode }) {
             __html: `
               if ('serviceWorker' in navigator) {
                 window.addEventListener('load', function () {
+                  var host = location.hostname;
+                  var isLocal = host === 'localhost' || host === '127.0.0.1';
+                  if (isLocal) {
+                    navigator.serviceWorker.getRegistrations().then(function (regs) {
+                      regs.forEach(function (r) { r.unregister(); });
+                    });
+                    return;
+                  }
                   navigator.serviceWorker.register('/sw.js').catch(function () {});
                 });
               }
@@ -38,6 +46,15 @@ export default function Root({ children }: { children: ReactNode }) {
 }
 
 const responsiveBackground = `
+html, body, #root {
+  height: 100%;
+}
 body {
   background-color: #F4F6F8;
+  margin: 0;
+  overflow: hidden;
+}
+#root {
+  display: flex;
+  flex-direction: column;
 }`;
