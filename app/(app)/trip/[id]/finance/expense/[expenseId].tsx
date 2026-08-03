@@ -359,7 +359,9 @@ export default function ExpenseDetailScreen() {
   }
 
   const pendingForMe = expensePayments.filter(
-    (p) => p.status === 'pending' && (p.toUid === currentUser.uid || isFinanceLead)
+    (p) =>
+      p.status === 'pending' &&
+      (p.toUid === currentUser.uid || isFinanceLead || isAdmin)
   );
 
   function installmentRef(paymentInstallmentId?: string) {
