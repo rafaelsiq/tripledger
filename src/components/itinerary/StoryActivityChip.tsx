@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatItemSchedule } from '@/src/lib/itineraryStory';
+import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
@@ -12,21 +12,30 @@ type Props = {
 /** Compact highlight row for storytelling day chapters. */
 export function StoryActivityChip({ item, onPress }: Props) {
   const schedule = formatItemSchedule(item);
+  const isRest = itemKind(item) === 'rest';
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.chip, pressed && { opacity: 0.88 }]}
+      style={({ pressed }) => [
+        styles.chip,
+        isRest && styles.chipRest,
+        pressed && { opacity: 0.88 },
+      ]}
     >
       {item.imageUrl ? (
         <Image source={{ uri: item.imageUrl }} style={styles.thumb} />
       ) : (
-        <View style={[styles.thumb, styles.thumbFallback]}>
-          <Text style={styles.thumbLetter}>{item.title.slice(0, 1).toUpperCase()}</Text>
+        <View style={[styles.thumb, styles.thumbFallback, isRest && styles.thumbRest]}>
+          <Text style={[styles.thumbLetter, isRest && styles.thumbLetterRest]}>
+            {item.title.slice(0, 1).toUpperCase()}
+          </Text>
         </View>
       )}
       <View style={styles.body}>
-        {schedule ? <Text style={styles.time}>{schedule}</Text> : null}
+        {schedule ? (
+          <Text style={[styles.time, isRest && styles.timeRest]}>{schedule}</Text>
+        ) : null}
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>
@@ -49,6 +58,9 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     padding: spacing.sm,
   },
+  chipRest: {
+    backgroundColor: colors.financeSoft,
+  },
   thumb: {
     width: 52,
     height: 52,
@@ -59,10 +71,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  thumbRest: {
+    backgroundColor: '#D7E3EC',
+  },
   thumbLetter: {
     fontFamily: fonts.displayBold,
     fontSize: 20,
     color: colors.accent,
+  },
+  thumbLetterRest: {
+    color: colors.finance,
   },
   body: { flex: 1, gap: 2 },
   time: {
@@ -70,6 +88,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.accent,
     letterSpacing: 0.3,
+  },
+  timeRest: {
+    color: colors.finance,
   },
   title: {
     fontFamily: fonts.uiBold,

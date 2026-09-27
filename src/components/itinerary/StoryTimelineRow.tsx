@@ -1,6 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatItemSchedule } from '@/src/lib/itineraryStory';
+import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -21,6 +21,7 @@ export function StoryTimelineRow({
   cardWidth = 260,
 }: Props) {
   const schedule = formatItemSchedule(item);
+  const isRest = itemKind(item) === 'rest';
 
   return (
     <View style={styles.wrap}>
@@ -29,15 +30,20 @@ export function StoryTimelineRow({
         style={({ pressed }) => [
           styles.card,
           { width: cardWidth },
+          isRest && styles.cardRest,
           pressed && { opacity: 0.92 },
         ]}
       >
-        <Text style={styles.time}>{schedule || timeLabel}</Text>
+        <Text style={[styles.time, isRest && styles.timeRest]}>
+          {schedule || timeLabel}
+        </Text>
         {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
         ) : (
-          <View style={[styles.image, styles.imageFallback]}>
-            <Text style={styles.fallbackText}>{item.title.slice(0, 1).toUpperCase()}</Text>
+          <View style={[styles.image, styles.imageFallback, isRest && styles.imageFallbackRest]}>
+            <Text style={[styles.fallbackText, isRest && styles.fallbackTextRest]}>
+              {item.title.slice(0, 1).toUpperCase()}
+            </Text>
           </View>
         )}
         <View style={styles.body}>
@@ -76,6 +82,9 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     ...shadows.card,
   },
+  cardRest: {
+    borderColor: '#D7E3EC',
+  },
   time: {
     fontFamily: fonts.uiBold,
     fontSize: 13,
@@ -83,6 +92,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     letterSpacing: 0.3,
+  },
+  timeRest: {
+    color: colors.finance,
   },
   image: {
     width: '100%',
@@ -94,10 +106,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  imageFallbackRest: {
+    backgroundColor: colors.financeSoft,
+  },
   fallbackText: {
     fontFamily: fonts.displayBold,
     fontSize: 40,
     color: colors.accent,
+  },
+  fallbackTextRest: {
+    color: colors.finance,
   },
   body: {
     gap: 4,

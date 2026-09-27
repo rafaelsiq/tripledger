@@ -18,6 +18,7 @@ import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { memberLabel } from '@/src/lib/members';
 import { confirmAction } from '@/src/lib/notify';
+import { itemKind } from '@/src/lib/itineraryStory';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   canManageItineraryItem,
@@ -28,7 +29,7 @@ import {
   toggleItemDone,
 } from '@/src/services/itinerary';
 import type { ItineraryItem, ItineraryVoteValue } from '@/src/types';
-import { ITINERARY_VOTE_LABELS } from '@/src/types';
+import { ITINERARY_ITEM_KIND_LABELS, ITINERARY_VOTE_LABELS } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
 const VOTE_OPTIONS: {
@@ -241,14 +242,34 @@ export default function ItineraryItemDetailScreen() {
         <View style={styles.header}>
           {currentItem.time || currentItem.endTime ? (
             <View style={styles.scheduleBlock}>
-              {currentItem.time ? (
-                <Text style={styles.time}>Ida {currentItem.time}</Text>
-              ) : null}
-              {currentItem.endTime ? (
-                <Text style={styles.time}>Volta à estadia {currentItem.endTime}</Text>
-              ) : null}
+              {itemKind(currentItem) === 'rest' ? (
+                <>
+                  {currentItem.time ? (
+                    <Text style={[styles.time, styles.timeRest]}>
+                      Início {currentItem.time}
+                    </Text>
+                  ) : null}
+                  {currentItem.endTime ? (
+                    <Text style={[styles.time, styles.timeRest]}>
+                      Fim {currentItem.endTime}
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {currentItem.time ? (
+                    <Text style={styles.time}>Ida {currentItem.time}</Text>
+                  ) : null}
+                  {currentItem.endTime ? (
+                    <Text style={styles.time}>Volta à estadia {currentItem.endTime}</Text>
+                  ) : null}
+                </>
+              )}
             </View>
           ) : null}
+          <Text style={styles.kindLabel}>
+            {ITINERARY_ITEM_KIND_LABELS[itemKind(currentItem)]}
+          </Text>
           <Text style={styles.title}>{currentItem.title}</Text>
           {currentItem.location ? (
             <Text style={styles.location}>{currentItem.location}</Text>
@@ -403,6 +424,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiBold,
     fontSize: 12,
     letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  timeRest: {
+    color: colors.finance,
+  },
+  kindLabel: {
+    color: colors.inkSoft,
+    fontFamily: fonts.uiBold,
+    fontSize: 12,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   title: {

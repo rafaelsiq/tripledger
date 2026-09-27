@@ -1,4 +1,9 @@
-import type { ItineraryItem } from '@/src/types';
+import type { ItineraryItem, ItineraryItemKind } from '@/src/types';
+
+/** Resolve kind with legacy default. */
+export function itemKind(item: Pick<ItineraryItem, 'kind'>): ItineraryItemKind {
+  return item.kind === 'rest' ? 'rest' : 'activity';
+}
 
 /** Parse free-text activity time (`HH:mm` / `H:mm`) into minutes from midnight. */
 export function parseItemTime(time?: string | null): number | null {
@@ -14,19 +19,23 @@ export function parseItemTime(time?: string | null): number | null {
   return hours * 60 + minutes;
 }
 
-/** Compact ida → volta label for cards and chips. */
+/** Compact schedule label for cards and chips. */
 export function formatItemSchedule(
-  item: Pick<ItineraryItem, 'time' | 'endTime'>
+  item: Pick<ItineraryItem, 'time' | 'endTime' | 'kind'>
 ): string | null {
   const start = item.time?.trim();
   const end = item.endTime?.trim();
-  if (start && end) return `${start} → ${end}`;
-  if (start) return `Ida ${start}`;
-  if (end) return `Volta ${end}`;
+  const rest = itemKind(item) === 'rest';
+
+  if (start && end) {
+    return rest ? `Descanso ${start} → ${end}` : `${start} → ${end}`;
+  }
+  if (start) return rest ? `Início ${start}` : `Ida ${start}`;
+  if (end) return rest ? `Fim ${end}` : `Volta ${end}`;
   return null;
 }
 
-/** True when both departure and return times are present and parseable. */
+/** True when both start and end times are present and parseable. */
 export function hasCompleteActivityWindow(
   item: Pick<ItineraryItem, 'time' | 'endTime'>
 ): boolean {
