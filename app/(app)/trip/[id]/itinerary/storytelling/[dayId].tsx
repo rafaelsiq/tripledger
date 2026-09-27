@@ -6,15 +6,24 @@ import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { StoryTimelineRow } from '@/src/components/itinerary/StoryTimelineRow';
 import { Body, EmptyState, Label, Screen } from '@/src/components/ui';
+import { useLayout } from '@/src/hooks/useLayout';
 import { useTrip } from '@/src/hooks/useTrip';
 import { parseItemTime, splitTimedAndUntimed } from '@/src/lib/itineraryStory';
 import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, spacing } from '@/src/theme';
 
+function timeLabelOf(item: ItineraryItem) {
+  const minutes = parseItemTime(item.time);
+  if (item.time?.trim()) return item.time.trim();
+  if (minutes === null) return '—';
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+}
+
 export default function StorytellingDayScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
   const { trip, isAdmin, isFinanceLead } = useTrip();
+  const { isWide } = useLayout();
   const router = useRouter();
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [items, setItems] = useState<ItineraryItem[]>([]);
@@ -39,16 +48,24 @@ export default function StorytellingDayScreen() {
   );
 
   const { timed, untimed } = useMemo(() => splitTimedAndUntimed(items), [items]);
+  const cardWidth = isWide ? 280 : 240;
 
   if (!trip) return null;
 
   const title = day?.title || (dayIndex >= 0 ? `Dia ${dayIndex + 1}` : 'Dia');
 
+  function openItem(item: ItineraryItem) {
+    router.push({
+      pathname: `/(app)/trip/${trip!.id}/itinerary/item/[itemId]` as never,
+      params: { itemId: item.id, dayId: String(dayId) },
+    });
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Timeline do dia' }} />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.content}>
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
 
         <View style={styles.hero}>
@@ -61,7 +78,9 @@ export default function StorytellingDayScreen() {
               {format(parseISO(day.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
             </Text>
           ) : null}
-          <Body muted>Atividades ordenadas do início ao fim do dia (00:00–23:59).</Body>
+          <Body muted>
+            Deslize na horizontal — atividades de 00:00 a 23:59.
+          </Body>
         </View>
 
         {!items.length ? (
@@ -70,66 +89,64 @@ export default function StorytellingDayScreen() {
             subtitle="Ainda não há atividades neste dia."
           />
         ) : (
-          <View style={styles.timeline}>
+          <View style={styles.sections}>
             {timed.length ? (
               <View style={styles.block}>
                 <Label>Ao longo do dia</Label>
-                {timed.map((item, index) => {
-                  const minutes = parseItemTime(item.time);
-                  const timeLabel =
-                    item.time?.trim() ||
-                    (minutes !== null
-                      ? `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
-                      : '--:--');
-                  return (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.track}
+                  decelerationRate="fast"
+                >
+                  {timed.map((item, index) => (
                     <StoryTimelineRow
                       key={item.id}
                       item={item}
-                      timeLabel={timeLabel}
-                      isLast={index === timed.length - 1 && untimed.length === 0}
-                      onPress={() =>
-                        router.push({
-                          pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                          params: { itemId: item.id, dayId: String(dayId) },
-                        })
-                      }
+                      timeLabel={timeLabelOf(item)}
+                      cardWidth={cardWidth}
+                      isLast={index === timed.length - 1}
+                      onPress={() => openItem(item)}
                     />
-                  );
-                })}
+                  ))}
+                </ScrollView>
               </View>
             ) : null}
 
             {untimed.length ? (
               <View style={styles.block}>
                 <Label>Sem horário</Label>
-                <Body muted>Atividades sem horário definido ficam ao final da timeline.</Body>
-                {untimed.map((item, index) => (
-                  <StoryTimelineRow
-                    key={item.id}
-                    item={item}
-                    timeLabel="—"
-                    isLast={index === untimed.length - 1}
-                    onPress={() =>
-                      router.push({
-                        pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                        params: { itemId: item.id, dayId: String(dayId) },
-                      })
-                    }
-                  />
-                ))}
+                <Body muted>Ficam ao final da sequência do dia.</Body>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.track}
+                  decelerationRate="fast"
+                >
+                  {untimed.map((item, index) => (
+                    <StoryTimelineRow
+                      key={item.id}
+                      item={item}
+                      timeLabel="—"
+                      cardWidth={cardWidth}
+                      isLast={index === untimed.length - 1}
+                      onPress={() => openItem(item)}
+                    />
+                  ))}
+                </ScrollView>
               </View>
             ) : null}
           </View>
         )}
-      </ScrollView>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
+    flex: 1,
     gap: spacing.md,
-    paddingBottom: spacing.xxl,
   },
   hero: { gap: spacing.xs },
   dayIndex: {
@@ -151,6 +168,11 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     marginBottom: 4,
   },
-  timeline: { gap: spacing.lg },
+  sections: { gap: spacing.lg, flex: 1 },
   block: { gap: spacing.sm },
+  track: {
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.lg,
+    alignItems: 'stretch',
+  },
 });

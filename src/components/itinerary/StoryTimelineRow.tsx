@@ -8,21 +8,28 @@ type Props = {
   timeLabel: string;
   onPress: () => void;
   isLast?: boolean;
+  cardWidth?: number;
 };
 
-/** Single activity on the storytelling day timeline. */
-export function StoryTimelineRow({ item, timeLabel, onPress, isLast }: Props) {
+/** Horizontal timeline card for storytelling day view. */
+export function StoryTimelineRow({
+  item,
+  timeLabel,
+  onPress,
+  isLast,
+  cardWidth = 260,
+}: Props) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && { opacity: 0.9 }]}
-    >
-      <View style={styles.rail}>
+    <View style={styles.wrap}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.card,
+          { width: cardWidth },
+          pressed && { opacity: 0.92 },
+        ]}
+      >
         <Text style={styles.time}>{timeLabel}</Text>
-        <View style={styles.dot} />
-        {!isLast ? <View style={styles.line} /> : null}
-      </View>
-      <View style={styles.card}>
         {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
         ) : (
@@ -40,63 +47,42 @@ export function StoryTimelineRow({ item, timeLabel, onPress, isLast }: Props) {
             </Text>
           ) : null}
           {item.description ? (
-            <Text style={styles.desc} numberOfLines={2}>
+            <Text style={styles.desc} numberOfLines={3}>
               {item.description}
             </Text>
           ) : null}
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+      {!isLast ? <View style={styles.connector} /> : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
+  wrap: {
     flexDirection: 'row',
-    gap: spacing.md,
-    minHeight: 96,
-  },
-  rail: {
-    width: 52,
     alignItems: 'center',
   },
-  time: {
-    fontFamily: fonts.uiBold,
-    fontSize: 12,
-    color: colors.accent,
-    marginBottom: 6,
-  },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
-    borderWidth: 2,
-    borderColor: colors.accentSoft,
-  },
-  line: {
-    flex: 1,
-    width: 2,
-    backgroundColor: colors.border,
-    marginTop: 4,
-    minHeight: 40,
-  },
   card: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: spacing.sm,
     backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
-    marginBottom: spacing.md,
     ...shadows.card,
   },
+  time: {
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.accent,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    letterSpacing: 0.3,
+  },
   image: {
-    width: 84,
-    minHeight: 84,
-    alignSelf: 'stretch',
+    width: '100%',
+    height: 150,
+    marginTop: spacing.sm,
     backgroundColor: colors.accentSoft,
   },
   imageFallback: {
@@ -105,18 +91,16 @@ const styles = StyleSheet.create({
   },
   fallbackText: {
     fontFamily: fonts.displayBold,
-    fontSize: 28,
+    fontSize: 40,
     color: colors.accent,
   },
   body: {
-    flex: 1,
     gap: 4,
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.sm,
+    padding: spacing.md,
   },
   title: {
     fontFamily: fonts.uiBold,
-    fontSize: 15,
+    fontSize: 16,
     color: colors.ink,
   },
   meta: {
@@ -129,5 +113,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.inkMuted,
     lineHeight: 17,
+  },
+  connector: {
+    width: 28,
+    height: 2,
+    backgroundColor: colors.border,
+    marginHorizontal: 4,
   },
 });
