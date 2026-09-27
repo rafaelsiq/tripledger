@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatItemSchedule } from '@/src/lib/itineraryStory';
 import { countVotes } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
@@ -11,6 +12,7 @@ type Props = {
 
 export function ItineraryCard({ item, onPress }: Props) {
   const counts = useMemo(() => countVotes(item), [item]);
+  const schedule = formatItemSchedule(item);
 
   return (
     <Pressable
@@ -26,7 +28,7 @@ export function ItineraryCard({ item, onPress }: Props) {
       )}
       <View style={styles.body}>
         <View style={styles.meta}>
-          {item.time ? <Text style={styles.time}>{item.time}</Text> : null}
+          {schedule ? <Text style={styles.time}>{schedule}</Text> : null}
           {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
         </View>
         <Text style={styles.title}>{item.title}</Text>

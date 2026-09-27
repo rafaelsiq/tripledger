@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
@@ -7,6 +7,7 @@ import { Body, Button, Input, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { parseItemTime } from '@/src/lib/itineraryStory';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
   canManageItineraryItem,
@@ -39,6 +40,7 @@ export function ItineraryItemForm({
   const [title, setTitle] = useState(initialItem?.title || '');
   const [description, setDescription] = useState(initialItem?.description || '');
   const [time, setTime] = useState(initialItem?.time || initialTime || '');
+  const [endTime, setEndTime] = useState(initialItem?.endTime || '');
   const [location, setLocation] = useState(initialItem?.location || '');
   const [mapUrl, setMapUrl] = useState(initialItem?.mapUrl || '');
   const [imageUri, setImageUri] = useState<string | undefined>();
@@ -56,6 +58,7 @@ export function ItineraryItemForm({
     setTitle(initialItem.title || '');
     setDescription(initialItem.description || '');
     setTime(initialItem.time || '');
+    setEndTime(initialItem.endTime || '');
     setLocation(initialItem.location || '');
     setMapUrl(initialItem.mapUrl || '');
     setExistingImageUrl(initialItem.imageUrl);
@@ -106,6 +109,22 @@ export function ItineraryItemForm({
       showError('Informe um título.', 'Campo obrigatório');
       return;
     }
+
+    const departMinutes = parseItemTime(time);
+    const returnMinutes = parseItemTime(endTime);
+    if (departMinutes === null) {
+      showError('Use o formato HH:mm (ex.: 09:30).', 'Horário de ida');
+      return;
+    }
+    if (returnMinutes === null) {
+      showError('Use o formato HH:mm (ex.: 12:00).', 'Horário de volta à estadia');
+      return;
+    }
+    if (returnMinutes <= departMinutes) {
+      showError('A volta à estadia precisa ser depois da ida.', 'Horários');
+      return;
+    }
+
     try {
       setLoading(true);
       if (mode === 'edit' && initialItem) {
@@ -117,6 +136,7 @@ export function ItineraryItemForm({
           title,
           description,
           time,
+          endTime,
           location,
           mapUrl,
           imageUri,
@@ -130,6 +150,7 @@ export function ItineraryItemForm({
           title,
           description,
           time,
+          endTime,
           location,
           mapUrl,
           imageUri,
@@ -189,7 +210,29 @@ export function ItineraryItemForm({
           onChangeText={setDescription}
           placeholder="Levar água e protetor"
         />
-        <Input label="Horário" value={time} onChangeText={setTime} placeholder="09:30" />
+        <View style={styles.timeRow}>
+          <View style={styles.timeField}>
+            <Input
+              label="Horário de ida"
+              value={time}
+              onChangeText={setTime}
+              placeholder="09:30"
+              autoCapitalize="none"
+            />
+          </View>
+          <View style={styles.timeField}>
+            <Input
+              label="Volta à estadia"
+              value={endTime}
+              onChangeText={setEndTime}
+              placeholder="12:00"
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
+        <Body muted>
+          Ida = saída da estadia. Volta = retorno à estadia.
+        </Body>
         <Input
           label="Local"
           value={location}
@@ -222,4 +265,11 @@ export function ItineraryItemForm({
 
 const styles = StyleSheet.create({
   form: { gap: spacing.md, paddingBottom: spacing.xxl },
+  timeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  timeField: {
+    flex: 1,
+  },
 });

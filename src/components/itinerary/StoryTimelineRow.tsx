@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatItemSchedule } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -19,6 +20,8 @@ export function StoryTimelineRow({
   isLast,
   cardWidth = 260,
 }: Props) {
+  const schedule = formatItemSchedule(item);
+
   return (
     <View style={styles.wrap}>
       <Pressable
@@ -29,7 +32,7 @@ export function StoryTimelineRow({
           pressed && { opacity: 0.92 },
         ]}
       >
-        <Text style={styles.time}>{timeLabel}</Text>
+        <Text style={styles.time}>{schedule || timeLabel}</Text>
         {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.image} />
         ) : (

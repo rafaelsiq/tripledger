@@ -1,5 +1,6 @@
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { formatItemSchedule } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
@@ -10,6 +11,8 @@ type Props = {
 
 /** Compact highlight row for storytelling day chapters. */
 export function StoryActivityChip({ item, onPress }: Props) {
+  const schedule = formatItemSchedule(item);
+
   return (
     <Pressable
       onPress={onPress}
@@ -23,7 +26,7 @@ export function StoryActivityChip({ item, onPress }: Props) {
         </View>
       )}
       <View style={styles.body}>
-        {item.time ? <Text style={styles.time}>{item.time}</Text> : null}
+        {schedule ? <Text style={styles.time}>{schedule}</Text> : null}
         <Text style={styles.title} numberOfLines={2}>
           {item.title}
         </Text>

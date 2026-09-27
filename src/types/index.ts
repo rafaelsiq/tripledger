@@ -139,7 +139,10 @@ export interface ItineraryItem {
   title: string;
   description?: string;
   imageUrl?: string;
+  /** Departure from the stay (ida). Used for timeline ordering. */
   time?: string;
+  /** Return to the stay (volta à estadia). */
+  endTime?: string;
   location?: string;
   mapUrl?: string;
   order: number;
