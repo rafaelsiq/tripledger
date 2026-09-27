@@ -1,6 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
@@ -15,13 +23,20 @@ import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itiner
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, spacing } from '@/src/theme';
 
+const BRIDGE_WIDTH = 88;
+const HOUR_GAP = spacing.md;
+/** Advance roughly one screen of hours per arrow tap. */
+const PAGE_HOURS = 3;
+
 export default function StorytellingDayScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
   const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { isWide } = useLayout();
   const router = useRouter();
+  const railRef = useRef<ScrollView>(null);
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [items, setItems] = useState<ItineraryItem[]>([]);
+  const [activeHour, setActiveHour] = useState(0);
 
   useEffect(() => {
     if (!trip) return;
@@ -44,14 +59,25 @@ export default function StorytellingDayScreen() {
 
   const { hours, untimed } = useMemo(() => buildHourSlots(items), [items]);
   const hourWidth = isWide ? 180 : 150;
+  const hourStep = hourWidth + HOUR_GAP;
   const untimedCardWidth = isWide ? 240 : 200;
 
   const prevDay = dayIndex > 0 ? days[dayIndex - 1] : undefined;
   const nextDay = dayIndex >= 0 && dayIndex < days.length - 1 ? days[dayIndex + 1] : undefined;
+  const bridgeOffset = prevDay ? BRIDGE_WIDTH : 0;
+
+  const canGoPrev = activeHour > 0;
+  const canGoNext = activeHour < Math.max(0, hours.length - 1);
+
+  useEffect(() => {
+    setActiveHour(0);
+    railRef.current?.scrollTo({ x: 0, animated: false });
+  }, [dayId]);
 
   if (!trip) return null;
 
   const title = day?.title || (dayIndex >= 0 ? `Dia ${dayIndex + 1}` : 'Dia');
+  const activeLabel = hours[activeHour]?.label ?? '00:00';
 
   function openItem(item: ItineraryItem) {
     router.push({
@@ -76,6 +102,19 @@ export default function StorytellingDayScreen() {
     router.replace(`/(app)/trip/${trip!.id}/itinerary/storytelling/${targetId}`);
   }
 
+  function scrollToHour(index: number) {
+    const next = Math.max(0, Math.min(hours.length - 1, index));
+    setActiveHour(next);
+    railRef.current?.scrollTo({
+      x: bridgeOffset + next * hourStep,
+      animated: true,
+    });
+  }
+
+  function scrollByPage(direction: -1 | 1) {
+    scrollToHour(activeHour + direction * PAGE_HOURS);
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Timeline do dia' }} />
@@ -94,51 +133,107 @@ export default function StorytellingDayScreen() {
             </Text>
           ) : null}
           <Body muted>
-            Do amanhecer à noite — e a sequência segue no dia seguinte.
+            Do amanhecer à noite — use as setas para percorrer os horários.
           </Body>
         </View>
 
         <View style={styles.block}>
           <Label>Horários do dia</Label>
-          <ScrollView
-            horizontal
-            nestedScrollEnabled
-            showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
-            style={styles.rail}
-            contentContainerStyle={styles.track}
-          >
-            {prevDay ? (
-              <StoryDayBridge
-                compact
-                fromLabel={`Dia ${dayIndex}`}
-                toLabel={`Dia ${dayIndex + 1}`}
-                onPress={() => openDay(prevDay.id)}
-              />
-            ) : null}
+          <View style={styles.railWrap}>
+            <View style={styles.railRow}>
+              <Pressable
+                onPress={() => scrollByPage(-1)}
+                disabled={!canGoPrev}
+                accessibilityRole="button"
+                accessibilityLabel="Horários anteriores"
+                style={({ pressed }) => [
+                  styles.sideBtn,
+                  !canGoPrev && styles.sideBtnDisabled,
+                  pressed && canGoPrev && { opacity: 0.85 },
+                ]}
+              >
+                <Ionicons
+                  name="chevron-back"
+                  size={22}
+                  color={canGoPrev ? colors.accent : colors.inkMuted}
+                />
+              </Pressable>
 
-            {hours.map((slot, index) => (
-              <StoryHourColumn
-                key={slot.label}
-                timeLabel={slot.label}
-                items={slot.items}
-                canAdd={canMutate}
-                width={hourWidth}
-                isLast={index === hours.length - 1 && !nextDay}
-                onAdd={() => addAtTime(slot.label)}
-                onOpenItem={openItem}
-              />
-            ))}
+              <ScrollView
+                ref={railRef}
+                horizontal
+                nestedScrollEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="fast"
+                snapToInterval={hourStep}
+                snapToAlignment="start"
+                disableIntervalMomentum
+                style={styles.rail}
+                contentContainerStyle={styles.track}
+                onScroll={(e) => {
+                  const x = e.nativeEvent.contentOffset.x;
+                  const next = Math.round(Math.max(0, x - bridgeOffset) / hourStep);
+                  if (next !== activeHour) {
+                    setActiveHour(Math.max(0, Math.min(hours.length - 1, next)));
+                  }
+                }}
+                scrollEventThrottle={16}
+              >
+                {prevDay ? (
+                  <StoryDayBridge
+                    compact
+                    fromLabel={`Dia ${dayIndex}`}
+                    toLabel={`Dia ${dayIndex + 1}`}
+                    onPress={() => openDay(prevDay.id)}
+                  />
+                ) : null}
 
-            {nextDay ? (
-              <StoryDayBridge
-                compact
-                fromLabel={`Dia ${dayIndex + 1}`}
-                toLabel={`Dia ${dayIndex + 2}`}
-                onPress={() => openDay(nextDay.id)}
-              />
-            ) : null}
-          </ScrollView>
+                {hours.map((slot, index) => (
+                  <StoryHourColumn
+                    key={slot.label}
+                    timeLabel={slot.label}
+                    items={slot.items}
+                    canAdd={canMutate}
+                    width={hourWidth}
+                    isLast={index === hours.length - 1 && !nextDay}
+                    onAdd={() => addAtTime(slot.label)}
+                    onOpenItem={openItem}
+                  />
+                ))}
+
+                {nextDay ? (
+                  <StoryDayBridge
+                    compact
+                    fromLabel={`Dia ${dayIndex + 1}`}
+                    toLabel={`Dia ${dayIndex + 2}`}
+                    onPress={() => openDay(nextDay.id)}
+                  />
+                ) : null}
+              </ScrollView>
+
+              <Pressable
+                onPress={() => scrollByPage(1)}
+                disabled={!canGoNext}
+                accessibilityRole="button"
+                accessibilityLabel="Próximos horários"
+                style={({ pressed }) => [
+                  styles.sideBtn,
+                  !canGoNext && styles.sideBtnDisabled,
+                  pressed && canGoNext && { opacity: 0.85 },
+                ]}
+              >
+                <Ionicons
+                  name="chevron-forward"
+                  size={22}
+                  color={canGoNext ? colors.accent : colors.inkMuted}
+                />
+              </Pressable>
+            </View>
+
+            <Text style={styles.positionHint}>
+              {activeLabel} · hora {activeHour + 1} de {hours.length}
+            </Text>
+          </View>
         </View>
 
         {untimed.length ? (
@@ -148,7 +243,7 @@ export default function StorytellingDayScreen() {
             <ScrollView
               horizontal
               nestedScrollEnabled
-              showsHorizontalScrollIndicator
+              showsHorizontalScrollIndicator={false}
               style={styles.rail}
               contentContainerStyle={styles.track}
             >
@@ -196,12 +291,40 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   block: { gap: spacing.sm },
-  rail: {
+  railWrap: {
+    gap: spacing.sm,
     width: '100%',
+  },
+  railRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    width: '100%',
+  },
+  sideBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.accentSoft,
+    borderWidth: 1,
+    borderColor: '#C6E3DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  sideBtnDisabled: {
+    backgroundColor: colors.surfaceMuted,
+    borderColor: colors.border,
+  },
+  rail: {
+    flex: 1,
+    maxHeight: 320,
     ...(Platform.OS === 'web'
       ? ({
-          overflowX: 'auto',
+          overflowX: 'hidden',
           overflowY: 'hidden',
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         } as object)
       : null),
   },
@@ -210,5 +333,11 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     paddingVertical: spacing.sm,
     paddingRight: spacing.lg,
+  },
+  positionHint: {
+    textAlign: 'center',
+    fontFamily: fonts.uiSemi,
+    fontSize: 13,
+    color: colors.inkSoft,
   },
 });
