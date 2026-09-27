@@ -52,7 +52,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   wrapCompact: {
-    width: 88,
+    width: 72,
     minHeight: 220,
   },
   line: {
