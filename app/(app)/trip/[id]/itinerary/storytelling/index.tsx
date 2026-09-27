@@ -35,10 +35,10 @@ export default function StorytellingOverviewScreen() {
 
   const contentWidth = Math.min(width, 1280);
   const cardGap = spacing.md;
-  const cardWidth = Math.min(
-    Math.max(280, contentWidth - pagePadding * 2 - (isWide ? 80 : 24)),
-    420
-  );
+  // Narrow enough that several day cards sit side-by-side in the viewport.
+  const cardWidth = isWide
+    ? Math.min(300, Math.max(240, Math.floor((contentWidth - pagePadding * 2) / 3) - cardGap))
+    : Math.min(280, Math.max(220, width - pagePadding * 2 - 48));
 
   useEffect(() => {
     if (!trip) return;
@@ -69,7 +69,9 @@ export default function StorytellingOverviewScreen() {
 
       <View style={styles.hero}>
         <Text style={styles.heroTitle}>Storytelling</Text>
-        <Body muted>Deslize horizontalmente pelos dias — toque para abrir a timeline.</Body>
+        <Body muted>
+          Dias lado a lado — deslize na horizontal e toque para abrir a timeline.
+        </Body>
       </View>
 
       <View style={{ marginBottom: spacing.md }}>
@@ -88,7 +90,8 @@ export default function StorytellingOverviewScreen() {
             horizontal
             data={days}
             keyExtractor={(item) => item.id}
-            showsHorizontalScrollIndicator={false}
+            style={styles.dayRail}
+            showsHorizontalScrollIndicator
             decelerationRate="fast"
             snapToInterval={cardWidth + cardGap}
             snapToAlignment="start"
@@ -189,6 +192,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingVertical: spacing.sm,
     paddingRight: spacing.lg,
+    alignItems: 'stretch',
+  },
+  dayRail: {
+    flexGrow: 0,
   },
   chapter: {
     backgroundColor: colors.surface,
@@ -197,7 +204,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     padding: spacing.md,
     gap: spacing.md,
-    minHeight: 360,
+    minHeight: 340,
     ...shadows.card,
   },
   chapterHeader: { gap: 4 },
