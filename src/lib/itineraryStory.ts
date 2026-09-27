@@ -62,3 +62,46 @@ export function splitTimedAndUntimed(items: ItineraryItem[]): {
   }
   return { timed, untimed };
 }
+
+export type StoryHourSlot = {
+  hour: number;
+  label: string;
+  items: ItineraryItem[];
+};
+
+/** Fixed 00:00–23:00 hour slots for the storytelling day timeline. */
+export function buildHourSlots(items: ItineraryItem[]): {
+  hours: StoryHourSlot[];
+  untimed: ItineraryItem[];
+} {
+  const buckets: ItineraryItem[][] = Array.from({ length: 24 }, () => []);
+  const untimed: ItineraryItem[] = [];
+
+  for (const item of items) {
+    const minutes = parseItemTime(item.time);
+    if (minutes === null) {
+      untimed.push(item);
+      continue;
+    }
+    buckets[Math.floor(minutes / 60)]!.push(item);
+  }
+
+  for (const bucket of buckets) {
+    bucket.sort((a, b) => {
+      const ta = parseItemTime(a.time) ?? 0;
+      const tb = parseItemTime(b.time) ?? 0;
+      if (ta !== tb) return ta - tb;
+      return a.order - b.order;
+    });
+  }
+
+  untimed.sort((a, b) => a.order - b.order);
+
+  const hours: StoryHourSlot[] = buckets.map((hourItems, hour) => ({
+    hour,
+    label: `${String(hour).padStart(2, '0')}:00`,
+    items: hourItems,
+  }));
+
+  return { hours, untimed };
+}

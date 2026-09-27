@@ -1,11 +1,14 @@
 import React from 'react';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ItineraryItemForm } from '@/src/components/itinerary/ItineraryItemForm';
 import { Body, Button, Screen } from '@/src/components/ui';
-import { useRouter } from 'expo-router';
 
 export default function NewItineraryItem() {
-  const { dayId, order } = useLocalSearchParams<{ dayId: string; order?: string }>();
+  const { dayId, order, time } = useLocalSearchParams<{
+    dayId: string;
+    order?: string;
+    time?: string;
+  }>();
   const router = useRouter();
 
   if (!dayId) {
@@ -18,6 +21,11 @@ export default function NewItineraryItem() {
   }
 
   return (
-    <ItineraryItemForm mode="create" dayId={String(dayId)} order={Number(order) || 0} />
+    <ItineraryItemForm
+      mode="create"
+      dayId={String(dayId)}
+      order={Number(order) || 0}
+      initialTime={time ? String(time) : undefined}
+    />
   );
 }
