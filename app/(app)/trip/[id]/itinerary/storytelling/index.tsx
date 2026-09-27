@@ -1,9 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  FlatList,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -24,21 +23,19 @@ import {
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
+const CARD_WIDTH = 280;
+const CARD_GAP = spacing.md;
+
 export default function StorytellingOverviewScreen() {
   const { trip, isAdmin, isFinanceLead } = useTrip();
-  const { width, pagePadding, isWide } = useLayout();
+  const { isWide } = useLayout();
   const router = useRouter();
-  const listRef = useRef<FlatList<ItineraryDay>>(null);
+  const railRef = useRef<ScrollView>(null);
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [itemsByDay, setItemsByDay] = useState<Record<string, ItineraryItem[]>>({});
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const contentWidth = Math.min(width, 1280);
-  const cardGap = spacing.md;
-  // Narrow enough that several day cards sit side-by-side in the viewport.
-  const cardWidth = isWide
-    ? Math.min(300, Math.max(240, Math.floor((contentWidth - pagePadding * 2) / 3) - cardGap))
-    : Math.min(280, Math.max(220, width - pagePadding * 2 - 48));
+  const cardWidth = isWide ? 300 : CARD_WIDTH;
 
   useEffect(() => {
     if (!trip) return;
@@ -55,10 +52,13 @@ export default function StorytellingOverviewScreen() {
     return subscribeTripItineraryItems(trip.id, dayIds, setItemsByDay);
   }, [trip, dayIds.join('|')]);
 
-  function onScrollEnd(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const x = e.nativeEvent.contentOffset.x;
-    const next = Math.round(x / (cardWidth + cardGap));
-    setActiveIndex(Math.max(0, Math.min(days.length - 1, next)));
+  function scrollToDay(index: number) {
+    const next = Math.max(0, Math.min(days.length - 1, index));
+    setActiveIndex(next);
+    railRef.current?.scrollTo({
+      x: next * (cardWidth + CARD_GAP),
+      animated: true,
+    });
   }
 
   if (!trip) return null;
@@ -84,25 +84,33 @@ export default function StorytellingOverviewScreen() {
           subtitle="Defina as datas da viagem para gerar a agenda."
         />
       ) : (
-        <>
-          <FlatList
-            ref={listRef}
+        <View style={styles.railWrap}>
+          <ScrollView
+            ref={railRef}
             horizontal
-            data={days}
-            keyExtractor={(item) => item.id}
-            style={styles.dayRail}
+            nestedScrollEnabled
             showsHorizontalScrollIndicator
             decelerationRate="fast"
-            snapToInterval={cardWidth + cardGap}
+            snapToInterval={cardWidth + CARD_GAP}
             snapToAlignment="start"
             disableIntervalMomentum
-            contentContainerStyle={styles.listContent}
-            onMomentumScrollEnd={onScrollEnd}
-            renderItem={({ item, index }) => {
+            style={styles.rail}
+            contentContainerStyle={styles.railContent}
+            onScroll={(e) => {
+              const x = e.nativeEvent.contentOffset.x;
+              const next = Math.round(x / (cardWidth + CARD_GAP));
+              if (next !== activeIndex) {
+                setActiveIndex(Math.max(0, Math.min(days.length - 1, next)));
+              }
+            }}
+            scrollEventThrottle={16}
+          >
+            {days.map((item, index) => {
               const items = itemsByDay[item.id] || [];
               const highlights = pickMainActivities(items, 3);
               return (
                 <Pressable
+                  key={item.id}
                   onPress={() =>
                     router.push(
                       `/(app)/trip/${trip.id}/itinerary/storytelling/${item.id}`
@@ -110,7 +118,10 @@ export default function StorytellingOverviewScreen() {
                   }
                   style={({ pressed }) => [
                     styles.chapter,
-                    { width: cardWidth, marginRight: cardGap },
+                    {
+                      width: cardWidth,
+                      marginRight: index === days.length - 1 ? 0 : CARD_GAP,
+                    },
                     pressed && { opacity: 0.94 },
                   ]}
                 >
@@ -153,26 +164,20 @@ export default function StorytellingOverviewScreen() {
                   )}
                 </Pressable>
               );
-            }}
-          />
+            })}
+          </ScrollView>
 
           <View style={styles.dots}>
             {days.map((day, index) => (
               <Pressable
                 key={day.id}
-                onPress={() => {
-                  listRef.current?.scrollToOffset({
-                    offset: index * (cardWidth + cardGap),
-                    animated: true,
-                  });
-                  setActiveIndex(index);
-                }}
+                onPress={() => scrollToDay(index)}
                 style={[styles.dot, index === activeIndex && styles.dotOn]}
                 accessibilityLabel={`Ir para dia ${index + 1}`}
               />
             ))}
           </View>
-        </>
+        </View>
       )}
     </Screen>
   );
@@ -189,15 +194,29 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayBold,
     letterSpacing: -0.6,
   },
-  listContent: {
-    paddingVertical: spacing.sm,
-    paddingRight: spacing.lg,
-    alignItems: 'stretch',
+  railWrap: {
+    gap: spacing.sm,
+    width: '100%',
   },
-  dayRail: {
-    flexGrow: 0,
+  rail: {
+    width: '100%',
+    maxHeight: 440,
+    ...(Platform.OS === 'web'
+      ? ({
+          // Ensure the scroller itself never stacks children vertically on web.
+          overflowX: 'auto',
+          overflowY: 'hidden',
+        } as object)
+      : null),
+  },
+  railContent: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.md,
   },
   chapter: {
+    flexShrink: 0,
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     borderWidth: 1,
@@ -225,7 +244,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui,
     textTransform: 'capitalize',
   },
-  highlights: { gap: spacing.sm, flex: 1 },
+  highlights: { gap: spacing.sm, flexGrow: 1 },
   more: {
     fontFamily: fonts.uiSemi,
     fontSize: 12,
@@ -243,7 +262,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 8,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
   },
   dot: {
     width: 8,
