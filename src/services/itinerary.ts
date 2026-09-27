@@ -103,6 +103,7 @@ export async function createItineraryItem(input: {
   title: string;
   description?: string;
   time?: string;
+  endTime?: string;
   location?: string;
   mapUrl?: string;
   imageUri?: string;
@@ -121,6 +122,7 @@ export async function createItineraryItem(input: {
     description: optionalText(input.description),
     imageUrl,
     time: optionalText(input.time),
+    endTime: optionalText(input.endTime),
     location: optionalText(input.location),
     mapUrl: optionalText(input.mapUrl),
     order: input.order,
@@ -226,6 +228,7 @@ export async function updateItineraryItem(input: {
   title: string;
   description?: string;
   time?: string;
+  endTime?: string;
   location?: string;
   mapUrl?: string;
   imageUri?: string;
@@ -253,6 +256,7 @@ export async function updateItineraryItem(input: {
       title: input.title.trim(),
       description: optionalText(input.description) ?? null,
       time: optionalText(input.time) ?? null,
+      endTime: optionalText(input.endTime) ?? null,
       location: optionalText(input.location) ?? null,
       mapUrl: optionalText(input.mapUrl) ?? null,
       imageUrl: imageUrl ?? null,

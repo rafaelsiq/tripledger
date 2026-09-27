@@ -239,7 +239,16 @@ export default function ItineraryItemDetailScreen() {
         )}
 
         <View style={styles.header}>
-          {currentItem.time ? <Text style={styles.time}>{currentItem.time}</Text> : null}
+          {currentItem.time || currentItem.endTime ? (
+            <View style={styles.scheduleBlock}>
+              {currentItem.time ? (
+                <Text style={styles.time}>Ida {currentItem.time}</Text>
+              ) : null}
+              {currentItem.endTime ? (
+                <Text style={styles.time}>Volta à estadia {currentItem.endTime}</Text>
+              ) : null}
+            </View>
+          ) : null}
           <Text style={styles.title}>{currentItem.title}</Text>
           {currentItem.location ? (
             <Text style={styles.location}>{currentItem.location}</Text>
@@ -388,6 +397,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayBold,
   },
   header: { gap: spacing.sm },
+  scheduleBlock: { gap: 2 },
   time: {
     color: colors.accent,
     fontFamily: fonts.uiBold,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { formatItemSchedule } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -33,25 +34,28 @@ export function StoryHourColumn({
 
       {items.length ? (
         <View style={styles.items}>
-          {items.map((item) => (
-            <Pressable
-              key={item.id}
-              onPress={() => onOpenItem(item)}
-              style={({ pressed }) => [styles.itemCard, pressed && { opacity: 0.92 }]}
-            >
-              <Text style={styles.itemTime} numberOfLines={1}>
-                {item.time?.trim() || timeLabel}
-              </Text>
-              <Text style={styles.itemTitle} numberOfLines={3}>
-                {item.title}
-              </Text>
-              {item.location ? (
-                <Text style={styles.itemMeta} numberOfLines={1}>
-                  {item.location}
+          {items.map((item) => {
+            const schedule = formatItemSchedule(item);
+            return (
+              <Pressable
+                key={item.id}
+                onPress={() => onOpenItem(item)}
+                style={({ pressed }) => [styles.itemCard, pressed && { opacity: 0.92 }]}
+              >
+                <Text style={styles.itemTime} numberOfLines={1}>
+                  {schedule || timeLabel}
                 </Text>
-              ) : null}
-            </Pressable>
-          ))}
+                <Text style={styles.itemTitle} numberOfLines={3}>
+                  {item.title}
+                </Text>
+                {item.location ? (
+                  <Text style={styles.itemMeta} numberOfLines={1}>
+                    {item.location}
+                  </Text>
+                ) : null}
+              </Pressable>
+            );
+          })}
           {canAdd ? (
             <Pressable
               onPress={onAdd}
