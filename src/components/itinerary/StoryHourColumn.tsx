@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
+import { useLayout } from '@/src/hooks/useLayout';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -28,8 +29,17 @@ export function StoryHourColumn({
   onAdd,
   onOpenItem,
 }: Props) {
+  const { isWide } = useLayout();
+
   return (
-    <View style={[styles.wrap, { width }, !isLast && styles.wrapGap]}>
+    <View
+      style={[
+        styles.wrap,
+        !isWide && styles.wrapMobile,
+        { width },
+        !isLast && (isWide ? styles.wrapGap : styles.wrapGapMobile),
+      ]}
+    >
       <Text style={styles.time}>{timeLabel}</Text>
 
       {items.length ? (
@@ -83,6 +93,7 @@ export function StoryHourColumn({
           accessibilityLabel={`Adicionar atividade às ${timeLabel}`}
           style={({ pressed }) => [
             styles.emptyCard,
+            !isWide && styles.emptyCardMobile,
             pressed && canAdd && { opacity: 0.9 },
             !canAdd && { opacity: 0.75 },
           ]}
@@ -119,11 +130,19 @@ const styles = StyleSheet.create({
   wrapGap: {
     marginRight: spacing.md,
   },
+  wrapGapMobile: {
+    marginRight: spacing.sm,
+  },
   time: {
     fontFamily: fonts.uiBold,
     fontSize: 14,
     color: colors.accent,
     letterSpacing: 0.3,
+  },
+  wrapMobile: {
+    minHeight: 200,
+    padding: spacing.sm,
+    borderRadius: radii.lg,
   },
   items: {
     gap: spacing.sm,
@@ -167,6 +186,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing.sm,
     backgroundColor: colors.surfaceMuted,
+  },
+  emptyCardMobile: {
+    minHeight: 120,
   },
   plusCircle: {
     width: 40,

@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Body, Button, Input, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
+import { useLayout } from '@/src/hooks/useLayout';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { itemKind, parseItemTime } from '@/src/lib/itineraryStory';
@@ -37,6 +38,7 @@ export function ItineraryItemForm({
 }: Props) {
   const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
+  const { isWide } = useLayout();
   const { showError, showSuccess } = useToast();
   const router = useRouter();
 
@@ -254,7 +256,7 @@ export function ItineraryItemForm({
           onChangeText={setDescription}
           placeholder={isRest ? 'Pausa para almoço / regenerar' : 'Levar água e protetor'}
         />
-        <View style={styles.timeRow}>
+        <View style={[styles.timeRow, !isWide && styles.timeRowStacked]}>
           <View style={styles.timeField}>
             <Input
               label={isRest ? 'Início' : 'Horário de ida'}
@@ -344,6 +346,9 @@ const styles = StyleSheet.create({
   timeRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+  },
+  timeRowStacked: {
+    flexDirection: 'column',
   },
   timeField: {
     flex: 1,

@@ -12,6 +12,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLayout } from '@/src/hooks/useLayout';
 import { colors, fonts, spacing } from '@/src/theme';
 
 type Props = {
@@ -30,7 +31,7 @@ type Props = {
   contentContainerStyle?: StyleProp<ViewStyle>;
 };
 
-/** Shared horizontal rail chrome (side arrows + hint) for storytelling pages. */
+/** Shared horizontal rail chrome for storytelling — side arrows on desktop, under-rail on mobile. */
 export function StoryRailNav({
   children,
   canGoPrev,
@@ -46,63 +47,91 @@ export function StoryRailNav({
   railStyle,
   contentContainerStyle,
 }: Props) {
+  const { isWide } = useLayout();
+
+  const prevBtn = (
+    <Pressable
+      onPress={onPrev}
+      disabled={!canGoPrev}
+      accessibilityRole="button"
+      accessibilityLabel={prevAccessibilityLabel}
+      style={({ pressed }) => [
+        styles.sideBtn,
+        !isWide && styles.sideBtnCompact,
+        !canGoPrev && styles.sideBtnDisabled,
+        pressed && canGoPrev && { opacity: 0.85 },
+      ]}
+    >
+      <Ionicons
+        name="chevron-back"
+        size={isWide ? 22 : 20}
+        color={canGoPrev ? colors.accent : colors.inkMuted}
+      />
+    </Pressable>
+  );
+
+  const nextBtn = (
+    <Pressable
+      onPress={onNext}
+      disabled={!canGoNext}
+      accessibilityRole="button"
+      accessibilityLabel={nextAccessibilityLabel}
+      style={({ pressed }) => [
+        styles.sideBtn,
+        !isWide && styles.sideBtnCompact,
+        !canGoNext && styles.sideBtnDisabled,
+        pressed && canGoNext && { opacity: 0.85 },
+      ]}
+    >
+      <Ionicons
+        name="chevron-forward"
+        size={isWide ? 22 : 20}
+        color={canGoNext ? colors.accent : colors.inkMuted}
+      />
+    </Pressable>
+  );
+
+  const rail = (
+    <ScrollView
+      ref={railRef}
+      horizontal
+      nestedScrollEnabled
+      showsHorizontalScrollIndicator={false}
+      decelerationRate="fast"
+      snapToInterval={snapToInterval}
+      snapToAlignment="start"
+      disableIntervalMomentum
+      style={[styles.rail, railStyle]}
+      contentContainerStyle={[styles.railContent, contentContainerStyle]}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
+    >
+      {children}
+    </ScrollView>
+  );
+
+  if (!isWide) {
+    return (
+      <View style={styles.railWrap}>
+        {rail}
+        <View style={styles.mobileControls}>
+          {prevBtn}
+          <Text style={styles.positionHint} numberOfLines={1}>
+            {positionHint}
+          </Text>
+          {nextBtn}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.railWrap}>
       <View style={styles.railRow}>
-        <Pressable
-          onPress={onPrev}
-          disabled={!canGoPrev}
-          accessibilityRole="button"
-          accessibilityLabel={prevAccessibilityLabel}
-          style={({ pressed }) => [
-            styles.sideBtn,
-            !canGoPrev && styles.sideBtnDisabled,
-            pressed && canGoPrev && { opacity: 0.85 },
-          ]}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color={canGoPrev ? colors.accent : colors.inkMuted}
-          />
-        </Pressable>
-
-        <ScrollView
-          ref={railRef}
-          horizontal
-          nestedScrollEnabled
-          showsHorizontalScrollIndicator={false}
-          decelerationRate="fast"
-          snapToInterval={snapToInterval}
-          snapToAlignment="start"
-          disableIntervalMomentum
-          style={[styles.rail, railStyle]}
-          contentContainerStyle={[styles.railContent, contentContainerStyle]}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-        >
-          {children}
-        </ScrollView>
-
-        <Pressable
-          onPress={onNext}
-          disabled={!canGoNext}
-          accessibilityRole="button"
-          accessibilityLabel={nextAccessibilityLabel}
-          style={({ pressed }) => [
-            styles.sideBtn,
-            !canGoNext && styles.sideBtnDisabled,
-            pressed && canGoNext && { opacity: 0.85 },
-          ]}
-        >
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color={canGoNext ? colors.accent : colors.inkMuted}
-          />
-        </Pressable>
+        {prevBtn}
+        {rail}
+        {nextBtn}
       </View>
-
       <Text style={styles.positionHint}>{positionHint}</Text>
     </View>
   );
@@ -126,6 +155,10 @@ export const storyHeroStyles = StyleSheet.create({
     fontFamily: fonts.displayBold,
     letterSpacing: -0.6,
   },
+  titleCompact: {
+    fontSize: 26,
+    letterSpacing: -0.4,
+  },
   date: {
     color: colors.inkMuted,
     fontFamily: fonts.ui,
@@ -147,6 +180,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     width: '100%',
   },
+  mobileControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: 2,
+  },
   sideBtn: {
     width: 44,
     height: 44,
@@ -158,12 +198,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexShrink: 0,
   },
+  sideBtnCompact: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
   sideBtnDisabled: {
     backgroundColor: colors.surfaceMuted,
     borderColor: colors.border,
   },
   rail: {
     flex: 1,
+    width: '100%',
     ...(Platform.OS === 'web'
       ? ({
           overflowX: 'hidden',
@@ -179,6 +225,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   positionHint: {
+    flex: 1,
     textAlign: 'center',
     fontFamily: fonts.uiSemi,
     fontSize: 13,
