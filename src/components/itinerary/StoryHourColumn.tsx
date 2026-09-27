@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatItemSchedule } from '@/src/lib/itineraryStory';
+import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -36,13 +36,21 @@ export function StoryHourColumn({
         <View style={styles.items}>
           {items.map((item) => {
             const schedule = formatItemSchedule(item);
+            const isRest = itemKind(item) === 'rest';
             return (
               <Pressable
                 key={item.id}
                 onPress={() => onOpenItem(item)}
-                style={({ pressed }) => [styles.itemCard, pressed && { opacity: 0.92 }]}
+                style={({ pressed }) => [
+                  styles.itemCard,
+                  isRest && styles.itemCardRest,
+                  pressed && { opacity: 0.92 },
+                ]}
               >
-                <Text style={styles.itemTime} numberOfLines={1}>
+                <Text
+                  style={[styles.itemTime, isRest && styles.itemTimeRest]}
+                  numberOfLines={2}
+                >
                   {schedule || timeLabel}
                 </Text>
                 <Text style={styles.itemTitle} numberOfLines={3}>
@@ -127,10 +135,16 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     gap: 2,
   },
+  itemCardRest: {
+    backgroundColor: colors.financeSoft,
+  },
   itemTime: {
     fontFamily: fonts.uiSemi,
     fontSize: 11,
     color: colors.accent,
+  },
+  itemTimeRest: {
+    color: colors.finance,
   },
   itemTitle: {
     fontFamily: fonts.uiBold,

@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatItemSchedule } from '@/src/lib/itineraryStory';
+import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import { countVotes } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
+import { ITINERARY_ITEM_KIND_LABELS } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
 type Props = {
@@ -13,21 +14,31 @@ type Props = {
 export function ItineraryCard({ item, onPress }: Props) {
   const counts = useMemo(() => countVotes(item), [item]);
   const schedule = formatItemSchedule(item);
+  const kind = itemKind(item);
+  const isRest = kind === 'rest';
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, item.done && styles.done, pressed && { opacity: 0.94 }]}
+      style={({ pressed }) => [
+        styles.card,
+        isRest && styles.cardRest,
+        item.done && styles.done,
+        pressed && { opacity: 0.94 },
+      ]}
     >
       {item.imageUrl ? (
         <Image source={{ uri: item.imageUrl }} style={styles.image} />
       ) : (
-        <View style={[styles.image, styles.imageFallback]}>
+        <View style={[styles.image, styles.imageFallback, isRest && styles.imageFallbackRest]}>
           <Text style={styles.fallbackText}>{item.title.slice(0, 1).toUpperCase()}</Text>
         </View>
       )}
       <View style={styles.body}>
         <View style={styles.meta}>
+          <Text style={[styles.kindTag, isRest && styles.kindTagRest]}>
+            {ITINERARY_ITEM_KIND_LABELS[kind]}
+          </Text>
           {schedule ? <Text style={styles.time}>{schedule}</Text> : null}
           {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
         </View>
@@ -60,6 +71,9 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadows.card,
   },
+  cardRest: {
+    borderColor: '#D7E3EC',
+  },
   done: {
     opacity: 0.78,
   },
@@ -71,6 +85,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  imageFallbackRest: {
+    backgroundColor: colors.financeSoft,
   },
   fallbackText: {
     color: colors.accent,
@@ -85,6 +102,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.sm,
     alignItems: 'center',
+    flexWrap: 'wrap',
+  },
+  kindTag: {
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
+    fontSize: 11,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  kindTagRest: {
+    color: colors.finance,
   },
   time: {
     color: colors.accent,

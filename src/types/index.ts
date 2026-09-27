@@ -133,15 +133,34 @@ export const ITINERARY_VOTE_LABELS: Record<ItineraryVoteValue, string> = {
   no: 'Não topa',
 };
 
+/** Activity outing vs rest/block at the stay. */
+export type ItineraryItemKind = 'activity' | 'rest';
+
+export const ITINERARY_ITEM_KIND_LABELS: Record<ItineraryItemKind, string> = {
+  activity: 'Atividade',
+  rest: 'Descanso',
+};
+
 export interface ItineraryItem {
   id: string;
   dayId: string;
   title: string;
   description?: string;
   imageUrl?: string;
-  /** Departure from the stay (ida). Used for timeline ordering. */
+  /** Defaults to activity when missing (legacy items). */
+  kind?: ItineraryItemKind;
+  /**
+   * Start of the window:
+   * - activity: departure from the stay (ida)
+   * - rest: rest start
+   * Used for timeline ordering.
+   */
   time?: string;
-  /** Return to the stay (volta à estadia). */
+  /**
+   * End of the window:
+   * - activity: return to the stay (volta)
+   * - rest: rest end
+   */
   endTime?: string;
   location?: string;
   mapUrl?: string;

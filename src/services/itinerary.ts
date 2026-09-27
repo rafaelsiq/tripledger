@@ -102,6 +102,7 @@ export async function createItineraryItem(input: {
   dayId: string;
   title: string;
   description?: string;
+  kind?: ItineraryItem['kind'];
   time?: string;
   endTime?: string;
   location?: string;
@@ -121,6 +122,7 @@ export async function createItineraryItem(input: {
     title: input.title.trim(),
     description: optionalText(input.description),
     imageUrl,
+    kind: input.kind === 'rest' ? 'rest' : 'activity',
     time: optionalText(input.time),
     endTime: optionalText(input.endTime),
     location: optionalText(input.location),
@@ -227,6 +229,7 @@ export async function updateItineraryItem(input: {
   actorUid: string;
   title: string;
   description?: string;
+  kind?: ItineraryItem['kind'];
   time?: string;
   endTime?: string;
   location?: string;
@@ -255,6 +258,7 @@ export async function updateItineraryItem(input: {
       dayId: input.dayId,
       title: input.title.trim(),
       description: optionalText(input.description) ?? null,
+      kind: input.kind === 'rest' ? 'rest' : 'activity',
       time: optionalText(input.time) ?? null,
       endTime: optionalText(input.endTime) ?? null,
       location: optionalText(input.location) ?? null,
