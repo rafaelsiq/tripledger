@@ -4,6 +4,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
+import { StoryDayBridge } from '@/src/components/itinerary/StoryDayBridge';
 import { StoryHourColumn } from '@/src/components/itinerary/StoryHourColumn';
 import { StoryTimelineRow } from '@/src/components/itinerary/StoryTimelineRow';
 import { Body, Label, Screen } from '@/src/components/ui';
@@ -45,6 +46,9 @@ export default function StorytellingDayScreen() {
   const hourWidth = isWide ? 180 : 150;
   const untimedCardWidth = isWide ? 240 : 200;
 
+  const prevDay = dayIndex > 0 ? days[dayIndex - 1] : undefined;
+  const nextDay = dayIndex >= 0 && dayIndex < days.length - 1 ? days[dayIndex + 1] : undefined;
+
   if (!trip) return null;
 
   const title = day?.title || (dayIndex >= 0 ? `Dia ${dayIndex + 1}` : 'Dia');
@@ -68,6 +72,10 @@ export default function StorytellingDayScreen() {
     });
   }
 
+  function openDay(targetId: string) {
+    router.replace(`/(app)/trip/${trip!.id}/itinerary/storytelling/${targetId}`);
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Timeline do dia' }} />
@@ -86,7 +94,7 @@ export default function StorytellingDayScreen() {
             </Text>
           ) : null}
           <Body muted>
-            Horários em linha (00:00–23:00). Toque em um horário livre para adicionar.
+            Do amanhecer à noite — e a sequência segue no dia seguinte.
           </Body>
         </View>
 
@@ -95,11 +103,20 @@ export default function StorytellingDayScreen() {
           <ScrollView
             horizontal
             nestedScrollEnabled
-            showsHorizontalScrollIndicator
+            showsHorizontalScrollIndicator={false}
             decelerationRate="fast"
             style={styles.rail}
             contentContainerStyle={styles.track}
           >
+            {prevDay ? (
+              <StoryDayBridge
+                compact
+                fromLabel={`Dia ${dayIndex}`}
+                toLabel={`Dia ${dayIndex + 1}`}
+                onPress={() => openDay(prevDay.id)}
+              />
+            ) : null}
+
             {hours.map((slot, index) => (
               <StoryHourColumn
                 key={slot.label}
@@ -107,11 +124,20 @@ export default function StorytellingDayScreen() {
                 items={slot.items}
                 canAdd={canMutate}
                 width={hourWidth}
-                isLast={index === hours.length - 1}
+                isLast={index === hours.length - 1 && !nextDay}
                 onAdd={() => addAtTime(slot.label)}
                 onOpenItem={openItem}
               />
             ))}
+
+            {nextDay ? (
+              <StoryDayBridge
+                compact
+                fromLabel={`Dia ${dayIndex + 1}`}
+                toLabel={`Dia ${dayIndex + 2}`}
+                onPress={() => openDay(nextDay.id)}
+              />
+            ) : null}
           </ScrollView>
         </View>
 
