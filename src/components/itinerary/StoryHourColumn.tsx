@@ -90,10 +90,6 @@ export function StoryHourColumn({
   );
 }
 
-function timeLabelOf(item: ItineraryItem, fallback: string) {
-  return item.time?.trim() || fallback;
-}
-
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
