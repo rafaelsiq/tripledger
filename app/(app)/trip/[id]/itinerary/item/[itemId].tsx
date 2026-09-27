@@ -21,6 +21,7 @@ import { memberLabel } from '@/src/lib/members';
 import { confirmAction } from '@/src/lib/notify';
 import { itemKind } from '@/src/lib/itineraryStory';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
+import { useLayout } from '@/src/hooks/useLayout';
 import {
   canManageItineraryItem,
   countVotes,
@@ -50,6 +51,7 @@ export default function ItineraryItemDetailScreen() {
   const router = useRouter();
   const { trip, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
+  const { isWide } = useLayout();
   const { showError, showSuccess } = useToast();
   const [item, setItem] = useState<ItineraryItem | null>(null);
   const [voting, setVoting] = useState(false);
@@ -248,10 +250,13 @@ export default function ItineraryItemDetailScreen() {
         />
 
         {currentItem.imageUrl ? (
-          <Image source={{ uri: currentItem.imageUrl }} style={styles.hero} />
+          <Image
+            source={{ uri: currentItem.imageUrl }}
+            style={[styles.hero, !isWide && styles.heroMobile]}
+          />
         ) : (
-          <View style={[styles.hero, styles.heroFallback]}>
-            <Text style={styles.heroLetter}>
+          <View style={[styles.hero, !isWide && styles.heroMobile, styles.heroFallback]}>
+            <Text style={[styles.heroLetter, !isWide && styles.heroLetterMobile]}>
               {currentItem.title.slice(0, 1).toUpperCase()}
             </Text>
           </View>
@@ -288,7 +293,7 @@ export default function ItineraryItemDetailScreen() {
           <Text style={styles.kindLabel}>
             {ITINERARY_ITEM_KIND_LABELS[itemKind(currentItem)]}
           </Text>
-          <Text style={styles.title}>{currentItem.title}</Text>
+          <Text style={[styles.title, !isWide && styles.titleMobile]}>{currentItem.title}</Text>
           {currentItem.location ? (
             <Text style={styles.location}>{currentItem.location}</Text>
           ) : null}
@@ -318,8 +323,11 @@ export default function ItineraryItemDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPopup('none')}
       >
-        <Pressable style={styles.backdrop} onPress={() => setPopup('none')}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={[styles.backdrop, !isWide && styles.backdropMobile]} onPress={() => setPopup('none')}>
+          <Pressable
+            style={[styles.sheet, !isWide && styles.sheetMobile]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.sheetHeader}>
               <Label>Opções</Label>
               <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
@@ -412,8 +420,11 @@ export default function ItineraryItemDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPopup('none')}
       >
-        <Pressable style={styles.backdrop} onPress={() => setPopup('none')}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={[styles.backdrop, !isWide && styles.backdropMobile]} onPress={() => setPopup('none')}>
+          <Pressable
+            style={[styles.sheet, !isWide && styles.sheetMobile]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.sheetHeader}>
               <Label>O grupo topa esse rolê?</Label>
               <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
@@ -459,14 +470,22 @@ export default function ItineraryItemDetailScreen() {
         animationType="fade"
         onRequestClose={() => setPopup('none')}
       >
-        <Pressable style={styles.backdrop} onPress={() => setPopup('none')}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+        <Pressable style={[styles.backdrop, !isWide && styles.backdropMobile]} onPress={() => setPopup('none')}>
+          <Pressable
+            style={[styles.sheet, !isWide && styles.sheetMobile]}
+            onPress={(e) => e.stopPropagation()}
+          >
             <View style={styles.sheetHeader}>
               <Label>Placar do grupo</Label>
               <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
                 <Ionicons name="close" size={22} color={colors.inkMuted} />
               </Pressable>
             </View>
+            <ScrollView
+              style={!isWide ? styles.sheetScroll : undefined}
+              contentContainerStyle={styles.sheetScrollContent}
+              showsVerticalScrollIndicator={false}
+            >
             <Body muted>
               {counts ? `${counts.total} de ${totalMembers} já votaram` : 'Ainda sem votos'}
             </Body>
@@ -503,6 +522,7 @@ export default function ItineraryItemDetailScreen() {
               variant="secondary"
               onPress={() => setPopup('vote')}
             />
+            </ScrollView>
           </Pressable>
         </Pressable>
       </Modal>
@@ -525,6 +545,10 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     backgroundColor: colors.surfaceMuted,
   },
+  heroMobile: {
+    height: 160,
+    borderRadius: radii.lg,
+  },
   heroFallback: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -534,6 +558,9 @@ const styles = StyleSheet.create({
     color: colors.accent,
     fontSize: 64,
     fontFamily: fonts.displayBold,
+  },
+  heroLetterMobile: {
+    fontSize: 48,
   },
   header: { gap: spacing.sm },
   scheduleBlock: { gap: 2 },
@@ -560,6 +587,9 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayBold,
     letterSpacing: -0.5,
   },
+  titleMobile: {
+    fontSize: 24,
+  },
   location: {
     color: colors.inkSoft,
     fontFamily: fonts.ui,
@@ -576,12 +606,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: spacing.lg,
   },
+  backdropMobile: {
+    justifyContent: 'flex-end',
+    padding: 0,
+  },
   sheet: {
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     padding: spacing.lg,
     gap: spacing.md,
     ...shadows.card,
+  },
+  sheetMobile: {
+    borderTopLeftRadius: radii.xl,
+    borderTopRightRadius: radii.xl,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingBottom: spacing.xl,
+    maxHeight: '88%',
   },
   sheetHeader: {
     flexDirection: 'row',

@@ -18,20 +18,24 @@ import {
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
-const CARD_WIDTH = 280;
-const BRIDGE_WIDTH = 72;
+const BRIDGE_WIDE = 72;
+const BRIDGE_NARROW = 52;
 
 export default function StorytellingOverviewScreen() {
   const { trip, isAdmin, isFinanceLead } = useTrip();
-  const { isWide } = useLayout();
+  const { isWide, width, pagePadding } = useLayout();
   const router = useRouter();
   const railRef = useRef<ScrollView>(null);
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [itemsByDay, setItemsByDay] = useState<Record<string, ItineraryItem[]>>({});
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const cardWidth = isWide ? 300 : CARD_WIDTH;
-  const step = cardWidth + BRIDGE_WIDTH;
+  const bridgeWidth = isWide ? BRIDGE_WIDE : BRIDGE_NARROW;
+  // Full-bleed card on mobile so one day reads cleanly; peek of the bridge/next day.
+  const cardWidth = isWide
+    ? 300
+    : Math.max(260, Math.min(320, width - pagePadding * 2 - 12));
+  const step = cardWidth + bridgeWidth;
   const canGoPrev = activeIndex > 0;
   const canGoNext = activeIndex < Math.max(0, days.length - 1);
 
@@ -66,7 +70,9 @@ export default function StorytellingOverviewScreen() {
       <Stack.Screen options={{ title: 'Storytelling' }} />
 
       <View style={storyHeroStyles.hero}>
-        <Text style={storyHeroStyles.title}>Storytelling</Text>
+        <Text style={[storyHeroStyles.title, !isWide && storyHeroStyles.titleCompact]}>
+          Storytelling
+        </Text>
         <Body muted>
           A viagem em sequência — o fim de um dia se liga ao amanhecer do
           próximo.
@@ -93,7 +99,7 @@ export default function StorytellingOverviewScreen() {
           nextAccessibilityLabel="Próximo dia"
           positionHint={`Dia ${activeIndex + 1} de ${days.length}`}
           snapToInterval={step}
-          railStyle={styles.rail}
+          railStyle={[styles.rail, !isWide && styles.railMobile]}
           onScroll={(e) => {
             const x = e.nativeEvent.contentOffset.x;
             const next = Math.round(x / step);
@@ -104,7 +110,7 @@ export default function StorytellingOverviewScreen() {
         >
           {days.map((item, index) => {
             const items = itemsByDay[item.id] || [];
-            const highlights = pickMainActivities(items, 3);
+            const highlights = pickMainActivities(items, isWide ? 3 : 2);
             const nextDay = days[index + 1];
             return (
               <React.Fragment key={item.id}>
@@ -116,13 +122,14 @@ export default function StorytellingOverviewScreen() {
                   }
                   style={({ pressed }) => [
                     styles.chapter,
+                    !isWide && styles.chapterMobile,
                     { width: cardWidth },
                     pressed && { opacity: 0.94 },
                   ]}
                 >
                   <View style={styles.chapterHeader}>
                     <Text style={storyHeroStyles.eyebrow}>Dia {index + 1}</Text>
-                    <Text style={styles.dayTitle} numberOfLines={2}>
+                    <Text style={[styles.dayTitle, !isWide && styles.dayTitleMobile]} numberOfLines={2}>
                       {item.title || `Dia ${index + 1}`}
                     </Text>
                     <Text style={storyHeroStyles.date}>
@@ -179,6 +186,9 @@ const styles = StyleSheet.create({
   rail: {
     maxHeight: 440,
   },
+  railMobile: {
+    maxHeight: 380,
+  },
   chapter: {
     flexShrink: 0,
     backgroundColor: colors.surface,
@@ -190,11 +200,19 @@ const styles = StyleSheet.create({
     minHeight: 340,
     ...shadows.card,
   },
+  chapterMobile: {
+    minHeight: 280,
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
   chapterHeader: { gap: 4 },
   dayTitle: {
     color: colors.ink,
     fontSize: 24,
     fontFamily: fonts.display,
+  },
+  dayTitleMobile: {
+    fontSize: 22,
   },
   highlights: { gap: spacing.sm, flexGrow: 1 },
   more: {

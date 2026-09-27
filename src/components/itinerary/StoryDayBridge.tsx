@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLayout } from '@/src/hooks/useLayout';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
 type Props = {
@@ -12,15 +13,26 @@ type Props = {
 
 /** Visual bridge from the end of one day into the start of the next. */
 export function StoryDayBridge({ fromLabel, toLabel, onPress, compact }: Props) {
+  const { isWide } = useLayout();
+  const wrapStyle = [
+    styles.wrap,
+    !isWide && styles.wrapNarrow,
+    compact && styles.wrapCompact,
+    compact && !isWide && styles.wrapCompactNarrow,
+  ];
+
   const content = (
     <>
       <View style={styles.line} />
-      <View style={[styles.pill, compact && styles.pillCompact]}>
-        <Ionicons name="moon-outline" size={compact ? 12 : 14} color={colors.accent} />
-        <Text style={[styles.text, compact && styles.textCompact]} numberOfLines={2}>
+      <View style={[styles.pill, compact && styles.pillCompact, !isWide && styles.pillNarrow]}>
+        <Ionicons name="moon-outline" size={compact || !isWide ? 12 : 14} color={colors.accent} />
+        <Text
+          style={[styles.text, (compact || !isWide) && styles.textCompact]}
+          numberOfLines={2}
+        >
           {fromLabel} → {toLabel}
         </Text>
-        <Ionicons name="sunny-outline" size={compact ? 12 : 14} color={colors.accent} />
+        <Ionicons name="sunny-outline" size={compact || !isWide ? 12 : 14} color={colors.accent} />
       </View>
       <View style={styles.line} />
     </>
@@ -32,14 +44,14 @@ export function StoryDayBridge({ fromLabel, toLabel, onPress, compact }: Props) 
         onPress={onPress}
         accessibilityRole="button"
         accessibilityLabel={`Ir de ${fromLabel} para ${toLabel}`}
-        style={({ pressed }) => [styles.wrap, compact && styles.wrapCompact, pressed && { opacity: 0.88 }]}
+        style={({ pressed }) => [...wrapStyle, pressed && { opacity: 0.88 }]}
       >
         {content}
       </Pressable>
     );
   }
 
-  return <View style={[styles.wrap, compact && styles.wrapCompact]}>{content}</View>;
+  return <View style={wrapStyle}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
@@ -51,9 +63,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: 4,
   },
+  wrapNarrow: {
+    width: 52,
+    paddingHorizontal: 2,
+  },
   wrapCompact: {
-    width: 72,
     minHeight: 220,
+  },
+  wrapCompactNarrow: {
+    minHeight: 200,
   },
   line: {
     width: 2,
@@ -77,6 +95,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 6,
   },
+  pillNarrow: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
   text: {
     fontFamily: fonts.uiBold,
     fontSize: 10,
@@ -85,6 +107,7 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
   textCompact: {
-    fontSize: 10,
+    fontSize: 9,
+    lineHeight: 12,
   },
 });

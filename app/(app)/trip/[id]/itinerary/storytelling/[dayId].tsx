@@ -16,10 +16,8 @@ import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itiner
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, spacing } from '@/src/theme';
 
-const BRIDGE_WIDTH = 72;
-const HOUR_GAP = spacing.md;
-/** Advance roughly one screen of hours per arrow tap. */
-const PAGE_HOURS = 3;
+const BRIDGE_WIDE = 72;
+const BRIDGE_NARROW = 52;
 
 export default function StorytellingDayScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
@@ -51,13 +49,16 @@ export default function StorytellingDayScreen() {
   );
 
   const { hours, untimed } = useMemo(() => buildHourSlots(items), [items]);
-  const hourWidth = isWide ? 180 : 150;
-  const hourStep = hourWidth + HOUR_GAP;
+  const hourWidth = isWide ? 180 : 128;
+  const hourGap = isWide ? spacing.md : spacing.sm;
+  const hourStep = hourWidth + hourGap;
   const untimedCardWidth = isWide ? 240 : 200;
+  const pageHours = isWide ? 3 : 2;
+  const bridgeWidth = isWide ? BRIDGE_WIDE : BRIDGE_NARROW;
 
   const prevDay = dayIndex > 0 ? days[dayIndex - 1] : undefined;
   const nextDay = dayIndex >= 0 && dayIndex < days.length - 1 ? days[dayIndex + 1] : undefined;
-  const bridgeOffset = prevDay ? BRIDGE_WIDTH : 0;
+  const bridgeOffset = prevDay ? bridgeWidth : 0;
 
   const canGoPrev = activeHour > 0;
   const canGoNext = activeHour < Math.max(0, hours.length - 1);
@@ -104,7 +105,7 @@ export default function StorytellingDayScreen() {
   }
 
   function scrollByPage(direction: -1 | 1) {
-    scrollToHour(activeHour + direction * PAGE_HOURS);
+    scrollToHour(activeHour + direction * pageHours);
   }
 
   return (
@@ -116,7 +117,9 @@ export default function StorytellingDayScreen() {
           {dayIndex >= 0 ? (
             <Text style={storyHeroStyles.eyebrow}>Dia {dayIndex + 1}</Text>
           ) : null}
-          <Text style={storyHeroStyles.title}>{title}</Text>
+          <Text style={[storyHeroStyles.title, !isWide && storyHeroStyles.titleCompact]}>
+            {title}
+          </Text>
           {day ? (
             <Text style={storyHeroStyles.date}>
               {format(parseISO(day.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
@@ -141,7 +144,7 @@ export default function StorytellingDayScreen() {
           nextAccessibilityLabel="Próximos horários"
           positionHint={`Hora ${activeHour + 1} de ${hours.length}`}
           snapToInterval={hourStep}
-          railStyle={styles.rail}
+          railStyle={[styles.rail, !isWide && styles.railMobile]}
           contentContainerStyle={styles.trackPad}
           onScroll={(e) => {
             const x = e.nativeEvent.contentOffset.x;
@@ -218,6 +221,9 @@ const styles = StyleSheet.create({
   },
   rail: {
     maxHeight: 320,
+  },
+  railMobile: {
+    maxHeight: 280,
   },
   trackPad: {
     paddingRight: spacing.lg,
