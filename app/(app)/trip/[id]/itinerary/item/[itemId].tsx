@@ -43,7 +43,7 @@ const VOTE_OPTIONS: {
   { value: 'no', hint: 'Prefiro outra coisa', tone: 'no' },
 ];
 
-type Popup = 'none' | 'vote' | 'results';
+type Popup = 'none' | 'menu' | 'vote' | 'results';
 
 export default function ItineraryItemDetailScreen() {
   const { itemId, dayId } = useLocalSearchParams<{ itemId: string; dayId?: string }>();
@@ -114,6 +114,10 @@ export default function ItineraryItemDetailScreen() {
     return member ? memberLabel(member) : 'Membro';
   }
 
+  function openFromMenu(next: Popup) {
+    setPopup(next);
+  }
+
   async function onVote(vote: ItineraryVoteValue) {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
@@ -138,8 +142,9 @@ export default function ItineraryItemDetailScreen() {
       if (removing) {
         setPopup('none');
       } else {
-        // After casting a vote, show the group scoreboard popup.
-        setPopup('results');
+        // Close vote popup first, then open placar as the next popup.
+        setPopup('none');
+        setTimeout(() => setPopup('results'), 180);
       }
     } catch (e) {
       showError(e, 'Falha ao votar');
@@ -149,6 +154,7 @@ export default function ItineraryItemDetailScreen() {
   }
 
   async function onToggleDone() {
+    setPopup('none');
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
@@ -167,6 +173,7 @@ export default function ItineraryItemDetailScreen() {
   }
 
   function onEdit() {
+    setPopup('none');
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
@@ -182,6 +189,7 @@ export default function ItineraryItemDetailScreen() {
   }
 
   async function onDelete() {
+    setPopup('none');
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
@@ -219,18 +227,17 @@ export default function ItineraryItemDetailScreen() {
       <Stack.Screen
         options={{
           title: 'Atividade',
-          headerRight: canManage
-            ? () => (
-                <Pressable
-                  onPress={onEdit}
-                  hitSlop={10}
-                  style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-                >
-                  <Ionicons name="create-outline" size={18} color={colors.accent} />
-                  <Text style={styles.headerActionText}>Editar</Text>
-                </Pressable>
-              )
-            : undefined,
+          headerRight: () => (
+            <Pressable
+              onPress={() => setPopup('menu')}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir menu da atividade"
+              style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+            >
+              <Ionicons name="ellipsis-horizontal" size={20} color={colors.accent} />
+            </Pressable>
+          ),
         }}
       />
       <ScrollView contentContainerStyle={styles.content}>
@@ -288,6 +295,12 @@ export default function ItineraryItemDetailScreen() {
           {currentItem.description ? (
             <Body muted>{currentItem.description}</Body>
           ) : null}
+          {myVote ? (
+            <Text style={styles.voteStatus}>
+              Seu voto: {ITINERARY_VOTE_LABELS[myVote]}
+              {counts ? ` · ${counts.total}/${totalMembers} votos` : ''}
+            </Text>
+          ) : null}
           {currentItem.mapUrl ? (
             <Button
               title="Abrir no mapa"
@@ -296,44 +309,103 @@ export default function ItineraryItemDetailScreen() {
             />
           ) : null}
         </View>
-
-        <View style={styles.actions}>
-          <Button
-            title={myVote ? `Seu voto: ${ITINERARY_VOTE_LABELS[myVote]}` : 'Votar com o grupo'}
-            onPress={() => setPopup('vote')}
-            disabled={!canMutate && !myVote}
-          />
-          <Button
-            title={
-              counts
-                ? `Ver placar (${counts.total}/${totalMembers})`
-                : 'Ver placar do grupo'
-            }
-            variant="secondary"
-            onPress={() => setPopup('results')}
-          />
-          {canMutate ? (
-            <Button
-              title={currentItem.done ? 'Desmarcar como feito' : 'Marcar como feito'}
-              variant="secondary"
-              onPress={onToggleDone}
-            />
-          ) : null}
-        </View>
-
-        {canManage ? (
-          <View style={styles.deleteBlock}>
-            <Body muted>Remove a atividade e os votos ligados a ela.</Body>
-            <Button
-              title="Excluir atividade"
-              variant="danger"
-              onPress={onDelete}
-              loading={deleting}
-            />
-          </View>
-        ) : null}
       </ScrollView>
 
+      {/* Page actions menu */}
+      <Modal
+        visible={popup === 'menu'}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPopup('none')}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setPopup('none')}>
+          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.sheetHeader}>
+              <Label>Opções</Label>
+              <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
+                <Ionicons name="close" size={22} color={colors.inkMuted} />
+              </Pressable>
+            </View>
+
+            <Pressable
+              onPress={() => openFromMenu('vote')}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+            >
+              <Ionicons name="thumbs-up-outline" size={20} color={colors.accent} />
+              <View style={styles.menuText}>
+                <Text style={styles.menuLabel}>
+                  {myVote ? 'Alterar voto' : 'Votar com o grupo'}
+                </Text>
+                <Text style={styles.menuHint}>Topa, talvez ou não topa</Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              onPress={() => openFromMenu('results')}
+              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+            >
+              <Ionicons name="stats-chart-outline" size={20} color={colors.accent} />
+              <View style={styles.menuText}>
+                <Text style={styles.menuLabel}>Ver placar</Text>
+                <Text style={styles.menuHint}>
+                  {counts
+                    ? `${counts.total} de ${totalMembers} já votaram`
+                    : 'Resultado do grupo'}
+                </Text>
+              </View>
+            </Pressable>
+
+            {canMutate ? (
+              <Pressable
+                onPress={onToggleDone}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+              >
+                <Ionicons
+                  name={currentItem.done ? 'refresh-outline' : 'checkmark-circle-outline'}
+                  size={20}
+                  color={colors.accent}
+                />
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>
+                    {currentItem.done ? 'Desmarcar como feito' : 'Marcar como feito'}
+                  </Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            {canManage ? (
+              <Pressable
+                onPress={onEdit}
+                style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
+              >
+                <Ionicons name="create-outline" size={20} color={colors.accent} />
+                <View style={styles.menuText}>
+                  <Text style={styles.menuLabel}>Editar</Text>
+                </View>
+              </Pressable>
+            ) : null}
+
+            {canManage ? (
+              <Pressable
+                onPress={onDelete}
+                disabled={deleting}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed && styles.menuItemPressed,
+                  deleting && { opacity: 0.55 },
+                ]}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.danger} />
+                <View style={styles.menuText}>
+                  <Text style={[styles.menuLabel, { color: colors.danger }]}>Excluir</Text>
+                </View>
+              </Pressable>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Vote popup */}
       <Modal
         visible={popup === 'vote'}
         transparent
@@ -344,11 +416,7 @@ export default function ItineraryItemDetailScreen() {
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <Label>O grupo topa esse rolê?</Label>
-              <Pressable
-                onPress={() => setPopup('none')}
-                hitSlop={10}
-                accessibilityLabel="Fechar"
-              >
+              <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
                 <Ionicons name="close" size={22} color={colors.inkMuted} />
               </Pressable>
             </View>
@@ -384,6 +452,7 @@ export default function ItineraryItemDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* Placar popup — primarily after vote */}
       <Modal
         visible={popup === 'results'}
         transparent
@@ -394,11 +463,7 @@ export default function ItineraryItemDetailScreen() {
           <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
             <View style={styles.sheetHeader}>
               <Label>Placar do grupo</Label>
-              <Pressable
-                onPress={() => setPopup('none')}
-                hitSlop={10}
-                accessibilityLabel="Fechar"
-              >
+              <Pressable onPress={() => setPopup('none')} hitSlop={10} accessibilityLabel="Fechar">
                 <Ionicons name="close" size={22} color={colors.inkMuted} />
               </Pressable>
             </View>
@@ -454,18 +519,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingVertical: 4,
   },
-  headerActionText: {
-    color: colors.accent,
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
-  },
-  deleteBlock: {
-    gap: spacing.xs,
-    marginTop: spacing.sm,
-    paddingTop: spacing.md,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
   hero: {
     width: '100%',
     height: 220,
@@ -512,7 +565,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui,
     fontSize: 14,
   },
-  actions: { gap: spacing.sm },
+  voteStatus: {
+    color: colors.accent,
+    fontFamily: fonts.uiSemi,
+    fontSize: 13,
+  },
   backdrop: {
     flex: 1,
     backgroundColor: colors.overlay,
@@ -531,6 +588,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  menuItemPressed: { opacity: 0.88 },
+  menuText: { flex: 1, gap: 2 },
+  menuLabel: {
+    color: colors.ink,
+    fontFamily: fonts.uiBold,
+    fontSize: 15,
+  },
+  menuHint: {
+    color: colors.inkMuted,
+    fontFamily: fonts.ui,
+    fontSize: 12,
   },
   voteRow: { gap: spacing.sm },
   voteBtn: {
