@@ -1,7 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { StoryTimelineRow } from '@/src/components/itinerary/StoryTimelineRow';
 import type { ItineraryItem } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -9,27 +8,62 @@ type Props = {
   timeLabel: string;
   items: ItineraryItem[];
   canAdd: boolean;
-  cardWidth: number;
-  emptyWidth: number;
+  width: number;
   isLast: boolean;
   onAdd: () => void;
   onOpenItem: (item: ItineraryItem) => void;
 };
 
-/** One hour column on the horizontal storytelling day track. */
+/**
+ * Fixed-width hour column for the horizontal day rail.
+ * Empty hours always show an add affordance.
+ */
 export function StoryHourColumn({
   timeLabel,
   items,
   canAdd,
-  cardWidth,
-  emptyWidth,
+  width,
   isLast,
   onAdd,
   onOpenItem,
 }: Props) {
-  if (!items.length) {
-    return (
-      <View style={styles.wrap}>
+  return (
+    <View style={[styles.wrap, { width }, !isLast && styles.wrapGap]}>
+      <Text style={styles.time}>{timeLabel}</Text>
+
+      {items.length ? (
+        <View style={styles.items}>
+          {items.map((item) => (
+            <Pressable
+              key={item.id}
+              onPress={() => onOpenItem(item)}
+              style={({ pressed }) => [styles.itemCard, pressed && { opacity: 0.92 }]}
+            >
+              <Text style={styles.itemTime} numberOfLines={1}>
+                {item.time?.trim() || timeLabel}
+              </Text>
+              <Text style={styles.itemTitle} numberOfLines={3}>
+                {item.title}
+              </Text>
+              {item.location ? (
+                <Text style={styles.itemMeta} numberOfLines={1}>
+                  {item.location}
+                </Text>
+              ) : null}
+            </Pressable>
+          ))}
+          {canAdd ? (
+            <Pressable
+              onPress={onAdd}
+              accessibilityLabel={`Adicionar outra atividade às ${timeLabel}`}
+              style={({ pressed }) => [styles.addChip, pressed && { opacity: 0.85 }]}
+            >
+              <Ionicons name="add" size={16} color={colors.accent} />
+              <Text style={styles.addChipText}>Adicionar</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : (
         <Pressable
           onPress={canAdd ? onAdd : undefined}
           disabled={!canAdd}
@@ -37,90 +71,84 @@ export function StoryHourColumn({
           accessibilityLabel={`Adicionar atividade às ${timeLabel}`}
           style={({ pressed }) => [
             styles.emptyCard,
-            { width: emptyWidth },
             pressed && canAdd && { opacity: 0.9 },
-            !canAdd && { opacity: 0.7 },
+            !canAdd && { opacity: 0.75 },
           ]}
         >
-          <Text style={styles.time}>{timeLabel}</Text>
-          <View style={styles.emptyBody}>
-            {canAdd ? (
-              <>
-                <View style={styles.plusCircle}>
-                  <Ionicons name="add" size={22} color={colors.accent} />
-                </View>
-                <Text style={styles.hint}>Adicionar</Text>
-              </>
-            ) : (
-              <Text style={styles.hintMuted}>Livre</Text>
-            )}
-          </View>
+          {canAdd ? (
+            <>
+              <View style={styles.plusCircle}>
+                <Ionicons name="add" size={22} color={colors.accent} />
+              </View>
+              <Text style={styles.hint}>Adicionar</Text>
+            </>
+          ) : (
+            <Text style={styles.hintMuted}>Livre</Text>
+          )}
         </Pressable>
-        {!isLast ? <View style={styles.connector} /> : null}
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.wrap}>
-      <View style={styles.filled}>
-        {items.map((item, index) => (
-          <StoryTimelineRow
-            key={item.id}
-            item={item}
-            timeLabel={item.time?.trim() || timeLabel}
-            cardWidth={cardWidth}
-            isLast={index === items.length - 1 && !canAdd && isLast}
-            onPress={() => onOpenItem(item)}
-          />
-        ))}
-        {canAdd ? (
-          <Pressable
-            onPress={onAdd}
-            accessibilityLabel={`Adicionar outra atividade às ${timeLabel}`}
-            style={({ pressed }) => [styles.addMore, pressed && { opacity: 0.85 }]}
-          >
-            <Ionicons name="add" size={18} color={colors.accent} />
-            <Text style={styles.addMoreText}>{timeLabel}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-      {!isLast ? <View style={styles.connector} /> : null}
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  filled: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  emptyCard: {
-    minHeight: 180,
+    flexShrink: 0,
+    flexGrow: 0,
+    minHeight: 220,
     backgroundColor: colors.surface,
     borderRadius: radii.xl,
     borderWidth: 1,
     borderColor: colors.border,
-    borderStyle: 'dashed',
     padding: spacing.md,
+    gap: spacing.sm,
     ...shadows.card,
+  },
+  wrapGap: {
+    marginRight: spacing.md,
   },
   time: {
     fontFamily: fonts.uiBold,
-    fontSize: 13,
+    fontSize: 14,
     color: colors.accent,
     letterSpacing: 0.3,
   },
-  emptyBody: {
+  items: {
+    gap: spacing.sm,
     flex: 1,
+  },
+  itemCard: {
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.md,
+    padding: spacing.sm,
+    gap: 2,
+  },
+  itemTime: {
+    fontFamily: fonts.uiSemi,
+    fontSize: 11,
+    color: colors.accent,
+  },
+  itemTitle: {
+    fontFamily: fonts.uiBold,
+    fontSize: 14,
+    color: colors.ink,
+  },
+  itemMeta: {
+    fontFamily: fonts.ui,
+    fontSize: 12,
+    color: colors.inkMuted,
+  },
+  emptyCard: {
+    flex: 1,
+    minHeight: 140,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing.sm,
-    paddingVertical: spacing.md,
+    backgroundColor: colors.surfaceMuted,
   },
   plusCircle: {
     width: 40,
@@ -140,27 +168,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.inkMuted,
   },
-  addMore: {
+  addChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 4,
     backgroundColor: colors.accentSoft,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: '#C6E3DB',
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    marginLeft: 4,
+    paddingVertical: 8,
   },
-  addMoreText: {
+  addChipText: {
     fontFamily: fonts.uiBold,
     fontSize: 12,
     color: colors.accent,
-  },
-  connector: {
-    width: 28,
-    height: 2,
-    backgroundColor: colors.border,
-    marginHorizontal: 4,
   },
 });

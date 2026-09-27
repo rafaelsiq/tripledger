@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -42,8 +42,8 @@ export default function StorytellingDayScreen() {
   );
 
   const { hours, untimed } = useMemo(() => buildHourSlots(items), [items]);
-  const cardWidth = isWide ? 260 : 200;
-  const emptyWidth = isWide ? 160 : 140;
+  const hourWidth = isWide ? 180 : 150;
+  const untimedCardWidth = isWide ? 240 : 200;
 
   if (!trip) return null;
 
@@ -86,59 +86,59 @@ export default function StorytellingDayScreen() {
             </Text>
           ) : null}
           <Body muted>
-            Todas as horas (00:00–23:00). Toque em um horário livre para adicionar.
+            Horários em linha (00:00–23:00). Toque em um horário livre para adicionar.
           </Body>
         </View>
 
-        <View style={styles.sections}>
+        <View style={styles.block}>
+          <Label>Horários do dia</Label>
+          <ScrollView
+            horizontal
+            nestedScrollEnabled
+            showsHorizontalScrollIndicator
+            decelerationRate="fast"
+            style={styles.rail}
+            contentContainerStyle={styles.track}
+          >
+            {hours.map((slot, index) => (
+              <StoryHourColumn
+                key={slot.label}
+                timeLabel={slot.label}
+                items={slot.items}
+                canAdd={canMutate}
+                width={hourWidth}
+                isLast={index === hours.length - 1}
+                onAdd={() => addAtTime(slot.label)}
+                onOpenItem={openItem}
+              />
+            ))}
+          </ScrollView>
+        </View>
+
+        {untimed.length ? (
           <View style={styles.block}>
-            <Label>Horários do dia</Label>
+            <Label>Sem horário</Label>
+            <Body muted>Atividades ainda sem horário definido.</Body>
             <ScrollView
               horizontal
-              showsHorizontalScrollIndicator={false}
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator
+              style={styles.rail}
               contentContainerStyle={styles.track}
-              decelerationRate="fast"
             >
-              {hours.map((slot, index) => (
-                <StoryHourColumn
-                  key={slot.label}
-                  timeLabel={slot.label}
-                  items={slot.items}
-                  canAdd={canMutate}
-                  cardWidth={cardWidth}
-                  emptyWidth={emptyWidth}
-                  isLast={index === hours.length - 1 && untimed.length === 0}
-                  onAdd={() => addAtTime(slot.label)}
-                  onOpenItem={openItem}
+              {untimed.map((item, index) => (
+                <StoryTimelineRow
+                  key={item.id}
+                  item={item}
+                  timeLabel="—"
+                  cardWidth={untimedCardWidth}
+                  isLast={index === untimed.length - 1}
+                  onPress={() => openItem(item)}
                 />
               ))}
             </ScrollView>
           </View>
-
-          {untimed.length ? (
-            <View style={styles.block}>
-              <Label>Sem horário</Label>
-              <Body muted>Atividades ainda sem horário definido.</Body>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.track}
-                decelerationRate="fast"
-              >
-                {untimed.map((item, index) => (
-                  <StoryTimelineRow
-                    key={item.id}
-                    item={item}
-                    timeLabel="—"
-                    cardWidth={cardWidth}
-                    isLast={index === untimed.length - 1}
-                    onPress={() => openItem(item)}
-                  />
-                ))}
-              </ScrollView>
-            </View>
-          ) : null}
-        </View>
+        ) : null}
       </View>
     </Screen>
   );
@@ -169,11 +169,20 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     marginBottom: 4,
   },
-  sections: { gap: spacing.lg, flex: 1 },
   block: { gap: spacing.sm },
+  rail: {
+    width: '100%',
+    ...(Platform.OS === 'web'
+      ? ({
+          overflowX: 'auto',
+          overflowY: 'hidden',
+        } as object)
+      : null),
+  },
   track: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
     paddingVertical: spacing.sm,
     paddingRight: spacing.lg,
-    alignItems: 'stretch',
   },
 });
