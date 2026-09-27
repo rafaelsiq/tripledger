@@ -18,6 +18,8 @@ export default function ItineraryLayout() {
     >
       <Stack.Screen name="index" options={{ headerLeft: () => <TripHomeBackButton /> }} />
       <Stack.Screen name="calendar" />
+      <Stack.Screen name="storytelling/index" />
+      <Stack.Screen name="storytelling/[dayId]" />
       <Stack.Screen name="day/[dayId]" />
       <Stack.Screen name="item/[itemId]" />
       <Stack.Screen name="new-item" options={{ presentation: 'modal' }} />

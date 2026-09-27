@@ -64,6 +64,34 @@ export function subscribeDayItems(
   });
 }
 
+/** Live map of dayId → items for storytelling overview. */
+export function subscribeTripItineraryItems(
+  tripId: string,
+  dayIds: string[],
+  cb: (itemsByDay: Record<string, ItineraryItem[]>) => void
+): Unsubscribe {
+  if (!dayIds.length) {
+    cb({});
+    return () => undefined;
+  }
+
+  const cache: Record<string, ItineraryItem[]> = {};
+  for (const dayId of dayIds) {
+    cache[dayId] = [];
+  }
+
+  const unsubs = dayIds.map((dayId) =>
+    subscribeDayItems(tripId, dayId, (items) => {
+      cache[dayId] = items;
+      cb({ ...cache });
+    })
+  );
+
+  return () => {
+    for (const unsub of unsubs) unsub();
+  };
+}
+
 function optionalText(value?: string): string | undefined {
   const trimmed = value?.trim();
   return trimmed ? trimmed : undefined;
