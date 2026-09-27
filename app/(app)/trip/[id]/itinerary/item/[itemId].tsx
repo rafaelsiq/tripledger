@@ -625,6 +625,13 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xl,
     maxHeight: '88%',
   },
+  sheetScroll: {
+    flexGrow: 0,
+  },
+  sheetScrollContent: {
+    gap: spacing.md,
+    paddingBottom: spacing.sm,
+  },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
