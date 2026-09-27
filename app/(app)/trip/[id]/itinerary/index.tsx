@@ -31,15 +31,28 @@ export default function ItineraryHome() {
       <Stack.Screen
         options={{
           headerRight: () => (
-            <Pressable
-              onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
-              hitSlop={10}
-              accessibilityLabel="Ver calendário do roteiro"
-              style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-            >
-              <Ionicons name="calendar-outline" size={18} color={colors.accent} />
-              <Text style={styles.headerActionText}>Calendário</Text>
-            </Pressable>
+            <View style={styles.headerActions}>
+              <Pressable
+                onPress={() =>
+                  router.push(`/(app)/trip/${trip.id}/itinerary/storytelling`)
+                }
+                hitSlop={10}
+                accessibilityLabel="Ver storytelling do roteiro"
+                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="book-outline" size={18} color={colors.accent} />
+                <Text style={styles.headerActionText}>Storytelling</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
+                hitSlop={10}
+                accessibilityLabel="Ver calendário do roteiro"
+                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="calendar-outline" size={18} color={colors.accent} />
+                <Text style={styles.headerActionText}>Calendário</Text>
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -49,13 +62,24 @@ export default function ItineraryHome() {
           <Text style={styles.hero}>Roteiro</Text>
           <Text style={styles.sub}>Cada dia, uma história visual da viagem.</Text>
         </View>
-        <Pressable
-          onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
-          style={({ pressed }) => [styles.calendarBtn, pressed && { opacity: 0.88 }]}
-        >
-          <Ionicons name="calendar-outline" size={18} color={colors.white} />
-          <Text style={styles.calendarBtnText}>Calendário</Text>
-        </Pressable>
+        <View style={styles.heroActions}>
+          <Pressable
+            onPress={() =>
+              router.push(`/(app)/trip/${trip.id}/itinerary/storytelling`)
+            }
+            style={({ pressed }) => [styles.storyBtn, pressed && { opacity: 0.88 }]}
+          >
+            <Ionicons name="book-outline" size={18} color={colors.accent} />
+            <Text style={styles.storyBtnText}>Storytelling</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
+            style={({ pressed }) => [styles.calendarBtn, pressed && { opacity: 0.88 }]}
+          >
+            <Ionicons name="calendar-outline" size={18} color={colors.white} />
+            <Text style={styles.calendarBtnText}>Calendário</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={{ marginBottom: spacing.md }}>
@@ -116,6 +140,20 @@ const styles = StyleSheet.create({
     fontFamily: fonts.ui,
     marginTop: 6,
   },
+  heroActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: spacing.sm,
+    marginTop: 6,
+    maxWidth: 280,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingRight: 4,
+  },
   headerAction: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -128,6 +166,22 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiSemi,
     fontSize: 14,
   },
+  storyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.accentSoft,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: '#C6E3DB',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  storyBtnText: {
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+  },
   calendarBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -136,7 +190,6 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginTop: 6,
   },
   calendarBtnText: {
     color: colors.white,
