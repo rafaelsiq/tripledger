@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 0,
   },
   card: {
     backgroundColor: colors.surface,
@@ -69,6 +70,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+    flexShrink: 0,
     ...shadows.card,
   },
   time: {
