@@ -4,17 +4,20 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
+import { StoryHourColumn } from '@/src/components/itinerary/StoryHourColumn';
 import { StoryTimelineRow } from '@/src/components/itinerary/StoryTimelineRow';
-import { Body, EmptyState, Label, Screen } from '@/src/components/ui';
+import { Body, Label, Screen } from '@/src/components/ui';
+import { useLayout } from '@/src/hooks/useLayout';
 import { useTrip } from '@/src/hooks/useTrip';
-import { parseItemTime, splitTimedAndUntimed } from '@/src/lib/itineraryStory';
+import { buildHourSlots } from '@/src/lib/itineraryStory';
 import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { colors, fonts, spacing } from '@/src/theme';
 
 export default function StorytellingDayScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
-  const { trip, isAdmin, isFinanceLead } = useTrip();
+  const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
+  const { isWide } = useLayout();
   const router = useRouter();
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [items, setItems] = useState<ItineraryItem[]>([]);
@@ -38,17 +41,38 @@ export default function StorytellingDayScreen() {
     [days, dayId]
   );
 
-  const { timed, untimed } = useMemo(() => splitTimedAndUntimed(items), [items]);
+  const { hours, untimed } = useMemo(() => buildHourSlots(items), [items]);
+  const cardWidth = isWide ? 260 : 200;
+  const emptyWidth = isWide ? 160 : 140;
 
   if (!trip) return null;
 
   const title = day?.title || (dayIndex >= 0 ? `Dia ${dayIndex + 1}` : 'Dia');
 
+  function openItem(item: ItineraryItem) {
+    router.push({
+      pathname: `/(app)/trip/${trip!.id}/itinerary/item/[itemId]` as never,
+      params: { itemId: item.id, dayId: String(dayId) },
+    });
+  }
+
+  function addAtTime(timeLabel: string) {
+    if (!canMutate) return;
+    router.push({
+      pathname: `/(app)/trip/${trip!.id}/itinerary/new-item` as never,
+      params: {
+        dayId: String(dayId),
+        order: String(items.length),
+        time: timeLabel,
+      },
+    });
+  }
+
   return (
     <Screen>
       <Stack.Screen options={{ title: 'Timeline do dia' }} />
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <View style={styles.content}>
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
 
         <View style={styles.hero}>
@@ -61,75 +85,69 @@ export default function StorytellingDayScreen() {
               {format(parseISO(day.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
             </Text>
           ) : null}
-          <Body muted>Atividades ordenadas do início ao fim do dia (00:00–23:59).</Body>
+          <Body muted>
+            Todas as horas (00:00–23:00). Toque em um horário livre para adicionar.
+          </Body>
         </View>
 
-        {!items.length ? (
-          <EmptyState
-            title="Dia livre"
-            subtitle="Ainda não há atividades neste dia."
-          />
-        ) : (
-          <View style={styles.timeline}>
-            {timed.length ? (
-              <View style={styles.block}>
-                <Label>Ao longo do dia</Label>
-                {timed.map((item, index) => {
-                  const minutes = parseItemTime(item.time);
-                  const timeLabel =
-                    item.time?.trim() ||
-                    (minutes !== null
-                      ? `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`
-                      : '--:--');
-                  return (
-                    <StoryTimelineRow
-                      key={item.id}
-                      item={item}
-                      timeLabel={timeLabel}
-                      isLast={index === timed.length - 1 && untimed.length === 0}
-                      onPress={() =>
-                        router.push({
-                          pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                          params: { itemId: item.id, dayId: String(dayId) },
-                        })
-                      }
-                    />
-                  );
-                })}
-              </View>
-            ) : null}
+        <View style={styles.sections}>
+          <View style={styles.block}>
+            <Label>Horários do dia</Label>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.track}
+              decelerationRate="fast"
+            >
+              {hours.map((slot, index) => (
+                <StoryHourColumn
+                  key={slot.label}
+                  timeLabel={slot.label}
+                  items={slot.items}
+                  canAdd={canMutate}
+                  cardWidth={cardWidth}
+                  emptyWidth={emptyWidth}
+                  isLast={index === hours.length - 1 && untimed.length === 0}
+                  onAdd={() => addAtTime(slot.label)}
+                  onOpenItem={openItem}
+                />
+              ))}
+            </ScrollView>
+          </View>
 
-            {untimed.length ? (
-              <View style={styles.block}>
-                <Label>Sem horário</Label>
-                <Body muted>Atividades sem horário definido ficam ao final da timeline.</Body>
+          {untimed.length ? (
+            <View style={styles.block}>
+              <Label>Sem horário</Label>
+              <Body muted>Atividades ainda sem horário definido.</Body>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.track}
+                decelerationRate="fast"
+              >
                 {untimed.map((item, index) => (
                   <StoryTimelineRow
                     key={item.id}
                     item={item}
                     timeLabel="—"
+                    cardWidth={cardWidth}
                     isLast={index === untimed.length - 1}
-                    onPress={() =>
-                      router.push({
-                        pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                        params: { itemId: item.id, dayId: String(dayId) },
-                      })
-                    }
+                    onPress={() => openItem(item)}
                   />
                 ))}
-              </View>
-            ) : null}
-          </View>
-        )}
-      </ScrollView>
+              </ScrollView>
+            </View>
+          ) : null}
+        </View>
+      </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
+    flex: 1,
     gap: spacing.md,
-    paddingBottom: spacing.xxl,
   },
   hero: { gap: spacing.xs },
   dayIndex: {
@@ -151,6 +169,11 @@ const styles = StyleSheet.create({
     textTransform: 'capitalize',
     marginBottom: 4,
   },
-  timeline: { gap: spacing.lg },
+  sections: { gap: spacing.lg, flex: 1 },
   block: { gap: spacing.sm },
+  track: {
+    paddingVertical: spacing.sm,
+    paddingRight: spacing.lg,
+    alignItems: 'stretch',
+  },
 });

@@ -20,10 +20,17 @@ type Props = {
   mode: 'create' | 'edit';
   dayId: string;
   order?: number;
+  initialTime?: string;
   initialItem?: ItineraryItem;
 };
 
-export function ItineraryItemForm({ mode, dayId, order = 0, initialItem }: Props) {
+export function ItineraryItemForm({
+  mode,
+  dayId,
+  order = 0,
+  initialTime,
+  initialItem,
+}: Props) {
   const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
@@ -31,13 +38,18 @@ export function ItineraryItemForm({ mode, dayId, order = 0, initialItem }: Props
 
   const [title, setTitle] = useState(initialItem?.title || '');
   const [description, setDescription] = useState(initialItem?.description || '');
-  const [time, setTime] = useState(initialItem?.time || '');
+  const [time, setTime] = useState(initialItem?.time || initialTime || '');
   const [location, setLocation] = useState(initialItem?.location || '');
   const [mapUrl, setMapUrl] = useState(initialItem?.mapUrl || '');
   const [imageUri, setImageUri] = useState<string | undefined>();
   const [existingImageUrl, setExistingImageUrl] = useState(initialItem?.imageUrl);
   const [clearImage, setClearImage] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (mode !== 'create' || !initialTime) return;
+    setTime((prev) => prev || initialTime);
+  }, [mode, initialTime]);
 
   useEffect(() => {
     if (mode !== 'edit' || !initialItem) return;
