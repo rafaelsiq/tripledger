@@ -1,5 +1,5 @@
 /* TripLedger service worker — network-first so deploys aren't stuck on old shells */
-const CACHE = 'tripledger-v8';
+const CACHE = 'tripledger-v9';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
