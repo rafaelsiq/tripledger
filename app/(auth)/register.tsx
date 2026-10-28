@@ -134,7 +134,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   logoWide: {
-    fontFamily: fonts.displayBold,
+    fontFamily: fonts.brand,
     fontSize: 56,
     letterSpacing: -1.6,
     color: colors.ink,

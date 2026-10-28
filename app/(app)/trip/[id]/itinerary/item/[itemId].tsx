@@ -615,7 +615,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
+    ...shadows.raised,
   },
   sheetMobile: {
     borderTopLeftRadius: radii.xl,

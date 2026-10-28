@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     backgroundColor: colors.financeSoft,
     borderWidth: 1,
-    borderColor: '#D0DAE4',
+    borderColor: colors.borderStrong,
     borderRadius: radii.md,
     paddingVertical: 12,
     paddingHorizontal: spacing.md,

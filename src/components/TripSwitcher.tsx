@@ -15,7 +15,7 @@ import {
   tripSectionFromPath,
   useUserTrips,
 } from '@/src/hooks/useUserTrips';
-import { normalizeTripPhase, phaseLabel } from '@/src/lib/tripPhase';
+import { normalizeTripPhase, phaseLabel, phaseTone } from '@/src/lib/tripPhase';
 import type { Trip } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
@@ -61,7 +61,6 @@ export function TripSwitcher() {
         hitSlop={8}
       >
         <View style={styles.triggerTextWrap}>
-          <Text style={styles.triggerHint}>Viagem</Text>
           <Text style={styles.triggerLabel} numberOfLines={1}>
             {label}
           </Text>
@@ -115,16 +114,7 @@ export function TripSwitcher() {
                           </Text>
                         ) : null}
                       </View>
-                      <Badge
-                        text={phaseLabel(phase)}
-                        tone={
-                          phase === 'closed'
-                            ? 'neutral'
-                            : phase === 'in_progress'
-                              ? 'success'
-                              : 'accent'
-                        }
-                      />
+                      <Badge text={phaseLabel(phase)} tone={phaseTone(phase)} dot />
                       {selected ? (
                         <Ionicons
                           name="checkmark-circle"
@@ -169,19 +159,11 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     alignItems: 'flex-start',
   },
-  triggerHint: {
-    fontSize: 10,
-    lineHeight: 12,
-    color: colors.inkMuted,
-    fontFamily: fonts.uiSemi,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
   triggerLabel: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
     color: colors.ink,
-    fontFamily: fonts.uiSemi,
+    fontFamily: fonts.uiBold,
   },
   backdrop: {
     flex: 1,
@@ -198,7 +180,7 @@ const styles = StyleSheet.create({
     maxHeight: '70%',
     overflow: 'hidden',
     zIndex: 1,
-    ...shadows.card,
+    ...shadows.raised,
   },
   sheetHeader: {
     flexDirection: 'row',

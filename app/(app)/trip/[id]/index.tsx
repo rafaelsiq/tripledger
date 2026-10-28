@@ -10,7 +10,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { expenseTotals, memberBalance } from '@/src/lib/finance';
 import { formatDateLabel } from '@/src/lib/dates';
-import { phaseLabel } from '@/src/lib/tripPhase';
+import { phaseLabel, phaseTone } from '@/src/lib/tripPhase';
 import { colors, fonts, spacing, typography } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -64,7 +64,8 @@ export default function TripSummaryScreen() {
         <View style={styles.hero}>
           <Badge
             text={phaseLabel(phase)}
-            tone={phase === 'closed' ? 'neutral' : phase === 'in_progress' ? 'success' : 'accent'}
+            tone={phaseTone(phase)}
+            dot
           />
           <Text style={[styles.title, isWide && styles.titleWide]}>{trip.name}</Text>
           {trip.destination ? <Body muted>{trip.destination}</Body> : null}

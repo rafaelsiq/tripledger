@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.card,
+    ...shadows.raised,
   },
   dialogHeader: {
     flexDirection: 'row',

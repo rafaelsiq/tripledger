@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   cardRest: {
-    borderColor: '#D7E3EC',
+    borderColor: colors.surfaceSunken,
   },
   done: {
     opacity: 0.78,

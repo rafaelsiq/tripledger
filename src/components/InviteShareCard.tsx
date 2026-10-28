@@ -157,14 +157,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#C6E3DB',
+    borderColor: colors.accentBorder,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
     gap: spacing.sm,
   },
   codeBoxPressed: {
-    backgroundColor: '#D7EDE7',
+    backgroundColor: colors.accentSoft,
   },
   code: {
     fontSize: 32,

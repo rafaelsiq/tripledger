@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
     ...shadows.card,
   },
   cardRest: {
-    borderColor: '#D7E3EC',
+    borderColor: colors.surfaceSunken,
   },
   time: {
     fontFamily: fonts.uiBold,

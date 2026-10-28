@@ -769,7 +769,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#D0DAE4',
+    borderColor: colors.borderStrong,
   },
   equalTitle: {
     fontFamily: fonts.uiBold,

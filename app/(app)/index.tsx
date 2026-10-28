@@ -6,7 +6,7 @@ import { Badge, Button, Card, EmptyState, Input, Screen } from '@/src/components
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { formatDateLabel } from '@/src/lib/dates';
-import { normalizeTripPhase, phaseLabel } from '@/src/lib/tripPhase';
+import { normalizeTripPhase, phaseLabel, phaseTone } from '@/src/lib/tripPhase';
 import { logout } from '@/src/services/auth';
 import { subscribeUserTrips } from '@/src/services/trips';
 import type { Trip, TripPhase } from '@/src/types';
@@ -58,7 +58,8 @@ function TripRow({
             <Text style={styles.tripName}>{item.name}</Text>
             <Badge
               text={phaseLabel(phase)}
-              tone={phase === 'closed' ? 'neutral' : phase === 'in_progress' ? 'success' : 'accent'}
+              tone={phaseTone(phase)}
+              dot
             />
           </View>
           {item.destination ? <Text style={styles.dest}>{item.destination}</Text> : null}

@@ -178,7 +178,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingTop: spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(161, 92, 7, 0.25)',
+    borderTopColor: colors.warnBorder,
   },
   itemMain: { gap: 4 },
   expenseTitle: {

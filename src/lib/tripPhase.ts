@@ -19,6 +19,12 @@ export function phaseLabel(phase?: string | null): string {
   return PHASE_LABELS[normalizeTripPhase(phase)];
 }
 
+/** Badge tone per phase: planning reads as info, live as success, closed as neutral. */
+export function phaseTone(phase?: string | null): 'info' | 'success' | 'neutral' {
+  const p = normalizeTripPhase(phase);
+  return p === 'closed' ? 'neutral' : p === 'in_progress' ? 'success' : 'info';
+}
+
 export function daysUntil(dateValue: string, from = todayValue()): number | null {
   const target = parseDateValue(dateValue);
   const origin = parseDateValue(from);

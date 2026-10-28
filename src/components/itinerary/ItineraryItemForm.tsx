@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
   },
   kindChipOn: {
     backgroundColor: colors.accentSoft,
-    borderColor: '#C6E3DB',
+    borderColor: colors.accentBorder,
   },
   kindChipText: {
     fontFamily: fonts.uiSemi,

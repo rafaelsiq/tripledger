@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, View } from 'react-native';
+import { ActivityIndicator, Platform, View, type ColorValue } from 'react-native';
 import { Tabs, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,12 +7,32 @@ import { subscribeExpenses, subscribePayments } from '@/src/services/expenses';
 import { subscribeMembers, subscribeTrip } from '@/src/services/trips';
 import { canMutateTrip, normalizeTripPhase } from '@/src/lib/tripPhase';
 import type { Expense, Payment, Trip, TripMember } from '@/src/types';
-import { colors } from '@/src/theme';
+import { colors, fonts, navHeader } from '@/src/theme';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { TripProvider } from '@/src/hooks/useTrip';
 import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 import { TripSwitcher } from '@/src/components/TripSwitcher';
+
+type TabIconBase = 'home' | 'wallet' | 'map' | 'images' | 'people';
+
+/** Tab icon with a soft pill behind the active one (filled glyph when focused). */
+function tabIcon(base: TabIconBase) {
+  return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
+    return (
+      <View
+        style={{
+          paddingHorizontal: 16,
+          paddingVertical: 3,
+          borderRadius: 999,
+          backgroundColor: focused ? colors.accentSoft : 'transparent',
+        }}
+      >
+        <Ionicons name={focused ? base : `${base}-outline`} color={color} size={20} />
+      </View>
+    );
+  };
+}
 
 export default function TripLayout() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -73,14 +93,14 @@ export default function TripLayout() {
     <TripProvider value={value}>
       <Tabs
         screenOptions={{
-          headerStyle: { backgroundColor: colors.bg },
-          headerShadowVisible: false,
+          headerStyle: navHeader.headerStyle,
+          headerShadowVisible: navHeader.headerShadowVisible,
           headerLeft: () => <TripHomeBackButton />,
           headerTitle: () => <TripSwitcher />,
           headerTitleAlign: 'left',
           tabBarPosition: isWide ? 'top' : 'bottom',
           tabBarActiveTintColor: colors.accent,
-          tabBarInactiveTintColor: colors.inkMuted,
+          tabBarInactiveTintColor: colors.inkSoft,
           tabBarStyle: {
             backgroundColor: colors.surface,
             borderTopColor: colors.border,
@@ -91,12 +111,12 @@ export default function TripLayout() {
             paddingBottom: bottomInset,
           },
           tabBarItemStyle: {
-            paddingTop: 4,
+            paddingTop: 2,
             paddingBottom: 2,
           },
           tabBarLabelStyle: {
             fontSize: isWide ? 13 : 11,
-            fontWeight: '600',
+            fontFamily: fonts.uiBold,
             lineHeight: isWide ? 16 : 14,
           },
           tabBarIconStyle: {
@@ -109,9 +129,7 @@ export default function TripLayout() {
           options={{
             title: 'Resumo',
             tabBarLabel: 'Resumo',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="home-outline" color={color} size={size} />
-            ),
+            tabBarIcon: tabIcon('home'),
           }}
         />
         <Tabs.Screen
@@ -119,9 +137,7 @@ export default function TripLayout() {
           options={{
             title: 'Finanças',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="wallet-outline" color={color} size={size} />
-            ),
+            tabBarIcon: tabIcon('wallet'),
           }}
         />
         <Tabs.Screen
@@ -129,9 +145,7 @@ export default function TripLayout() {
           options={{
             title: 'Roteiro',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="map-outline" color={color} size={size} />
-            ),
+            tabBarIcon: tabIcon('map'),
           }}
         />
         <Tabs.Screen
@@ -139,18 +153,14 @@ export default function TripLayout() {
           options={{
             title: 'Feed',
             headerShown: false,
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="images-outline" color={color} size={size} />
-            ),
+            tabBarIcon: tabIcon('images'),
           }}
         />
         <Tabs.Screen
           name="members"
           options={{
             title: 'Membros',
-            tabBarIcon: ({ color, size }) => (
-              <Ionicons name="people-outline" color={color} size={size} />
-            ),
+            tabBarIcon: tabIcon('people'),
           }}
         />
       </Tabs>

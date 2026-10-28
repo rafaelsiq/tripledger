@@ -153,7 +153,7 @@ const styles = StyleSheet.create({
   },
   brand: { gap: spacing.sm, maxWidth: 520 },
   logo: {
-    fontFamily: fonts.displayBold,
+    fontFamily: fonts.brand,
     fontSize: 44,
     letterSpacing: -1.2,
     color: colors.ink,

@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: '#C6E3DB',
+    borderColor: colors.accentBorder,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
