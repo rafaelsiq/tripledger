@@ -28,8 +28,8 @@ export function ItineraryViewSwitcher({
     }
     const href =
       next === 'calendar'
-        ? `/(app)/trip/${tripId}/itinerary/calendar`
-        : `/(app)/trip/${tripId}/itinerary/storytelling`;
+        ? (`/(app)/trip/${tripId}/itinerary/calendar` as const)
+        : (`/(app)/trip/${tripId}/itinerary/storytelling` as const);
     // From the list we stack the view; between calendar and story we swap in place.
     if (current === 'list') router.push(href);
     else router.replace(href);

@@ -53,9 +53,10 @@ export function FinanceFab({ tripId }: Props) {
         onPress={() => setOpen(true)}
         accessibilityRole="button"
         accessibilityLabel="Novo lançamento"
-        style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.96 }] }]}
+        style={({ pressed }) => [styles.fab, styles.fabExtended, pressed && { transform: [{ scale: 0.97 }] }]}
       >
-        <Ionicons name="add" size={28} color={colors.white} />
+        <Ionicons name="add" size={20} color={colors.white} />
+        <Text style={styles.fabText}>Lançamento</Text>
       </Pressable>
 
       <Modal
@@ -114,6 +115,15 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 20,
   },
+  fabExtended: {
+    width: undefined,
+    height: 52,
+    borderRadius: radii.pill,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  fabText: { fontFamily: fonts.uiBold, fontSize: 15, color: colors.white },
   fabClose: {
     position: 'relative',
     right: 0,

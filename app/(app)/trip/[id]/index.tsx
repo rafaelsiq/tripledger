@@ -1,7 +1,19 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Badge, Notice, PageHeader, Screen } from '@/src/components/ui';
+import {
+  Badge,
+  ListGroup,
+  ListRow,
+  Notice,
+  PageHeader,
+  Screen,
+  SectionHeader,
+} from '@/src/components/ui';
+import { todayValue } from '@/src/lib/dates';
+import { itemKind, sortItemsByTime } from '@/src/lib/itineraryStory';
+import { countVotes, subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
+import type { ItineraryDay, ItineraryItem } from '@/src/types';
 import { BalanceCard } from '@/src/components/finance/BalanceCard';
 import { PendingConsolidationCard } from '@/src/components/finance/PendingConsolidationCard';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
@@ -46,6 +58,27 @@ export default function TripSummaryScreen() {
 
   const totals = useMemo(() => expenseTotals(expenses), [expenses]);
   const progress = useMemo(() => paymentProgress(expenses), [expenses]);
+
+  const [days, setDays] = useState<ItineraryDay[]>([]);
+  const [todayItems, setTodayItems] = useState<ItineraryItem[]>([]);
+  const today = todayValue();
+  const todayDay = days.find((d) => d.date === today) ?? null;
+  const todayIndex = todayDay ? days.indexOf(todayDay) : -1;
+  const tripId = trip?.id;
+  const todayDayId = todayDay?.id;
+
+  useEffect(() => {
+    if (!tripId) return;
+    return subscribeItineraryDays(tripId, setDays);
+  }, [tripId]);
+
+  useEffect(() => {
+    if (!tripId || !todayDayId) {
+      setTodayItems([]);
+      return;
+    }
+    return subscribeDayItems(tripId, todayDayId, (items) => setTodayItems(sortItemsByTime(items)));
+  }, [tripId, todayDayId]);
 
   if (!trip || !balance || !user) return null;
 
@@ -101,6 +134,50 @@ export default function TripSummaryScreen() {
     />
   ) : null;
 
+  const todaySection = todayDay ? (
+    <View style={styles.section}>
+      <SectionHeader
+        title={`Hoje · Dia ${todayIndex + 1}`}
+        trailing="Roteiro"
+        onTrailingPress={() => router.push(`/(app)/trip/${trip.id}/itinerary`)}
+      />
+      {todayItems.length === 0 ? (
+        <ListGroup>
+          <ListRow title="Dia livre" subtitle="Nenhuma atividade programada para hoje." />
+        </ListGroup>
+      ) : (
+        <ListGroup>
+          {todayItems.slice(0, 4).map((item) => {
+            const counts = countVotes(item);
+            const myVote = item.votes?.[user.uid];
+            const rest = itemKind(item) === 'rest';
+            return (
+              <ListRow
+                key={item.id}
+                leading={<Text style={styles.time}>{item.time?.trim() || '—'}</Text>}
+                title={item.title}
+                subtitle={
+                  rest
+                    ? 'Descanso'
+                    : !myVote
+                      ? 'Falta seu voto'
+                      : `${counts.yes} topam · ${counts.maybe} talvez`
+                }
+                chevron
+                onPress={() =>
+                  router.push({
+                    pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
+                    params: { itemId: item.id, dayId: item.dayId },
+                  })
+                }
+              />
+            );
+          })}
+        </ListGroup>
+      )}
+    </View>
+  ) : null;
+
   const invite = isAdmin ? (
     <InviteShareCard tripName={trip.name} inviteCode={trip.inviteCode} isAdmin />
   ) : null;
@@ -138,6 +215,7 @@ export default function TripSummaryScreen() {
               {overBudgetNotice}
             </View>
             <View style={styles.dashCol}>
+              {todaySection}
               {invite}
               {adminActions}
             </View>
@@ -147,6 +225,7 @@ export default function TripSummaryScreen() {
             {balanceCard}
             {kpis}
             {overBudgetNotice}
+            {todaySection}
             {invite}
             {adminActions}
           </>
@@ -183,6 +262,14 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   fill: { height: '100%', backgroundColor: colors.accent },
+  section: { gap: spacing.sm },
+  time: {
+    width: 44,
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.inkSoft,
+    fontVariant: ['tabular-nums'],
+  },
   dashRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
