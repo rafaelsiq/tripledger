@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Button, EmptyState, Screen } from '@/src/components/ui';
+import { Button, EmptyState, PageHeader, Screen } from '@/src/components/ui';
 import { FeedPostCard } from '@/src/components/feed/FeedPostCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { useTrip } from '@/src/hooks/useTrip';
 import { subscribeFeed } from '@/src/services/feed';
 import type { FeedPost } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import { spacing } from '@/src/theme';
 
 export default function FeedHome() {
   const { trip, canMutate, isAdmin, isFinanceLead } = useTrip();
@@ -27,21 +27,27 @@ export default function FeedHome() {
 
   return (
     <Screen>
-      <View style={[styles.top, isWide && styles.topWide]}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.hero}>Memórias</Text>
-          <Text style={styles.sub}>O feed do grupo — fotos, vídeos e momentos.</Text>
-        </View>
-        {canMutate ? (
-          <View style={isWide ? styles.publishWide : undefined}>
-            <Button
-              title="Publicar"
-              onPress={() => router.push(`/(app)/trip/${trip.id}/feed/new`)}
-            />
-          </View>
-        ) : null}
+      <View style={styles.top}>
+        <PageHeader
+          title="Feed"
+          subtitle={
+            posts.length > 0
+              ? `${posts.length} ${posts.length === 1 ? 'publicação' : 'publicações'} do grupo`
+              : 'Fotos, vídeos e momentos do grupo'
+          }
+          actions={
+            canMutate ? (
+              <Button
+                title="Publicar"
+                icon="add"
+                size="sm"
+                onPress={() => router.push(`/(app)/trip/${trip.id}/feed/new`)}
+              />
+            ) : undefined
+          }
+        />
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
       </View>
-      <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
       <FlatList
         style={styles.list}
         data={posts}
@@ -71,25 +77,7 @@ export default function FeedHome() {
 }
 
 const styles = StyleSheet.create({
-  top: { marginBottom: spacing.sm },
-  topWide: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  publishWide: { minWidth: 180 },
-  hero: {
-    color: colors.ink,
-    fontSize: 34,
-    fontFamily: fonts.displayBold,
-    letterSpacing: -0.8,
-  },
-  sub: {
-    color: colors.inkSoft,
-    fontFamily: fonts.ui,
-    marginTop: 6,
-  },
+  top: { gap: spacing.md, paddingTop: spacing.xs },
   list: {
     flex: 1,
     marginTop: spacing.md,

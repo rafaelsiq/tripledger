@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { Body, Button, Card, Label } from '@/src/components/ui';
+import { Button, Card, IconButton, Label } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/useToast';
 import {
   buildInviteShareMessage,
   buildInviteShareUrl,
   normalizeInviteCode,
 } from '@/src/lib/invite';
-import { colors, fonts, radii, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 
 type Props = {
   tripName: string;
@@ -92,53 +92,51 @@ export function InviteShareCard({ tripName, inviteCode, isAdmin = false }: Props
         <Label>Convite</Label>
         <Text style={styles.adminHint}>Somente você compartilha</Text>
       </View>
-
-      <Body muted>
-        Compartilhe o código ou o link para novos membros entrarem na viagem.
-      </Body>
-
-      <Pressable
-        onPress={copyCode}
-        disabled={busy === 'code'}
-        style={({ pressed }) => [styles.codeBox, pressed && styles.codeBoxPressed]}
-        accessibilityRole="button"
-        accessibilityLabel={`Código de convite ${code}`}
-      >
-        <Text style={styles.code}>{code}</Text>
-        <View style={styles.copyHint}>
-          <Ionicons name="copy-outline" size={18} color={colors.accent} />
-          <Text style={styles.copyHintText}>Copiar código</Text>
-        </View>
-      </Pressable>
-
-      <View style={styles.linkRow}>
-        <Ionicons name="link-outline" size={16} color={colors.inkMuted} />
-        <Text style={styles.linkText} numberOfLines={2}>
-          {inviteUrl}
-        </Text>
-      </View>
-
-      <View style={styles.actions}>
-        <Button
-          title="Copiar link"
-          variant="secondary"
-          onPress={copyLink}
-          loading={busy === 'link'}
-          disabled={!!busy && busy !== 'link'}
+      <View style={styles.row}>
+        <Pressable
+          onPress={copyCode}
+          disabled={busy === 'code'}
+          style={({ pressed }) => [styles.codeBox, pressed && { opacity: 0.7 }]}
+          accessibilityRole="button"
+          accessibilityLabel={`Copiar código de convite ${code}`}
+        >
+          <Text style={styles.codeLabel}>Código da viagem</Text>
+          <Text style={styles.code}>{code}</Text>
+        </Pressable>
+        <IconButton
+          icon="copy-outline"
+          label="Copiar código"
+          onPress={copyCode}
+          loading={busy === 'code'}
         />
         <Button
           title="Compartilhar"
+          size="sm"
+          icon="share-outline"
           onPress={shareInvite}
           loading={busy === 'share'}
           disabled={!!busy && busy !== 'share'}
         />
       </View>
+      <Pressable
+        onPress={copyLink}
+        disabled={!!busy}
+        style={({ pressed }) => [styles.linkRow, pressed && { opacity: 0.7 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Copiar link de convite"
+      >
+        <Ionicons name="link-outline" size={16} color={colors.inkSoft} />
+        <Text style={styles.linkText} numberOfLines={1}>
+          {inviteUrl}
+        </Text>
+        <Text style={styles.linkAction}>Copiar link</Text>
+      </Pressable>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  card: { gap: spacing.sm },
+  card: { gap: spacing.md },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -147,57 +145,48 @@ const styles = StyleSheet.create({
   },
   adminHint: {
     fontFamily: fonts.uiSemi,
-    fontSize: 11,
-    color: colors.accent,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    fontSize: 12,
+    color: colors.inkSoft,
   },
-  codeBox: {
-    marginTop: spacing.xs,
-    backgroundColor: colors.accentSoft,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.accentBorder,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+  row: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
   },
-  codeBoxPressed: {
-    backgroundColor: colors.accentSoft,
+  codeBox: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  codeLabel: {
+    fontFamily: fonts.uiSemi,
+    fontSize: 12,
+    color: colors.inkSoft,
   },
   code: {
-    fontSize: 32,
-    fontFamily: fonts.uiBold,
-    letterSpacing: 6,
-    color: colors.accentDark,
-  },
-  copyHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  copyHintText: {
-    fontFamily: fonts.uiSemi,
-    fontSize: 13,
-    color: colors.accent,
+    fontSize: 22,
+    fontFamily: fonts.uiHeavy,
+    letterSpacing: 2.5,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
   },
   linkRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radii.sm,
-    padding: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    paddingTop: 12,
   },
   linkText: {
     flex: 1,
     fontFamily: fonts.ui,
-    fontSize: 12,
+    fontSize: 13,
     color: colors.inkSoft,
-    lineHeight: 18,
   },
-  actions: {
-    gap: spacing.sm,
+  linkAction: {
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.accent,
   },
 });

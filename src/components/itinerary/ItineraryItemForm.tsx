@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Body, Button, Input, Label, Screen } from '@/src/components/ui';
+import { Body, Button, Card, Input, Screen, SectionHeader, Segmented } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { useToast } from '@/src/hooks/useToast';
@@ -17,7 +17,7 @@ import {
 } from '@/src/services/itinerary';
 import type { ItineraryItem, ItineraryItemKind } from '@/src/types';
 import { ITINERARY_ITEM_KIND_LABELS } from '@/src/types';
-import { colors, fonts, radii, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 
 type Props = {
   mode: 'create' | 'edit';
@@ -220,89 +220,95 @@ export function ItineraryItemForm({
           <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
         ) : null}
 
-        <View style={styles.kindBlock}>
-          <Label>Tipo</Label>
-          <View style={styles.kindRow}>
-            {KIND_OPTIONS.map((option) => {
-              const selected = kind === option;
-              return (
-                <Pressable
-                  key={option}
-                  onPress={() => setKind(option)}
-                  style={({ pressed }) => [
-                    styles.kindChip,
-                    selected && styles.kindChipOn,
-                    pressed && { opacity: 0.9 },
-                  ]}
-                >
-                  <Text style={[styles.kindChipText, selected && styles.kindChipTextOn]}>
-                    {ITINERARY_ITEM_KIND_LABELS[option]}
-                  </Text>
-                </Pressable>
-              );
-            })}
+        <Segmented
+          options={KIND_OPTIONS.map((id) => ({ id, label: ITINERARY_ITEM_KIND_LABELS[id] }))}
+          value={kind}
+          onChange={setKind}
+        />
+
+        <Card style={styles.card}>
+          <Input
+            label="Título"
+            value={title}
+            onChangeText={setTitle}
+            placeholder={isRest ? 'Descanso na casa' : 'Trilha da Lagoinha'}
+          />
+          <Input
+            label="Descrição (opcional)"
+            value={description}
+            onChangeText={setDescription}
+            placeholder={isRest ? 'Pausa para almoço / regenerar' : 'Levar água e protetor'}
+            multiline
+            style={styles.multiline}
+          />
+        </Card>
+
+        <View style={styles.section}>
+          <SectionHeader title="Quando e onde" />
+          <Card style={styles.card}>
+            <View style={styles.timeRow}>
+              <View style={styles.timeField}>
+                <Input
+                  label={isRest ? 'Início' : 'Saída'}
+                  value={time}
+                  onChangeText={setTime}
+                  placeholder="09:30"
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+              <View style={styles.timeField}>
+                <Input
+                  label={isRest ? 'Fim' : 'Volta à estadia'}
+                  value={endTime}
+                  onChangeText={setEndTime}
+                  placeholder="12:00"
+                  autoCapitalize="none"
+                  keyboardType="numbers-and-punctuation"
+                />
+              </View>
+            </View>
+            <Text style={styles.hint}>
+              {isRest
+                ? 'Defina o bloco de descanso com início e fim.'
+                : 'Saída = quando o grupo deixa a estadia. Volta = retorno à estadia.'}
+            </Text>
+            <Input
+              label="Local"
+              value={location}
+              onChangeText={setLocation}
+              placeholder={isRest ? 'Estadia' : 'Praia da Lagoinha'}
+            />
+            {!isRest ? (
+              <Input
+                label="Link do mapa (opcional)"
+                value={mapUrl}
+                onChangeText={setMapUrl}
+                placeholder="https://maps.google.com/..."
+                autoCapitalize="none"
+              />
+            ) : null}
+          </Card>
+        </View>
+
+        <View style={styles.section}>
+          <SectionHeader title="Imagem" />
+          <View style={styles.imageRow}>
+            <Button
+              title={hasImage ? 'Trocar imagem' : 'Adicionar imagem'}
+              icon="image-outline"
+              variant="secondary"
+              size="sm"
+              onPress={pickImage}
+            />
+            {hasImage ? (
+              <Button title="Remover" variant="ghost" size="sm" onPress={removeImage} />
+            ) : (
+              <Text style={styles.hint}>Opcional</Text>
+            )}
           </View>
         </View>
 
-        <Input
-          label="Título"
-          value={title}
-          onChangeText={setTitle}
-          placeholder={isRest ? 'Descanso na casa' : 'Trilha da Lagoinha'}
-        />
-        <Input
-          label="Descrição"
-          value={description}
-          onChangeText={setDescription}
-          placeholder={isRest ? 'Pausa para almoço / regenerar' : 'Levar água e protetor'}
-        />
-        <View style={[styles.timeRow, !isWide && styles.timeRowStacked]}>
-          <View style={styles.timeField}>
-            <Input
-              label={isRest ? 'Início' : 'Horário de ida'}
-              value={time}
-              onChangeText={setTime}
-              placeholder="09:30"
-              autoCapitalize="none"
-            />
-          </View>
-          <View style={styles.timeField}>
-            <Input
-              label={isRest ? 'Fim' : 'Volta à estadia'}
-              value={endTime}
-              onChangeText={setEndTime}
-              placeholder="12:00"
-              autoCapitalize="none"
-            />
-          </View>
-        </View>
-        <Body muted>
-          {isRest
-            ? 'Defina o bloco de descanso com início e fim.'
-            : 'Ida = saída da estadia. Volta = retorno à estadia.'}
-        </Body>
-        <Input
-          label="Local"
-          value={location}
-          onChangeText={setLocation}
-          placeholder={isRest ? 'Estadia' : 'Praia da Lagoinha'}
-        />
-        {!isRest ? (
-          <Input
-            label="Link do mapa"
-            value={mapUrl}
-            onChangeText={setMapUrl}
-            placeholder="https://maps.google.com/..."
-          />
-        ) : null}
-        <Button
-          title={hasImage ? 'Imagem selecionada' : 'Adicionar imagem (opcional)'}
-          variant="secondary"
-          onPress={pickImage}
-        />
-        {hasImage ? (
-          <Button title="Remover imagem" variant="ghost" onPress={removeImage} />
-        ) : null}
         <Button
           title={mode === 'edit' ? 'Salvar alterações' : 'Salvar no roteiro'}
           onPress={onSave}
@@ -314,43 +320,17 @@ export function ItineraryItemForm({
 }
 
 const styles = StyleSheet.create({
-  form: { gap: spacing.md, paddingBottom: spacing.xxl },
-  kindBlock: { gap: spacing.xs },
-  kindRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  kindChip: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  kindChipOn: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accentBorder,
-  },
-  kindChipText: {
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
-    color: colors.inkSoft,
-  },
-  kindChipTextOn: {
-    color: colors.accent,
-    fontFamily: fonts.uiBold,
-  },
+  form: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  section: { gap: spacing.sm },
+  card: { gap: spacing.md },
+  multiline: { minHeight: 76, textAlignVertical: 'top' },
+  hint: { fontFamily: fonts.ui, fontSize: 13, lineHeight: 18, color: colors.inkSoft },
   timeRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  timeRowStacked: {
-    flexDirection: 'column',
+    gap: 12,
   },
   timeField: {
     flex: 1,
   },
+  imageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
 });

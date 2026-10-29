@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Body, Button, Input, Screen, Title } from '@/src/components/ui';
+import { Button, Card, Input, PageHeader, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { normalizeInviteCode } from '@/src/lib/invite';
 import { getResolvedUserProfile } from '@/src/services/auth';
 import { joinTripByCode } from '@/src/services/trips';
-import { spacing } from '@/src/theme';
+import { fonts, spacing } from '@/src/theme';
 
 export default function JoinTripScreen() {
   const { user, profile } = useAuth();
@@ -57,26 +57,32 @@ export default function JoinTripScreen() {
   }, [autoTried, user, profile, paramCode]);
 
   return (
-    <Screen>
+    <Screen narrow>
       <View style={styles.form}>
-        <Title>Entrar na viagem</Title>
-        <Body muted>
-          Cole o código recebido do administrador ou abra o link de convite compartilhado.
-        </Body>
-        <Input
-          label="Código"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          value={code}
-          onChangeText={(text) => setCode(normalizeInviteCode(text))}
-          placeholder="ABC123"
+        <PageHeader
+          title="Entrar com código"
+          subtitle="Cole o código recebido do administrador ou abra o link de convite."
         />
-        <Button title="Entrar" onPress={() => onJoin()} loading={loading} />
+        <Card style={styles.card}>
+          <Input
+            label="Código de convite"
+            autoCapitalize="characters"
+            autoCorrect={false}
+            value={code}
+            onChangeText={(text) => setCode(normalizeInviteCode(text))}
+            placeholder="ABC123"
+            onSubmitEditing={() => onJoin()}
+            style={styles.codeInput}
+          />
+          <Button title="Entrar na viagem" onPress={() => onJoin()} loading={loading} />
+        </Card>
       </View>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  form: { gap: spacing.md, marginTop: spacing.lg },
+  form: { gap: spacing.md, paddingTop: spacing.xs },
+  card: { gap: spacing.md },
+  codeInput: { fontFamily: fonts.uiHeavy, fontSize: 22, letterSpacing: 4, textAlign: 'center' },
 });

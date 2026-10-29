@@ -2,9 +2,9 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { memberLabel } from '@/src/lib/members';
 import type { Settlement, TripMember } from '@/src/types';
-import { colors, fonts, radii, spacing } from '@/src/theme';
+import { colors, fonts, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
-import { Badge, Button } from '@/src/components/ui';
+import { Button, ListGroup } from '@/src/components/ui';
 
 type Props = {
   settlements: Settlement[];
@@ -22,60 +22,78 @@ export function SettlementList({
   onSettle,
 }: Props) {
   const nameOf = (uid: string) => {
+    if (uid === currentUid) return 'Você';
     const member = members.find((m) => m.uid === uid);
     return member ? memberLabel(member) : 'Membro';
   };
 
   if (settlements.length === 0) {
     return (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>Nenhum acerto pendente.</Text>
-      </View>
+      <ListGroup>
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Nenhum acerto gerado ainda.</Text>
+        </View>
+      </ListGroup>
     );
   }
 
   return (
-    <View style={styles.list}>
+    <ListGroup>
       {settlements.map((s) => {
         const involved = s.fromUid === currentUid || s.toUid === currentUid;
+        const settled = s.status === 'settled';
+        const mine = s.fromUid === currentUid && !settled;
         return (
-          <View key={s.id} style={styles.row}>
-            <View style={{ flex: 1, gap: 4 }}>
-              <Text style={styles.title}>
-                {nameOf(s.fromUid)} deve {formatCurrency(s.amount)} a {nameOf(s.toUid)}
-              </Text>
-              <Badge
-                text={s.status === 'settled' ? 'Quitado' : 'Em aberto'}
-                tone={s.status === 'settled' ? 'success' : 'warn'}
+          <View key={s.id} style={[styles.row, settled && styles.rowSettled, mine && styles.rowMine]}>
+            <Text style={[styles.title, settled && styles.settledText]} numberOfLines={2}>
+              <Text style={styles.name}>{nameOf(s.fromUid)}</Text>
+              {'  →  '}
+              <Text style={styles.name}>{nameOf(s.toUid)}</Text>
+            </Text>
+            <Text style={[styles.amount, settled && { color: colors.inkSoft }]}>
+              {formatCurrency(s.amount)}
+            </Text>
+            {settled ? (
+              <Text style={styles.settledTag}>Quitado</Text>
+            ) : involved || canManage ? (
+              <Button
+                title={mine ? 'Pagar' : 'Quitar'}
+                variant={mine ? 'primary' : 'secondary'}
+                size="sm"
+                onPress={() => onSettle(s)}
               />
-            </View>
-            {s.status === 'open' && (involved || canManage) ? (
-              <Button title="Quitar" variant="finance" onPress={() => onSettle(s)} />
-            ) : null}
+            ) : (
+              <Text style={styles.openTag}>Em aberto</Text>
+            )}
           </View>
         );
       })}
-    </View>
+    </ListGroup>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { gap: spacing.sm },
   row: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
     flexDirection: 'row',
-    gap: spacing.md,
     alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    minHeight: 56,
   },
-  title: {
+  rowSettled: { backgroundColor: colors.bg },
+  rowMine: { backgroundColor: colors.warnSoft },
+  title: { flex: 1, color: colors.ink, fontFamily: fonts.ui, fontSize: 14 },
+  name: { fontFamily: fonts.uiBold },
+  settledText: { color: colors.inkSoft, textDecorationLine: 'line-through' },
+  amount: {
+    fontFamily: fonts.uiBold,
+    fontSize: 15,
     color: colors.ink,
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
+    fontVariant: ['tabular-nums'],
   },
+  settledTag: { fontFamily: fonts.uiBold, fontSize: 12, color: colors.success, minWidth: 62, textAlign: 'right' },
+  openTag: { fontFamily: fonts.uiBold, fontSize: 12, color: colors.warn, minWidth: 62, textAlign: 'right' },
   empty: { padding: spacing.lg, alignItems: 'center' },
   emptyText: { color: colors.inkSoft, fontFamily: fonts.ui },
 });

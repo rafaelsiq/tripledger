@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { DateField } from '@/src/components/DateField';
-import { Button, Input, Screen, Title, Body } from '@/src/components/ui';
+import { Button, Card, Input, Notice, PageHeader, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { daysFromTodayValue, todayValue } from '@/src/lib/dates';
@@ -66,38 +66,43 @@ export default function NewTripScreen() {
   }
 
   return (
-    <Screen>
+    <Screen narrow>
       <ScrollView contentContainerStyle={styles.form}>
-        <Title>Nova viagem</Title>
-        <Body muted>
-          Você será o administrador e responsável financeiro. O orçamento nasce das despesas
-          previstas que você lançar depois.
-        </Body>
-        <Input label="Nome" value={name} onChangeText={setName} placeholder="Réveillon Floripa" />
-        <Input
-          label="Destino"
-          value={destination}
-          onChangeText={setDestination}
-          placeholder="Florianópolis"
-        />
-        <Input
-          label="Descrição"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Grupo de amigos"
-        />
-        <DateField
-          label="Início"
-          value={startDate}
-          onChange={onStartDateChange}
-          helperText="Toque para abrir o calendário"
-        />
-        <DateField
-          label="Fim"
-          value={endDate}
-          onChange={setEndDate}
-          minimumDate={startDate}
-          helperText="Não pode ser antes do início"
+        <PageHeader title="Nova viagem" subtitle="Dê um nome, destino e datas. O resto vem depois." />
+        <Card style={styles.card}>
+          <Input label="Nome da viagem" value={name} onChangeText={setName} placeholder="Réveillon Floripa" />
+          <Input
+            label="Destino"
+            value={destination}
+            onChangeText={setDestination}
+            placeholder="Cidade, região ou país"
+          />
+          <View style={styles.dates}>
+            <View style={styles.dateItem}>
+              <DateField label="Ida" value={startDate} onChange={onStartDateChange} />
+            </View>
+            <View style={styles.dateItem}>
+              <DateField
+                label="Volta"
+                value={endDate}
+                onChange={setEndDate}
+                minimumDate={startDate}
+              />
+            </View>
+          </View>
+          <Input
+            label="Descrição (opcional)"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Combinados, objetivo da viagem…"
+            multiline
+            style={{ minHeight: 84, textAlignVertical: 'top' }}
+          />
+        </Card>
+        <Notice
+          tone="neutral"
+          icon="information-circle-outline"
+          message="Você será administrador e responsável financeiro. Dá para transferir depois em Membros."
         />
         <Button title="Criar viagem" onPress={onCreate} loading={loading} />
       </ScrollView>
@@ -106,5 +111,8 @@ export default function NewTripScreen() {
 }
 
 const styles = StyleSheet.create({
-  form: { gap: spacing.md, paddingBottom: spacing.xxl },
+  form: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  card: { gap: spacing.md },
+  dates: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  dateItem: { flexGrow: 1, flexBasis: 150 },
 });

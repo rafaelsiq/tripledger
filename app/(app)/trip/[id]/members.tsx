@@ -1,8 +1,20 @@
 import React, { useMemo, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { InviteShareCard } from '@/src/components/InviteShareCard';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Badge, Body, Button, Card, EmptyState, Input, Label, Screen } from '@/src/components/ui';
+import {
+  Avatar,
+  Button,
+  Card,
+  EmptyState,
+  Input,
+  ListGroup,
+  ListRow,
+  PageHeader,
+  Screen,
+  SectionHeader,
+} from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -26,6 +38,8 @@ export default function MembersScreen() {
   const [creating, setCreating] = useState(false);
   const [linkingUid, setLinkingUid] = useState<string | null>(null);
   const [busyUid, setBusyUid] = useState<string | null>(null);
+  const [menuUid, setMenuUid] = useState<string | null>(null);
+  const [showCreate, setShowCreate] = useState(false);
 
   const realMembers = useMemo(
     () => members.filter((m) => !isDummyMember(m)),
@@ -55,6 +69,7 @@ export default function MembersScreen() {
         actorUid: user!.uid,
       });
       setDummyName('');
+      setShowCreate(false);
       showSuccess('Placeholder criado', member.displayName);
     } catch (e) {
       showError(e, 'Não foi possível criar o placeholder');
@@ -144,187 +159,274 @@ export default function MembersScreen() {
     }
   }
 
-  return (
-    <Screen>
-      <Text style={styles.title}>Membros ({members.length})</Text>
-      <FlatList
-        data={members}
-        keyExtractor={(item) => item.uid}
-        contentContainerStyle={{ gap: spacing.sm, paddingBottom: 40 }}
-        ListHeaderComponent={
-          <View style={{ marginBottom: spacing.sm, gap: spacing.sm }}>
-            <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
-            {isAdmin ? (
-              <InviteShareCard
-                tripName={trip.name}
-                inviteCode={trip.inviteCode}
-                isAdmin
-              />
-            ) : null}
-            {isAdmin && canMutate ? (
-              <Card style={styles.createCard}>
-                <Label>Placeholder (membro provisório)</Label>
-                <Body muted>
-                  Use quando alguém ainda não entrou no app. Você lança despesas e pagamentos por
-                  essa pessoa e, depois, vincula ao membro real.
-                </Body>
-                <Input
-                  label="Nome"
-                  value={dummyName}
-                  onChangeText={setDummyName}
-                  placeholder="Giovanni"
-                />
+  const managers = members.filter((m) => m.role === 'admin' || m.uid === trip.financeLeadUid);
+  const participants = members.filter((m) => !managers.includes(m));
+  const canManage = isAdmin && canMutate;
+
+  function roleLine(member: TripMember) {
+    if (isDummyMember(member)) return 'Provisório · sem conta no app';
+    const roles = [
+      member.role === 'admin' ? 'Administrador' : null,
+      member.uid === trip!.financeLeadUid ? 'Resp. financeiro' : null,
+    ].filter(Boolean);
+    return roles.length > 0 ? roles.join(' · ') : member.email || '—';
+  }
+
+  function renderMember(item: TripMember) {
+    const isFinance = item.uid === trip!.financeLeadUid;
+    const dummy = isDummyMember(item);
+    const linking = linkingUid === item.uid;
+    const menuOpen = menuUid === item.uid;
+    const canTransfer = !dummy && !isFinance;
+    const canRemove = item.uid !== user!.uid && item.uid !== trip!.adminUid;
+    const hasMenu = canManage && (canTransfer || canRemove);
+    const isYou = item.uid === user!.uid;
+
+    return (
+      <View key={item.uid}>
+        <ListRow
+          leading={<Avatar name={item.displayName} size={40} dashed={dummy} />}
+          title={isYou ? `${item.displayName} (você)` : item.displayName}
+          subtitle={roleLine(item)}
+          trailing={
+            <View style={styles.rowActions}>
+              {canManage && dummy ? (
                 <Button
-                  title="Criar placeholder"
+                  title={linking ? 'Cancelar' : 'Vincular'}
                   variant="secondary"
-                  onPress={onCreateDummy}
-                  loading={creating}
+                  size="sm"
+                  onPress={() => setLinkingUid(linking ? null : item.uid)}
+                  disabled={realMembers.length === 0}
                 />
-                {dummyMembers.length > 0 ? (
-                  <Body muted>
-                    {dummyMembers.length} placeholder{dummyMembers.length === 1 ? '' : 's'} ativo
-                    {dummyMembers.length === 1 ? '' : 's'}.
-                  </Body>
-                ) : null}
-              </Card>
+              ) : null}
+              {hasMenu ? (
+                <Pressable
+                  onPress={() => setMenuUid(menuOpen ? null : item.uid)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ações para ${item.displayName}`}
+                  accessibilityState={{ expanded: menuOpen }}
+                  hitSlop={6}
+                  style={styles.moreButton}
+                >
+                  <Ionicons name="ellipsis-vertical" size={18} color={colors.inkSoft} />
+                </Pressable>
+              ) : null}
+            </View>
+          }
+        />
+
+        {menuOpen ? (
+          <View style={styles.menu}>
+            {canTransfer ? (
+              <Pressable
+                style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: colors.surfaceMuted }]}
+                disabled={busyUid === item.uid}
+                onPress={() => {
+                  setMenuUid(null);
+                  onTransfer(item.uid, item.displayName);
+                }}
+              >
+                <Ionicons name="swap-horizontal-outline" size={18} color={colors.ink} />
+                <Text style={styles.menuText}>Tornar responsável financeiro</Text>
+              </Pressable>
+            ) : null}
+            {canRemove ? (
+              <Pressable
+                style={({ pressed }) => [styles.menuItem, pressed && { backgroundColor: colors.surfaceMuted }]}
+                disabled={busyUid === item.uid}
+                onPress={() => {
+                  setMenuUid(null);
+                  onRemove(item);
+                }}
+              >
+                <Ionicons name="person-remove-outline" size={18} color={colors.danger} />
+                <Text style={[styles.menuText, { color: colors.danger }]}>
+                  {dummy ? 'Remover provisório' : 'Remover da viagem'}
+                </Text>
+              </Pressable>
             ) : null}
           </View>
-        }
-        ListEmptyComponent={<EmptyState title="Sem membros" />}
-        renderItem={({ item }) => {
-          const isFinance = item.uid === trip.financeLeadUid;
-          const dummy = isDummyMember(item);
-          const linking = linkingUid === item.uid;
-          return (
-            <Card style={styles.card}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <Text style={styles.name}>{item.displayName}</Text>
-                <Text style={styles.email}>
-                  {dummy ? 'Sem conta no app' : item.email || '—'}
-                </Text>
-                <View style={styles.badges}>
-                  {item.role === 'admin' ? <Badge text="Admin" tone="accent" /> : null}
-                  {isFinance ? <Badge text="Resp. financeiro" tone="warn" /> : null}
-                  {dummy ? <Badge text="Placeholder" tone="warn" /> : null}
-                  {!dummy && item.role === 'member' && !isFinance ? (
-                    <Badge text="Membro" tone="neutral" />
-                  ) : null}
-                </View>
+        ) : null}
 
-                {linking && realMembers.length > 0 ? (
-                  <View style={styles.linkBox}>
-                    <Label>Vincular a</Label>
-                    <Body muted>
-                      Escolha a conta real que herda o que estava em “{item.displayName}”.
-                    </Body>
-                    {realMembers.map((real) => {
-                      const realIsFinance = real.uid === trip.financeLeadUid;
-                      const realIsYou = real.uid === user.uid;
-                      const meta = [
-                        real.email || null,
-                        real.role === 'admin' ? 'Admin' : null,
-                        realIsFinance ? 'Resp. financeiro' : null,
-                        realIsYou ? 'Você' : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ');
-                      return (
-                        <Pressable
-                          key={real.uid}
-                          disabled={busyUid === item.uid}
-                          onPress={() => onLink(item, real)}
-                          style={({ pressed }) => [
-                            styles.linkOption,
-                            pressed && { opacity: 0.88 },
-                            busyUid === item.uid && { opacity: 0.55 },
-                          ]}
-                        >
-                          <Text style={styles.linkOptionName}>{real.displayName}</Text>
-                          {meta ? <Text style={styles.linkOptionMeta}>{meta}</Text> : null}
-                        </Pressable>
-                      );
-                    })}
-                    <Button title="Cancelar" variant="ghost" onPress={() => setLinkingUid(null)} />
+        {linking && realMembers.length > 0 ? (
+          <View style={styles.linkBox}>
+            <Text style={styles.linkHint}>
+              Escolha a conta real que herda o que estava em “{item.displayName}”.
+            </Text>
+            {realMembers.map((real) => {
+              const meta = [
+                real.email || null,
+                real.role === 'admin' ? 'Admin' : null,
+                real.uid === trip!.financeLeadUid ? 'Resp. financeiro' : null,
+                real.uid === user!.uid ? 'Você' : null,
+              ]
+                .filter(Boolean)
+                .join(' · ');
+              return (
+                <Pressable
+                  key={real.uid}
+                  disabled={busyUid === item.uid}
+                  onPress={() => onLink(item, real)}
+                  style={({ pressed }) => [
+                    styles.linkOption,
+                    pressed && { backgroundColor: colors.surfaceMuted },
+                    busyUid === item.uid && { opacity: 0.55 },
+                  ]}
+                >
+                  <Avatar name={real.displayName} size={32} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.linkOptionName}>{real.displayName}</Text>
+                    {meta ? <Text style={styles.linkOptionMeta}>{meta}</Text> : null}
                   </View>
-                ) : null}
-              </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
 
-              {isAdmin && canMutate ? (
-                <View style={{ gap: spacing.sm, minWidth: 140 }}>
-                  {dummy ? (
+  const subtitle = `${members.length} ${members.length === 1 ? 'pessoa' : 'pessoas'}${
+    dummyMembers.length > 0
+      ? ` · ${dummyMembers.length} provisório${dummyMembers.length === 1 ? '' : 's'}`
+      : ''
+  }`;
+
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content}>
+        <PageHeader title="Membros" subtitle={subtitle} />
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+
+        {members.length === 0 ? <EmptyState title="Sem membros" /> : null}
+
+        {managers.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title="Gestão" />
+            <ListGroup>{managers.map(renderMember)}</ListGroup>
+          </View>
+        ) : null}
+
+        {participants.length > 0 || canManage ? (
+          <View style={styles.section}>
+            <SectionHeader title="Participantes" />
+            {participants.length > 0 ? (
+              <ListGroup>{participants.map(renderMember)}</ListGroup>
+            ) : null}
+
+            {canManage ? (
+              showCreate ? (
+                <Card style={styles.createCard}>
+                  <Text style={styles.createTitle}>Membro provisório</Text>
+                  <Text style={styles.linkHint}>
+                    Para quem ainda não entrou no app. Lance despesas por essa pessoa e vincule à
+                    conta real depois.
+                  </Text>
+                  <Input
+                    label="Nome"
+                    value={dummyName}
+                    onChangeText={setDummyName}
+                    placeholder="Giovanni"
+                    autoFocus
+                  />
+                  <View style={styles.createActions}>
                     <Button
-                      title={linking ? 'Escolhendo…' : 'Vincular a membro'}
-                      variant="secondary"
-                      onPress={() => setLinkingUid(linking ? null : item.uid)}
-                      disabled={realMembers.length === 0}
+                      title="Cancelar"
+                      variant="ghost"
+                      size="sm"
+                      onPress={() => {
+                        setShowCreate(false);
+                        setDummyName('');
+                      }}
                     />
-                  ) : null}
-                  {!dummy && !isFinance ? (
-                    <Button
-                      title="Tornar financeiro"
-                      variant="secondary"
-                      onPress={() => onTransfer(item.uid, item.displayName)}
-                      loading={busyUid === item.uid}
-                    />
-                  ) : null}
-                  {item.uid !== user.uid ? (
-                    <Button
-                      title="Remover"
-                      variant="danger"
-                      onPress={() => onRemove(item)}
-                      loading={busyUid === item.uid}
-                    />
-                  ) : null}
-                </View>
-              ) : null}
-            </Card>
-          );
-        }}
-      />
+                    <Button title="Adicionar" size="sm" onPress={onCreateDummy} loading={creating} />
+                  </View>
+                </Card>
+              ) : (
+                <Pressable
+                  onPress={() => setShowCreate(true)}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [
+                    styles.addDashed,
+                    pressed && { backgroundColor: colors.surface },
+                  ]}
+                >
+                  <Ionicons name="add" size={18} color={colors.inkLabel} />
+                  <Text style={styles.addDashedText}>Adicionar membro provisório</Text>
+                </Pressable>
+              )
+            ) : null}
+          </View>
+        ) : null}
+
+        {isAdmin ? (
+          <InviteShareCard tripName={trip.name} inviteCode={trip.inviteCode} isAdmin />
+        ) : null}
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  title: {
-    fontSize: 26,
-    fontFamily: fonts.display,
-    color: colors.ink,
-    marginBottom: spacing.md,
+  content: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  section: { gap: spacing.sm },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  moreButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radii.sm,
   },
-  createCard: { gap: spacing.sm },
-  card: {
+  menu: {
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    backgroundColor: colors.bg,
+    paddingVertical: 4,
+  },
+  menuItem: {
     flexDirection: 'row',
-    gap: spacing.md,
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 44,
+    paddingHorizontal: spacing.md,
   },
-  name: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 16 },
-  email: { color: colors.inkSoft, fontSize: 13, fontFamily: fonts.ui },
-  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  menuText: { fontFamily: fonts.uiSemi, fontSize: 15, color: colors.ink },
   linkBox: {
-    marginTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.divider,
+    backgroundColor: colors.bg,
+    padding: spacing.md,
     gap: spacing.sm,
-    padding: spacing.sm,
-    borderRadius: radii.md,
-    backgroundColor: colors.surfaceMuted,
   },
+  linkHint: { fontFamily: fonts.ui, fontSize: 13, color: colors.inkSoft, lineHeight: 19 },
   linkOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  linkOptionName: {
-    fontFamily: fonts.uiBold,
-    color: colors.ink,
-    fontSize: 15,
+  linkOptionName: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
+  linkOptionMeta: { fontFamily: fonts.ui, color: colors.inkSoft, fontSize: 12 },
+  createCard: { gap: spacing.sm },
+  createTitle: { fontFamily: fonts.uiBold, fontSize: 15, color: colors.ink },
+  createActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.sm },
+  addDashed: {
+    minHeight: 48,
+    borderRadius: radii.lg,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
   },
-  linkOptionMeta: {
-    fontFamily: fonts.ui,
-    color: colors.inkSoft,
-    fontSize: 12,
-  },
+  addDashedText: { fontFamily: fonts.uiBold, fontSize: 14, color: colors.inkLabel },
 });

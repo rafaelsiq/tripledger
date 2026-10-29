@@ -1,8 +1,19 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
-import { Badge, Button, Card, EmptyState, Input, Screen } from '@/src/components/ui';
+import {
+  Avatar,
+  Badge,
+  Button,
+  EmptyState,
+  ListGroup,
+  ListRow,
+  PageHeader,
+  Screen,
+  SectionHeader,
+} from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
 import { formatDateLabel } from '@/src/lib/dates';
@@ -20,55 +31,32 @@ const PHASE_FILTERS: { id: PhaseFilter; label: string }[] = [
   ...TRIP_PHASES.map((id) => ({ id, label: PHASE_LABELS[id] })),
 ];
 
-function TripRow({
-  item,
-  index,
-  onPress,
-}: {
-  item: Trip;
-  index: number;
-  onPress: () => void;
-}) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(10)).current;
-  const phase = normalizeTripPhase(item.phase);
+function tripMeta(trip: Trip) {
+  return [trip.destination, `${formatDateLabel(trip.startDate)} → ${formatDateLabel(trip.endDate)}`]
+    .filter(Boolean)
+    .join(' · ');
+}
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 320,
-        delay: index * 60,
-        useNativeDriver: true,
-      }),
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 320,
-        delay: index * 60,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, [index, opacity, translateY]);
-
+/** Highlighted card for trips happening now. */
+function LiveTripCard({ trip, onPress }: { trip: Trip; onPress: () => void }) {
   return (
-    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      <Pressable onPress={onPress}>
-        <Card style={styles.tripCard}>
-          <View style={styles.tripTop}>
-            <Text style={styles.tripName}>{item.name}</Text>
-            <Badge
-              text={phaseLabel(phase)}
-              tone={phaseTone(phase)}
-              dot
-            />
-          </View>
-          {item.destination ? <Text style={styles.dest}>{item.destination}</Text> : null}
-          <Text style={styles.dates}>
-            {formatDateLabel(item.startDate)} → {formatDateLabel(item.endDate)}
-          </Text>
-        </Card>
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      style={({ pressed }) => [styles.liveCard, pressed && { opacity: 0.92 }]}
+    >
+      <View style={styles.liveCover}>
+        <Badge text={phaseLabel(trip.phase)} tone="success" dot />
+      </View>
+      <View style={styles.liveBody}>
+        <Text style={styles.liveName} numberOfLines={1}>
+          {trip.name}
+        </Text>
+        <Text style={styles.liveMeta} numberOfLines={1}>
+          {tripMeta(trip)}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -104,203 +92,217 @@ export default function TripsHome() {
     });
   }, [trips, query, phaseFilter]);
 
+  const liveTrips = filteredTrips.filter((t) => normalizeTripPhase(t.phase) === 'in_progress');
+  const otherTrips = filteredTrips.filter((t) => normalizeTripPhase(t.phase) !== 'in_progress');
+  const liveCount = trips.filter((t) => normalizeTripPhase(t.phase) === 'in_progress').length;
   const hasActiveFilter = query.trim().length > 0 || phaseFilter !== 'all';
+  const firstName = profile?.displayName?.split(' ')[0];
+  const openTrip = (trip: Trip) => router.push(`/(app)/trip/${trip.id}`);
 
   return (
-    <Screen ambient style={{ paddingTop: spacing.sm }}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.hello}>Olá, {profile?.displayName?.split(' ')[0]}</Text>
-          <Text style={styles.sub}>Suas viagens em um só lugar</Text>
-        </View>
-        <Pressable onPress={() => logout()}>
-          <Text style={styles.logout}>Sair</Text>
-        </Pressable>
-      </View>
-
-      <View style={[styles.actions, isWide && styles.actionsWide]}>
-        <View style={isWide ? styles.actionItem : undefined}>
-          <Button title="Criar viagem" onPress={() => router.push('/(app)/trip/new')} />
-        </View>
-        <View style={isWide ? styles.actionItem : undefined}>
-          <Button
-            title="Entrar com código"
-            variant="secondary"
-            onPress={() => router.push('/(app)/trip/join')}
-          />
-        </View>
-      </View>
-
-      {user
-        ? adminTrips.map((trip) => (
-            <TripPhasePromptBanner
-              key={`prompt-${trip.id}`}
-              trip={trip}
-              adminUid={trip.adminUid}
-              currentUid={user.uid}
-              compact
-            />
-          ))
-        : null}
-
-      {trips.length > 0 ? (
-        <View style={styles.filters}>
-          <Input
-            label="Buscar"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Título, destino…"
-            autoCorrect={false}
-            clearButtonMode="while-editing"
-          />
-          <View style={styles.phaseRow}>
-            {PHASE_FILTERS.map((item) => {
-              const active = phaseFilter === item.id;
-              return (
-                <Pressable
-                  key={item.id}
-                  onPress={() => setPhaseFilter(item.id)}
-                  style={({ pressed }) => [
-                    styles.phaseChip,
-                    active && styles.phaseChipActive,
-                    pressed && { opacity: 0.88 },
-                  ]}
-                >
-                  <Text style={[styles.phaseChipText, active && styles.phaseChipTextActive]}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          {hasActiveFilter ? (
+    <Screen>
+      <ScrollView contentContainerStyle={styles.content}>
+        <PageHeader
+          title={firstName ? `Olá, ${firstName}` : 'Suas viagens'}
+          subtitle={
+            trips.length === 0
+              ? 'Suas viagens em um só lugar'
+              : `${trips.length} ${trips.length === 1 ? 'viagem' : 'viagens'}${
+                  liveCount > 0 ? ` · ${liveCount} em andamento` : ''
+                }`
+          }
+          actions={
             <Pressable
-              onPress={() => {
-                setQuery('');
-                setPhaseFilter('all');
-              }}
-              hitSlop={8}
+              onPress={() => logout()}
+              accessibilityRole="button"
+              accessibilityLabel="Sair da conta"
+              style={styles.account}
             >
-              <Text style={styles.clearFilters}>Limpar filtros</Text>
+              <Avatar name={profile?.displayName || '?'} size={32} />
+              <Text style={styles.logout}>Sair</Text>
             </Pressable>
-          ) : null}
-        </View>
-      ) : null}
+          }
+        />
 
-      <FlatList
-        style={styles.list}
-        data={filteredTrips}
-        key={isWide ? 'trips-grid' : 'trips-list'}
-        keyExtractor={(item) => item.id}
-        numColumns={isWide ? 2 : 1}
-        columnWrapperStyle={isWide ? styles.gridRow : undefined}
-        contentContainerStyle={{ gap: spacing.md, paddingBottom: spacing.xxl }}
-        ListEmptyComponent={
+        <View style={[styles.actions, isWide && { maxWidth: 520 }]}>
+          <View style={styles.actionItem}>
+            <Button title="Nova viagem" icon="add" onPress={() => router.push('/(app)/trip/new')} />
+          </View>
+          <View style={styles.actionItem}>
+            <Button
+              title="Usar código"
+              icon="log-in-outline"
+              variant="secondary"
+              onPress={() => router.push('/(app)/trip/join')}
+            />
+          </View>
+        </View>
+
+        {user
+          ? adminTrips.map((trip) => (
+              <TripPhasePromptBanner
+                key={`prompt-${trip.id}`}
+                trip={trip}
+                adminUid={trip.adminUid}
+                currentUid={user.uid}
+              />
+            ))
+          : null}
+
+        {trips.length > 0 ? (
+          <View style={styles.filters}>
+            <View style={styles.search}>
+              <Ionicons name="search" size={18} color={colors.inkSoft} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Buscar por nome ou destino"
+                placeholderTextColor={colors.inkMuted}
+                accessibilityLabel="Buscar viagens"
+                autoCorrect={false}
+                clearButtonMode="while-editing"
+                style={styles.searchInput}
+              />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.phaseRow}>
+              {PHASE_FILTERS.map((item) => {
+                const active = phaseFilter === item.id;
+                return (
+                  <Pressable
+                    key={item.id}
+                    onPress={() => setPhaseFilter(item.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {item.id === 'all' ? `${item.label} · ${trips.length}` : item.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {hasActiveFilter ? (
+              <Pressable
+                onPress={() => {
+                  setQuery('');
+                  setPhaseFilter('all');
+                }}
+                hitSlop={8}
+                style={{ alignSelf: 'flex-start' }}
+              >
+                <Text style={styles.clearFilters}>Limpar filtros</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+
+        {filteredTrips.length === 0 ? (
           <EmptyState
-            title={
-              trips.length === 0
-                ? 'Nenhuma viagem ainda'
-                : 'Nenhuma viagem com esse filtro'
-            }
+            title={trips.length === 0 ? 'Nenhuma viagem ainda' : 'Nenhuma viagem com esse filtro'}
             subtitle={
               trips.length === 0
                 ? 'Crie uma viagem ou entre com um código de convite.'
                 : 'Tente outro título ou status.'
             }
           />
-        }
-        renderItem={({ item, index }) => (
-          <View style={isWide ? styles.gridItem : undefined}>
-            <TripRow
-              item={item}
-              index={index}
-              onPress={() => router.push(`/(app)/trip/${item.id}`)}
-            />
+        ) : null}
+
+        {liveTrips.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title="Em andamento" />
+            <View style={[styles.liveGrid, isWide && styles.liveGridWide]}>
+              {liveTrips.map((trip) => (
+                <View key={trip.id} style={isWide ? styles.liveItemWide : undefined}>
+                  <LiveTripCard trip={trip} onPress={() => openTrip(trip)} />
+                </View>
+              ))}
+            </View>
           </View>
-        )}
-      />
+        ) : null}
+
+        {otherTrips.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title={liveTrips.length > 0 ? 'Outras viagens' : 'Viagens'} />
+            <ListGroup>
+              {otherTrips.map((trip) => {
+                const phase = normalizeTripPhase(trip.phase);
+                return (
+                  <ListRow
+                    key={trip.id}
+                    title={trip.name}
+                    subtitle={tripMeta(trip)}
+                    trailing={<Badge text={phaseLabel(phase)} tone={phaseTone(phase)} />}
+                    chevron
+                    onPress={() => openTrip(trip)}
+                  />
+                );
+              })}
+            </ListGroup>
+          </View>
+        ) : null}
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  hello: {
-    fontFamily: fonts.display,
-    fontSize: 28,
-    color: colors.ink,
-    letterSpacing: -0.4,
-  },
-  sub: {
-    color: colors.inkSoft,
-    marginTop: 4,
-    fontFamily: fonts.ui,
-  },
-  logout: {
-    color: colors.inkMuted,
-    fontFamily: fonts.uiSemi,
-  },
-  actions: { gap: spacing.sm, marginBottom: spacing.lg },
-  actionsWide: { flexDirection: 'row' },
+  content: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  account: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44 },
+  logout: { color: colors.inkSoft, fontFamily: fonts.uiSemi, fontSize: 14 },
+  actions: { flexDirection: 'row', gap: spacing.sm },
   actionItem: { flex: 1 },
-  filters: { gap: spacing.sm, marginBottom: spacing.lg },
-  phaseRow: {
+  filters: { gap: 10 },
+  search: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  phaseChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radii.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  phaseChipActive: {
-    backgroundColor: colors.accentSoft,
-    borderColor: colors.accent,
-  },
-  phaseChipText: {
-    fontFamily: fonts.uiSemi,
-    fontSize: 13,
-    color: colors.inkSoft,
-  },
-  phaseChipTextActive: {
-    color: colors.accentDark,
-  },
-  clearFilters: {
-    alignSelf: 'flex-start',
-    color: colors.inkMuted,
-    fontFamily: fonts.uiSemi,
-    fontSize: 13,
-  },
-  list: { flex: 1 },
-  gridRow: { gap: spacing.md },
-  gridItem: { flex: 1 },
-  tripCard: { gap: spacing.xs },
-  tripTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     gap: spacing.sm,
+    minHeight: 44,
+    paddingHorizontal: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    borderRadius: radii.sm,
   },
-  tripName: {
-    fontSize: 18,
-    fontFamily: fonts.uiBold,
-    color: colors.ink,
+  searchInput: {
     flex: 1,
-  },
-  dest: { color: colors.inkSoft, fontFamily: fonts.ui },
-  dates: {
-    color: colors.inkMuted,
-    fontSize: 13,
-    marginTop: 4,
+    paddingVertical: 10,
     fontFamily: fonts.ui,
+    fontSize: 15,
+    color: colors.ink,
   },
+  phaseRow: { gap: 6 },
+  chip: {
+    height: 32,
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    borderRadius: radii.pill,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+  },
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { fontFamily: fonts.uiSemi, fontSize: 13, color: colors.inkLabel },
+  chipTextActive: { fontFamily: fonts.uiBold, color: colors.white },
+  clearFilters: { color: colors.accent, fontFamily: fonts.uiBold, fontSize: 13 },
+  section: { gap: spacing.sm },
+  liveGrid: { gap: spacing.sm },
+  liveGridWide: { flexDirection: 'row', flexWrap: 'wrap' },
+  liveItemWide: { flexBasis: 320, flexGrow: 1 },
+  liveCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  liveCover: {
+    height: 72,
+    backgroundColor: colors.accent,
+    justifyContent: 'flex-end',
+    padding: 12,
+  },
+  liveBody: { paddingHorizontal: spacing.md, paddingVertical: 12, gap: 2 },
+  liveName: { fontFamily: fonts.uiBold, fontSize: 17, color: colors.ink },
+  liveMeta: { fontFamily: fonts.ui, fontSize: 13, color: colors.inkSoft },
 });

@@ -5,16 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import {
+  Avatar,
   Badge,
   Body,
   Button,
   Card,
   Input,
   Label,
+  ListGroup,
   Screen,
+  SectionHeader,
 } from '@/src/components/ui';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
-import { WhatsAppShareButton } from '@/src/components/finance/WhatsAppShareButton';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -422,15 +424,16 @@ export default function ExpenseDetailScreen() {
     <Screen>
       <Stack.Screen
         options={{
-          title: 'Despesa',
+          title: 'Lançamento',
           headerRight: canManageThisExpense
             ? () => (
                 <Pressable
                   onPress={onEdit}
                   hitSlop={10}
+                  accessibilityRole="button"
                   style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
                 >
-                  <Ionicons name="create-outline" size={18} color={colors.finance} />
+                  <Ionicons name="create-outline" size={18} color={colors.accent} />
                   <Text style={styles.headerActionText}>Editar</Text>
                 </Pressable>
               )
@@ -440,16 +443,30 @@ export default function ExpenseDetailScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
-        <View style={{ gap: 4 }}>
+        <View style={{ gap: 6 }}>
+          <View style={styles.badges}>
+            <Badge text={CATEGORY_LABELS[expense.category]} tone="neutral" />
+            <Badge
+              text={
+                expense.kind === 'income'
+                  ? 'Receita'
+                  : expense.kind === 'planned'
+                    ? 'Previsto'
+                    : 'Realizado'
+              }
+              tone={expense.kind === 'income' ? 'success' : expense.kind === 'planned' ? 'info' : 'neutral'}
+            />
+          </View>
           <Text style={styles.title}>{expense.title}</Text>
-          <Body muted>
-            {CATEGORY_LABELS[expense.category]} · pago por {nameOf(expense.paidByUid)}
-          </Body>
+          <Text style={styles.meta}>
+            {expense.kind === 'income' ? 'Recebido por' : 'Pago por'} {nameOf(expense.paidByUid)} ·{' '}
+            {expense.splits.length} {expense.splits.length === 1 ? 'pessoa' : 'pessoas'}
+          </Text>
         </View>
 
         <Card>
-          <Text style={styles.amount}>{formatCurrency(expense.amount)}</Text>
           <PaymentTimeline
+            title="Valor do lançamento"
             total={expense.amount}
             paid={paidTotal}
             payments={expensePayments}
@@ -457,36 +474,42 @@ export default function ExpenseDetailScreen() {
           />
         </Card>
 
-        <WhatsAppShareButton onPress={onShareWhatsApp} loading={sharing} />
-
-        <Card style={{ gap: spacing.sm }}>
-          <Label>Divisão</Label>
+        <SectionHeader title="Quem deve" trailing={`${expense.splits.filter((s) => s.status === 'paid').length} de ${expense.splits.length} pagos`} />
+        <ListGroup>
           {expense.splits.map((s) => {
             const userInstallments = installmentsByUser.get(s.uid) || [];
+            const isMe = s.uid === currentUser.uid;
+            const isPayer = s.uid === expense.paidByUid;
             return (
-              <View key={s.uid} style={styles.splitBlock}>
+              <View key={s.uid} style={[styles.splitBlock, isMe && s.status !== 'paid' && styles.splitMine]}>
                 <View style={styles.splitRow}>
-                  <Text style={styles.splitName}>{nameOf(s.uid)}</Text>
-                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                    <Text style={styles.splitValue}>
-                      {formatCurrency(s.paidAmount)} / {formatCurrency(s.amount)}
-                    </Text>
-                    <Badge
-                      text={
-                        s.status === 'paid'
+                  <Avatar name={nameOf(s.uid)} size={32} />
+                  <Text style={styles.splitName} numberOfLines={1}>
+                    {isMe ? 'Você' : nameOf(s.uid)}
+                  </Text>
+                  <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                    <Text style={styles.splitValue}>{formatCurrency(s.amount)}</Text>
+                    <Text
+                      style={[
+                        styles.splitStatus,
+                        {
+                          color:
+                            s.status === 'paid'
+                              ? colors.success
+                              : s.status === 'partial'
+                                ? colors.warn
+                                : colors.danger,
+                        },
+                      ]}
+                    >
+                      {isPayer && s.status === 'paid'
+                        ? 'Pagador'
+                        : s.status === 'paid'
                           ? 'Pago'
                           : s.status === 'partial'
-                            ? 'Parcial'
-                            : 'Pendente'
-                      }
-                      tone={
-                        s.status === 'paid'
-                          ? 'success'
-                          : s.status === 'partial'
-                            ? 'warn'
-                            : 'danger'
-                      }
-                    />
+                            ? `Parcial · ${formatCurrency(s.paidAmount)}`
+                            : 'Em aberto'}
+                    </Text>
                   </View>
                 </View>
                 {userInstallments.length > 1 ||
@@ -508,7 +531,16 @@ export default function ExpenseDetailScreen() {
               </View>
             );
           })}
-        </Card>
+        </ListGroup>
+
+        <Button
+          title="Enviar resumo no WhatsApp"
+          icon="logo-whatsapp"
+          variant="secondary"
+          size="sm"
+          onPress={onShareWhatsApp}
+          loading={sharing}
+        />
 
         {canMutate &&
         mySplit &&
@@ -595,11 +627,24 @@ export default function ExpenseDetailScreen() {
               const installment = installmentRef(p.installmentId);
               return (
                 <View key={p.id} style={{ gap: spacing.sm }}>
-                  <Text>
-                    {nameOf(p.fromUid)} enviou {formatCurrency(p.amount)}
-                    {installment ? ` · ${installment.index}ª parcela` : ''}
-                    {p.proofUrl ? ' (com comprovante)' : ' (sem comprovante)'}
-                  </Text>
+                  <View style={styles.pendingRow}>
+                    <View style={styles.pendingIcon}>
+                      <Ionicons
+                        name={p.proofUrl ? 'document-attach-outline' : 'cash-outline'}
+                        size={20}
+                        color={colors.inkSoft}
+                      />
+                    </View>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.pendingTitle}>
+                        {nameOf(p.fromUid)} enviou {formatCurrency(p.amount)}
+                      </Text>
+                      <Text style={styles.pendingMeta}>
+                        {installment ? `${installment.index}ª parcela · ` : ''}
+                        {p.proofUrl ? 'comprovante anexado' : 'sem comprovante'}
+                      </Text>
+                    </View>
+                  </View>
                   <View style={{ flexDirection: 'row', gap: spacing.sm }}>
                     <View style={{ flex: 1 }}>
                       <Button title="Confirmar" variant="finance" onPress={() => onConfirm(p.id)} />
@@ -671,7 +716,20 @@ export default function ExpenseDetailScreen() {
 
 const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingBottom: spacing.xxl },
-  title: { fontSize: 24, fontWeight: '700', color: colors.ink },
+  title: { fontFamily: fonts.uiHeavy, fontSize: 22, letterSpacing: -0.3, color: colors.ink },
+  meta: { fontFamily: fonts.ui, fontSize: 14, color: colors.inkSoft },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  pendingRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  pendingIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radii.sm,
+    backgroundColor: colors.surfaceMuted,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingTitle: { fontFamily: fonts.uiSemi, fontSize: 15, color: colors.ink },
+  pendingMeta: { fontFamily: fonts.ui, fontSize: 13, color: colors.inkSoft },
   headerAction: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -691,35 +749,40 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.border,
   },
-  amount: { fontSize: 28, fontWeight: '700', color: colors.finance, marginBottom: spacing.sm },
   splitBlock: {
-    gap: 4,
-    paddingVertical: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.border,
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
   },
+  splitMine: { backgroundColor: colors.warnSoft },
   splitRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
   },
-  splitName: { fontWeight: '600', color: colors.ink },
-  splitValue: { color: colors.inkSoft, fontSize: 13 },
-  installmentList: { gap: 2, paddingLeft: 2 },
-  installmentLine: { color: colors.inkMuted, fontSize: 12 },
+  splitName: { flex: 1, fontFamily: fonts.uiSemi, fontSize: 15, color: colors.ink },
+  splitValue: {
+    fontFamily: fonts.uiBold,
+    fontSize: 15,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  splitStatus: { fontFamily: fonts.uiBold, fontSize: 12 },
+  installmentList: { gap: 2, paddingLeft: 44 },
+  installmentLine: { fontFamily: fonts.ui, color: colors.inkSoft, fontSize: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   chip: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderStrong,
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
+    borderRadius: radii.pill,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   chipOn: {
-    backgroundColor: colors.finance,
-    borderColor: colors.finance,
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
   },
-  chipText: { color: colors.ink, fontWeight: '600', fontSize: 13 },
-  chipTextOn: { color: colors.white },
+  chipText: { color: colors.inkLabel, fontFamily: fonts.uiSemi, fontSize: 13 },
+  chipTextOn: { color: colors.accentDark, fontFamily: fonts.uiBold },
 });

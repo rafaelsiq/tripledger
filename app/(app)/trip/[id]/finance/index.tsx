@@ -1,12 +1,25 @@
 import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, View } from 'react-native';
 import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Badge, Card, EmptyState, Label, Screen } from '@/src/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+  IconButton,
+  IconTile,
+  ListGroup,
+  ListRow,
+  Notice,
+  PageHeader,
+  Screen,
+  SectionHeader,
+  Segmented,
+} from '@/src/components/ui';
 import { FinanceFab } from '@/src/components/finance/FinanceFab';
 import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
-import { WhatsAppShareButton } from '@/src/components/finance/WhatsAppShareButton';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
 import { exportCsvFile } from '@/src/lib/exportCsv';
@@ -16,9 +29,40 @@ import {
   FinanceShareCancelledError,
   shareFinanceSummary,
 } from '@/src/lib/financeShare';
-import { CATEGORY_LABELS } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import { memberLabel } from '@/src/lib/members';
+import { CATEGORY_LABELS, type Expense, type ExpenseCategory, type ExpenseKind } from '@/src/types';
+import { spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
+
+type KindFilter = 'all' | ExpenseKind;
+
+const KIND_FILTERS: { id: KindFilter; label: string }[] = [
+  { id: 'all', label: 'Todos' },
+  { id: 'actual', label: 'Realizado' },
+  { id: 'planned', label: 'Previsto' },
+  { id: 'income', label: 'Receitas' },
+];
+
+const CATEGORY_ICON: Record<
+  ExpenseCategory,
+  { name: React.ComponentProps<typeof IconTile>['name']; tone: React.ComponentProps<typeof IconTile>['tone'] }
+> = {
+  lodging: { name: 'bed-outline', tone: 'info' },
+  transport: { name: 'car-outline', tone: 'neutral' },
+  food: { name: 'restaurant-outline', tone: 'warn' },
+  activities: { name: 'trail-sign-outline', tone: 'success' },
+  other: { name: 'ellipsis-horizontal', tone: 'neutral' },
+};
+
+/** Settlement caption + tone shown under a row's amount. */
+function expenseStatus(expense: Expense) {
+  if (expense.kind === 'income') return { text: 'Receita', tone: 'success' as const };
+  const paid = expense.splits.reduce((s, sp) => s + sp.paidAmount, 0);
+  if (paid >= expense.amount - 0.01) return { text: 'Quitado', tone: 'success' as const };
+  if (paid <= 0 && expense.kind === 'planned') return { text: 'Não iniciado', tone: 'neutral' as const };
+  const settled = expense.splits.filter((sp) => sp.paidAmount >= sp.amount - 0.01).length;
+  return { text: `${settled} de ${expense.splits.length} pagos`, tone: 'warn' as const };
+}
 
 export default function FinanceHome() {
   const router = useRouter();
@@ -26,6 +70,7 @@ export default function FinanceHome() {
   const { trip, expenses, payments, members, canMutate, isAdmin, isFinanceLead } = useTrip();
   const [exporting, setExporting] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [filter, setFilter] = useState<KindFilter>('all');
 
   const totals = useMemo(() => {
     const relevant = expenses.filter((e) => e.kind !== 'income');
@@ -36,6 +81,36 @@ export default function FinanceHome() {
     );
     return { total, paid };
   }, [expenses]);
+
+  const pendingPayments = useMemo(
+    () => payments.filter((p) => p.status === 'pending'),
+    [payments]
+  );
+
+  /** Expenses grouped by the day they were logged, newest first. */
+  const sections = useMemo(() => {
+    const visible = expenses
+      .filter((e) => filter === 'all' || e.kind === filter)
+      .slice()
+      .sort((a, b) => b.createdAt - a.createdAt);
+    const groups: { key: string; title: string; total: number; items: Expense[] }[] = [];
+    for (const expense of visible) {
+      const key = format(expense.createdAt, 'yyyy-MM-dd');
+      let group = groups.find((g) => g.key === key);
+      if (!group) {
+        group = { key, title: format(expense.createdAt, 'EEE, d MMM', { locale: ptBR }), total: 0, items: [] };
+        groups.push(group);
+      }
+      group.items.push(expense);
+      group.total += expense.amount;
+    }
+    return groups;
+  }, [expenses, filter]);
+
+  const nameOf = (uid: string) => {
+    const member = members.find((m) => m.uid === uid);
+    return member ? memberLabel(member) : 'Membro';
+  };
 
   async function onExportCsv() {
     if (!trip || exporting) return;
@@ -74,150 +149,117 @@ export default function FinanceHome() {
 
   if (!trip) return null;
 
+  const firstPending = pendingPayments[0];
+
   return (
     <Screen>
-      <Stack.Screen
-        options={{
-          title: 'Finanças',
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
+      <Stack.Screen options={{ title: 'Finanças' }} />
+      <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
+        <PageHeader
+          title="Finanças"
+          actions={
+            <>
+              <IconButton
+                icon="download-outline"
+                label="Exportar CSV"
                 onPress={onExportCsv}
-                disabled={exporting}
-                hitSlop={10}
-                accessibilityLabel="Exportar CSV"
-                style={({ pressed }) => [
-                  styles.headerAction,
-                  pressed && { opacity: 0.7 },
-                  exporting && { opacity: 0.55 },
-                ]}
-              >
-                {exporting ? (
-                  <ActivityIndicator size="small" color={colors.finance} />
-                ) : (
-                  <Ionicons name="download-outline" size={18} color={colors.finance} />
-                )}
-                <Text style={styles.headerActionText}>CSV</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
-                hitSlop={10}
-                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-              >
-                <Ionicons name="document-text-outline" size={18} color={colors.finance} />
-                <Text style={styles.headerActionText}>Relatório</Text>
-              </Pressable>
-            </View>
-          ),
-        }}
-      />
-
-      <FlatList
-        style={styles.listFlex}
-        data={expenses}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        ListHeaderComponent={
-          <View style={styles.headerBlock}>
-            <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
-            <Card>
-              <PaymentTimeline
-                total={totals.total}
-                paid={totals.paid}
-                payments={payments}
-                members={members}
+                loading={exporting}
               />
-            </Card>
-            <WhatsAppShareButton onPress={onShareWhatsApp} loading={sharing} />
-            <View style={styles.sectionHeader}>
-              <Label>Lançamentos</Label>
-            </View>
-          </View>
-        }
-        ListEmptyComponent={
-          <EmptyState
-            title="Sem lançamentos"
-            subtitle={
-              canMutate
-                ? 'Toque no + para registrar uma despesa ou receita.'
-                : 'Ainda não há despesas nesta viagem.'
+              <IconButton
+                icon="logo-whatsapp"
+                label="Enviar resumo no WhatsApp"
+                onPress={onShareWhatsApp}
+                loading={sharing}
+              />
+              <Button
+                title="Relatório"
+                icon="document-text-outline"
+                variant="secondary"
+                size="sm"
+                onPress={() => router.push(`/(app)/trip/${trip.id}/finance/report`)}
+              />
+            </>
+          }
+        />
+
+        <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
+
+        <Card>
+          <PaymentTimeline
+            total={totals.total}
+            paid={totals.paid}
+            payments={payments}
+            members={members}
+          />
+        </Card>
+
+        {(isFinanceLead || isAdmin) && firstPending ? (
+          <Notice
+            tone="warn"
+            icon="time-outline"
+            title={`${pendingPayments.length} ${pendingPayments.length === 1 ? 'pagamento aguarda' : 'pagamentos aguardam'}`}
+            message="sua confirmação."
+            actionLabel="Revisar"
+            onAction={() =>
+              router.push(`/(app)/trip/${trip.id}/finance/expense/${firstPending.expenseId}`)
             }
           />
-        }
-        renderItem={({ item }) => {
-          const paid = item.splits.reduce((s, sp) => s + sp.paidAmount, 0);
-          return (
-            <Pressable
-              onPress={() =>
-                router.push(`/(app)/trip/${trip.id}/finance/expense/${item.id}`)
-              }
-            >
-              <Card style={styles.row}>
-                <View style={{ flex: 1, gap: 4 }}>
-                  <Text style={styles.title}>{item.title}</Text>
-                  <Text style={styles.meta}>
-                    {CATEGORY_LABELS[item.category]} ·{' '}
-                    {item.kind === 'income'
-                      ? 'Receita'
-                      : item.kind === 'planned'
-                        ? 'Previsto'
-                        : 'Execução'}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                  <Text style={styles.amount}>{formatCurrency(item.amount)}</Text>
-                  <Badge
-                    text={`${Math.round((paid / Math.max(item.amount, 1)) * 100)}%`}
-                    tone={paid >= item.amount ? 'success' : 'warn'}
-                  />
-                </View>
-              </Card>
-            </Pressable>
-          );
-        }}
-      />
+        ) : null}
+
+        <Segmented options={KIND_FILTERS} value={filter} onChange={setFilter} />
+
+        {sections.length === 0 ? (
+          <EmptyState
+            title={expenses.length === 0 ? 'Sem lançamentos' : 'Nada neste filtro'}
+            subtitle={
+              expenses.length > 0
+                ? 'Escolha outro tipo de lançamento.'
+                : canMutate
+                  ? 'Toque em + para registrar uma despesa ou receita.'
+                  : 'Ainda não há despesas nesta viagem.'
+            }
+          />
+        ) : (
+          sections.map((section) => (
+            <View key={section.key} style={styles.section}>
+              <SectionHeader title={section.title} trailing={formatCurrency(section.total)} />
+              <ListGroup>
+                {section.items.map((item) => {
+                  const status = expenseStatus(item);
+                  const icon = CATEGORY_ICON[item.category];
+                  const kindLabel =
+                    item.kind === 'planned' ? ' · Previsto' : item.kind === 'income' ? ' · Receita' : '';
+                  return (
+                    <ListRow
+                      key={item.id}
+                      leading={<IconTile name={icon.name} tone={icon.tone} />}
+                      title={item.title}
+                      subtitle={`${CATEGORY_LABELS[item.category]} · ${nameOf(item.paidByUid)}${kindLabel}`}
+                      value={formatCurrency(item.amount)}
+                      valueCaption={status.text}
+                      valueTone={status.tone}
+                      onPress={() =>
+                        router.push(`/(app)/trip/${trip.id}/finance/expense/${item.id}`)
+                      }
+                    />
+                  );
+                })}
+              </ListGroup>
+            </View>
+          ))
+        )}
+      </ScrollView>
       {canMutate ? <FinanceFab tripId={trip.id} /> : null}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  listFlex: { flex: 1 },
-  list: {
-    gap: spacing.sm,
+  flex: { flex: 1 },
+  content: {
+    gap: spacing.md,
+    paddingTop: spacing.xs,
     paddingBottom: 120,
   },
-  headerBlock: {
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-    marginTop: spacing.xs,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingRight: 4,
-  },
-  headerAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-  },
-  headerActionText: {
-    color: colors.finance,
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
-  },
-  row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  title: { fontFamily: fonts.uiBold, color: colors.ink, fontSize: 15 },
-  meta: { color: colors.inkSoft, fontSize: 12, fontFamily: fonts.ui },
-  amount: { fontFamily: fonts.uiBold, color: colors.finance },
+  section: { gap: spacing.sm },
 });

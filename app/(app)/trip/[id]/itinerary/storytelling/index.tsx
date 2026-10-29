@@ -7,7 +7,8 @@ import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { StoryActivityChip } from '@/src/components/itinerary/StoryActivityChip';
 import { StoryDayBridge } from '@/src/components/itinerary/StoryDayBridge';
 import { StoryRailNav, storyHeroStyles } from '@/src/components/itinerary/StoryRailNav';
-import { Body, EmptyState, Screen } from '@/src/components/ui';
+import { EmptyState, PageHeader, Screen } from '@/src/components/ui';
+import { ItineraryViewSwitcher } from '@/src/components/itinerary/ItineraryViewSwitcher';
 import { useLayout } from '@/src/hooks/useLayout';
 import { useTrip } from '@/src/hooks/useTrip';
 import { pickMainActivities } from '@/src/lib/itineraryStory';
@@ -69,14 +70,12 @@ export default function StorytellingOverviewScreen() {
     <Screen>
       <Stack.Screen options={{ title: 'Storytelling' }} />
 
-      <View style={storyHeroStyles.hero}>
-        <Text style={[storyHeroStyles.title, !isWide && storyHeroStyles.titleCompact]}>
-          Storytelling
-        </Text>
-        <Body muted>
-          A viagem em sequência — o fim de um dia se liga ao amanhecer do
-          próximo.
-        </Body>
+      <View style={[storyHeroStyles.hero, { gap: spacing.md }]}>
+        <PageHeader
+          title="Roteiro"
+          subtitle="A viagem em sequência: o fim de um dia se liga ao amanhecer do próximo."
+        />
+        <ItineraryViewSwitcher tripId={trip.id} current="story" />
       </View>
 
       <View style={storyHeroStyles.bannerSlot}>
@@ -192,7 +191,7 @@ const styles = StyleSheet.create({
   chapter: {
     flexShrink: 0,
     backgroundColor: colors.surface,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,

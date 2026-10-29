@@ -169,7 +169,7 @@ export function ListRow({
           ) : null}
         </View>
       ) : null}
-      {trailing}
+      {trailing ? <View>{trailing}</View> : null}
       {chevron ? <Ionicons name="chevron-forward" size={16} color={colors.iconMuted} /> : null}
     </>
   );
@@ -177,6 +177,7 @@ export function ListRow({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
       style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.bg }]}
     >
       {content}
@@ -214,6 +215,41 @@ export function Avatar({ name, size = 36, dashed }: { name: string; size?: numbe
     >
       <Text style={[styles.avatarText, { color: dashed ? colors.inkSoft : palette.fg, fontSize: size * 0.36 }]}>
         {initials || '?'}
+      </Text>
+    </View>
+  );
+}
+
+/** TripLedger logo: monogram tile + serif wordmark. */
+export function BrandMark({ size = 'md', inverse }: { size?: 'md' | 'lg'; inverse?: boolean }) {
+  const tile = size === 'lg' ? 44 : 32;
+  return (
+    <View style={styles.brand} accessibilityRole="header" accessibilityLabel="TripLedger">
+      <View
+        style={[
+          styles.brandTile,
+          { width: tile, height: tile, borderRadius: tile * 0.26 },
+          inverse && { backgroundColor: colors.white },
+        ]}
+      >
+        <Text
+          style={[
+            styles.brandTileText,
+            { fontSize: tile * 0.56 },
+            inverse && { color: colors.accent },
+          ]}
+        >
+          T
+        </Text>
+      </View>
+      <Text
+        style={[
+          styles.brandWord,
+          { fontSize: size === 'lg' ? 34 : 22 },
+          inverse && { color: colors.white },
+        ]}
+      >
+        TripLedger
       </Text>
     </View>
   );
@@ -554,6 +590,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatar: { alignItems: 'center', justifyContent: 'center' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandTile: {
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brandTileText: { fontFamily: fonts.brand, color: colors.white },
+  brandWord: { fontFamily: fonts.brand, color: colors.ink, letterSpacing: -0.5 },
   avatarText: { fontFamily: fonts.uiHeavy },
   button: {
     minHeight: 48,
