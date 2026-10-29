@@ -17,6 +17,8 @@ export default function FinanceLayout() {
       <Stack.Screen name="edit/[expenseId]" options={{ presentation: 'modal' }} />
       <Stack.Screen name="expense/[expenseId]" />
       <Stack.Screen name="report" />
+      <Stack.Screen name="fund/new" options={{ presentation: 'modal' }} />
+      <Stack.Screen name="fund/[fundId]" />
     </Stack>
   );
 }

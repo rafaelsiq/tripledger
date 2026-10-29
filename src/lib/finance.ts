@@ -2,6 +2,8 @@ import type {
   Expense,
   ExpenseInstallment,
   ExpenseSplit,
+  Fund,
+  FundMovement,
   Payment,
   Settlement,
 } from '@/src/types';
@@ -194,10 +196,14 @@ export function simplifyDebts(
   return result;
 }
 
+export function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
 /**
- * Net balance per member from expenses:
- * positive = others owe them / they should receive
- * negative = they owe
+ * Gross position per member from expenses only (ignores any repayment):
+ * positive = fronted more than their share, negative = consumed more than they fronted.
+ * Use computeLedgerBalances for "who still owes whom".
  */
 export function computeNetBalances(expenses: Expense[]): Record<string, number> {
   const balances: Record<string, number> = {};
@@ -211,6 +217,188 @@ export function computeNetBalances(expenses: Expense[]): Record<string, number> 
   }
 
   return balances;
+}
+
+/**
+ * Current position per member after every money movement:
+ * expenses (payer fronted, splits consumed), income (receiver holds the others' share),
+ * confirmed payments, settled settlements and confirmed fund contributions/refunds.
+ * positive = should receive, negative = still owes. Sums to ~0 across the group.
+ */
+export function computeLedgerBalances(input: {
+  expenses: Expense[];
+  payments?: Payment[];
+  settlements?: Settlement[];
+  fundMovements?: FundMovement[];
+}): Record<string, number> {
+  const balances: Record<string, number> = {};
+  const add = (uid: string, value: number) => {
+    balances[uid] = (balances[uid] || 0) + value;
+  };
+
+  for (const expense of input.expenses) {
+    const sign = expense.kind === 'income' ? -1 : 1;
+    add(expense.paidByUid, sign * expense.amount);
+    for (const split of expense.splits) {
+      add(split.uid, -sign * split.amount);
+    }
+  }
+
+  for (const payment of input.payments || []) {
+    if (payment.status !== 'confirmed') continue;
+    add(payment.fromUid, payment.amount);
+    add(payment.toUid, -payment.amount);
+  }
+
+  for (const settlement of input.settlements || []) {
+    if (settlement.status !== 'settled') continue;
+    add(settlement.fromUid, settlement.amount);
+    add(settlement.toUid, -settlement.amount);
+  }
+
+  for (const movement of input.fundMovements || []) {
+    if (movement.status !== 'confirmed') continue;
+    // Contribution: member hands cash to the holder. Refund: holder hands it back.
+    const fromUid = movement.type === 'contribution' ? movement.memberUid : movement.holderUid;
+    const toUid = movement.type === 'contribution' ? movement.holderUid : movement.memberUid;
+    add(fromUid, movement.amount);
+    add(toUid, -movement.amount);
+  }
+
+  for (const uid of Object.keys(balances)) {
+    balances[uid] = round2(balances[uid] || 0);
+  }
+  return balances;
+}
+
+/** What each member consumed: their share of costs minus their share of income. */
+export function computeConsumption(expenses: Expense[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const expense of expenses) {
+    const sign = expense.kind === 'income' ? -1 : 1;
+    for (const split of expense.splits) {
+      result[split.uid] = round2((result[split.uid] || 0) + sign * split.amount);
+    }
+  }
+  return result;
+}
+
+export type FundMemberSummary = {
+  uid: string;
+  contributed: number;
+  refunded: number;
+  /** Share of the costs paid from the fund (net of income received into it). */
+  consumed: number;
+  /** contributed − refunded − consumed. Positive = still has money in the fund. */
+  balance: number;
+};
+
+export type FundSummary = {
+  fund: Fund;
+  contributed: number;
+  refunded: number;
+  spent: number;
+  received: number;
+  pendingContributions: number;
+  /** Cash that should be with the holder right now. Negative = holder covered the gap. */
+  balance: number;
+  expenses: Expense[];
+  movements: FundMovement[];
+  members: FundMemberSummary[];
+};
+
+export function fundSummary(
+  fund: Fund,
+  allMovements: FundMovement[],
+  allExpenses: Expense[]
+): FundSummary {
+  const movements = allMovements.filter((m) => m.fundId === fund.id);
+  const expenses = allExpenses.filter((e) => e.fundId === fund.id);
+  const perMember = new Map<string, FundMemberSummary>();
+  const entry = (uid: string) => {
+    let item = perMember.get(uid);
+    if (!item) {
+      item = { uid, contributed: 0, refunded: 0, consumed: 0, balance: 0 };
+      perMember.set(uid, item);
+    }
+    return item;
+  };
+
+  let contributed = 0;
+  let refunded = 0;
+  let pendingContributions = 0;
+  for (const movement of movements) {
+    if (movement.status === 'pending' && movement.type === 'contribution') {
+      pendingContributions += movement.amount;
+    }
+    if (movement.status !== 'confirmed') continue;
+    if (movement.type === 'contribution') {
+      contributed += movement.amount;
+      entry(movement.memberUid).contributed += movement.amount;
+    } else {
+      refunded += movement.amount;
+      entry(movement.memberUid).refunded += movement.amount;
+    }
+  }
+
+  let spent = 0;
+  let received = 0;
+  for (const expense of expenses) {
+    const sign = expense.kind === 'income' ? -1 : 1;
+    if (sign > 0) spent += expense.amount;
+    else received += expense.amount;
+    for (const split of expense.splits) {
+      entry(split.uid).consumed += sign * split.amount;
+    }
+  }
+
+  const members = Array.from(perMember.values()).map((item) => {
+    const contributedR = round2(item.contributed);
+    const refundedR = round2(item.refunded);
+    const consumedR = round2(item.consumed);
+    return {
+      uid: item.uid,
+      contributed: contributedR,
+      refunded: refundedR,
+      consumed: consumedR,
+      balance: round2(contributedR - refundedR - consumedR),
+    };
+  });
+
+  return {
+    fund,
+    contributed: round2(contributed),
+    refunded: round2(refunded),
+    spent: round2(spent),
+    received: round2(received),
+    pendingContributions: round2(pendingContributions),
+    balance: round2(contributed - refunded - spent + received),
+    expenses,
+    movements,
+    members,
+  };
+}
+
+/** Open (not fully repaid) splits a member owes on expenses someone else paid. */
+export function openSplitsFor(uid: string, expenses: Expense[]) {
+  return expenses
+    .filter((e) => e.kind !== 'income' && !e.fundId && e.paidByUid !== uid)
+    .map((expense) => {
+      const split = expense.splits.find((s) => s.uid === uid);
+      if (!split) return null;
+      const remaining = round2(split.amount - split.paidAmount);
+      if (remaining <= 0.01) return null;
+      return { expense, split, remaining };
+    })
+    .filter((item): item is { expense: Expense; split: ExpenseSplit; remaining: number } => !!item);
+}
+
+/** Calendar day of an expense: explicit date, else the day it was logged. */
+export function expenseDay(expense: Pick<Expense, 'date' | 'createdAt'>): string {
+  if (expense.date) return expense.date;
+  const d = new Date(expense.createdAt);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function expenseTotals(expenses: Expense[]) {

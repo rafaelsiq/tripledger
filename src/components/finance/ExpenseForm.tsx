@@ -25,9 +25,11 @@ import {
   clampInstallmentCount,
   distributeCents,
   equalSplits,
+  fundSummary,
   MAX_INSTALLMENT_COUNT,
   sumAmounts,
 } from '@/src/lib/finance';
+import { todayValue } from '@/src/lib/dates';
 import { memberLabel } from '@/src/lib/members';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import { canManageExpense, createExpense, updateExpense, uploadTripFile } from '@/src/services/expenses';
@@ -52,8 +54,11 @@ const CATEGORY_ICONS: Record<ExpenseCategory, React.ComponentProps<typeof Ionico
   other: 'ellipsis-horizontal',
 };
 
+/** Accepts "1.234,56", "1234,56" and "1234.56". */
 function parseMoney(value: string) {
-  const n = Number(String(value).replace(',', '.'));
+  let text = String(value).trim().replace(/[^\d.,-]/g, '');
+  if (text.includes(',')) text = text.replace(/\./g, '').replace(',', '.');
+  const n = Number(text);
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -150,12 +155,15 @@ type Props = {
   mode: 'create' | 'edit';
   initialExpense?: Expense;
   initialKind?: ExpenseKind;
+  /** Preselect "paid from this fund" (create mode). */
+  initialFundId?: string;
 };
 
-export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
+export function ExpenseForm({ mode, initialExpense, initialKind, initialFundId }: Props) {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, members, canMutate, isAdmin, isFinanceLead } = useTrip();
+  const { trip, members, funds, fundMovements, expenses, canMutate, isAdmin, isFinanceLead } =
+    useTrip();
   const router = useRouter();
 
   const seeded = seedFromExpense(
@@ -186,6 +194,10 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
   );
   const [note, setNote] = useState(initialExpense?.note || '');
   const [dueDate, setDueDate] = useState(initialExpense?.dueDate || '');
+  const [date, setDate] = useState(
+    initialExpense ? initialExpense.date || '' : todayValue()
+  );
+  const [fundId, setFundId] = useState(initialExpense?.fundId || initialFundId || '');
   const [paidByUid, setPaidByUid] = useState(
     initialExpense?.paidByUid || user?.uid || ''
   );
@@ -226,6 +238,8 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
     setAmount(String(initialExpense.amount));
     setNote(initialExpense.note || '');
     setDueDate(initialExpense.dueDate || '');
+    setDate(initialExpense.date || '');
+    setFundId(initialExpense.fundId || '');
     setPaidByUid(initialExpense.paidByUid);
     setSelected(next.selected);
     setCustomAmounts(next.customAmounts);
@@ -249,6 +263,12 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
   }, [initialKind, mode]);
 
   const totalValue = parseMoney(amount);
+  const selectedFund = funds.find((f) => f.id === fundId);
+  const selectedFundSummary = useMemo(
+    () => (selectedFund ? fundSummary(selectedFund, fundMovements, expenses) : null),
+    [selectedFund, fundMovements, expenses]
+  );
+  const effectivePaidByUid = selectedFund ? selectedFund.holderUid : paidByUid;
 
   const resolvedAmounts = useMemo(
     () => resolveAmounts(selected, totalValue, customAmounts),
@@ -277,10 +297,10 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
   }, [selected, customAmounts, totalValue]);
 
   const customizedAmountUids = selected.filter((uid) => customAmounts[uid] !== undefined);
-  const customizedInstallmentUids = selected.filter(
-    (uid) => uid !== paidByUid && customInstallments[uid] !== undefined
-  );
-  const debtors = selected.filter((uid) => uid !== paidByUid);
+  const customizedInstallmentUids = selectedFund
+    ? []
+    : selected.filter((uid) => uid !== effectivePaidByUid && customInstallments[uid] !== undefined);
+  const debtors = selectedFund ? [] : selected.filter((uid) => uid !== effectivePaidByUid);
 
   function clearAmountOverride(uid: string) {
     setCustomAmounts((prev) => {
@@ -374,7 +394,7 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
       showError('Selecione quem divide a despesa.', 'Divisão incompleta');
       return;
     }
-    if (kind !== 'income' && !splitsMatch) {
+    if (!splitsMatch) {
       showError(
         `A soma das partes (${formatCurrency(splitSum)}) deve ser ${formatCurrency(totalValue)}.`,
         'Divisão incorreta'
@@ -391,7 +411,7 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
         uid,
         amount: resolvedAmounts[uid] || 0,
         installmentCount:
-          uid === paidByUid
+          uid === effectivePaidByUid || selectedFund
             ? 1
             : customInstallments[uid] ?? defaultInstallments,
       }));
@@ -406,12 +426,14 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
           title,
           category,
           amount: totalValue,
-          paidByUid: paidByUid || user.uid,
+          paidByUid: effectivePaidByUid || user.uid,
           memberIds: selected,
           customSplits,
           defaultInstallmentCount: defaultInstallments,
           note,
           dueDate: dueDate || undefined,
+          date: date || undefined,
+          fundId: selectedFund?.id,
           receiptUrl,
           clearReceipt: clearReceipt && !receiptUri,
         });
@@ -423,12 +445,14 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
           title,
           category,
           amount: totalValue,
-          paidByUid: paidByUid || user.uid,
+          paidByUid: effectivePaidByUid || user.uid,
           memberIds: selected,
           customSplits,
           defaultInstallmentCount: defaultInstallments,
           note,
           dueDate: dueDate || undefined,
+          date: date || undefined,
+          fundId: selectedFund?.id,
           receiptUrl,
           createdByUid: user.uid,
         });
@@ -517,13 +541,24 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
           <View style={styles.twoCols}>
             <View style={styles.col}>
               <DateField
-                label="Vencimento"
-                value={dueDate}
-                onChange={setDueDate}
+                label={kind === 'planned' ? 'Data prevista' : 'Data'}
+                value={date}
+                onChange={setDate}
                 placeholder="Opcional"
                 optional
               />
             </View>
+            {kind !== 'income' && !selectedFund ? (
+              <View style={styles.col}>
+                <DateField
+                  label="Vencimento do reembolso"
+                  value={dueDate}
+                  onChange={setDueDate}
+                  placeholder="Opcional"
+                  optional
+                />
+              </View>
+            ) : null}
           </View>
         </Card>
 
@@ -557,20 +592,63 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
         <View style={styles.section}>
           <SectionHeader title={kind === 'income' ? 'Quem recebeu' : 'Quem pagou'} />
           <View style={styles.chips}>
-            {members.map((m) => (
-              <Pressable
-                key={m.uid}
-                onPress={() => setPaidByUid(m.uid)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: paidByUid === m.uid }}
-                style={[styles.chip, paidByUid === m.uid && styles.chipOn]}
-              >
-                <Text style={[styles.chipText, paidByUid === m.uid && styles.chipTextOn]}>
-                  {memberLabel(m)}
-                </Text>
-              </Pressable>
-            ))}
+            {funds.map((f) => {
+              const on = fundId === f.id;
+              return (
+                <Pressable
+                  key={f.id}
+                  onPress={() => setFundId(f.id)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.chip, styles.fundChip, on && styles.chipOn]}
+                >
+                  <Ionicons
+                    name="wallet-outline"
+                    size={14}
+                    color={on ? colors.accentDark : colors.inkLabel}
+                  />
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{f.name}</Text>
+                </Pressable>
+              );
+            })}
+            {members.map((m) => {
+              const on = !selectedFund && paidByUid === m.uid;
+              return (
+                <Pressable
+                  key={m.uid}
+                  onPress={() => {
+                    setFundId('');
+                    setPaidByUid(m.uid);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.chip, on && styles.chipOn]}
+                >
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{memberLabel(m)}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+          {selectedFund && selectedFundSummary ? (
+            <Notice
+              tone={
+                kind !== 'income' && selectedFundSummary.balance - totalValue < -0.01
+                  ? 'warn'
+                  : 'accent'
+              }
+              icon="wallet-outline"
+              title={kind === 'income' ? 'Entra no caixa.' : 'Sai do caixa.'}
+              message={
+                kind === 'income'
+                  ? `O valor fica com ${nameOf(selectedFund.holderUid)} e volta como crédito para quem divide.`
+                  : `Ninguém precisa reembolsar: a parte de cada um é descontada do saldo no caixa. Saldo atual ${formatCurrency(selectedFundSummary.balance)}${
+                      selectedFundSummary.balance - totalValue < -0.01
+                        ? ` — vai faltar ${formatCurrency(totalValue - selectedFundSummary.balance)}, que fica como adiantamento de ${nameOf(selectedFund.holderUid)}.`
+                        : '.'
+                    }`
+              }
+            />
+          ) : null}
         </View>
 
         <View style={styles.section}>
@@ -603,9 +681,9 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
 
         <Input label="Nota (opcional)" value={note} onChangeText={setNote} placeholder="Observações" />
 
-        {kind !== 'income' && selected.length > 0 ? (
+        {selected.length > 0 ? (
           <View style={styles.section}>
-            <Label>Divisão por pessoa</Label>
+            <Label>{kind === 'income' ? 'Como a receita é dividida' : 'Divisão por pessoa'}</Label>
             <View style={styles.equalCard}>
               <Text style={styles.equalTitle}>Divisão igualitária</Text>
               <Body muted>
@@ -625,7 +703,7 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
                 <View style={{ flex: 1, gap: 4 }}>
                   <Text style={styles.overrideName}>
                     {nameOf(uid)}
-                    {uid === paidByUid ? ' (pagador)' : ''}
+                    {uid === effectivePaidByUid && !selectedFund ? ' (pagador)' : ''}
                   </Text>
                   <Input
                     keyboardType="decimal-pad"
@@ -850,6 +928,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
     borderColor: colors.accent,
   },
+  fundChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderStyle: 'dashed' },
   chipText: { color: colors.inkLabel, fontFamily: fonts.uiSemi, fontSize: 13 },
   chipTextOn: { color: colors.accentDark, fontFamily: fonts.uiBold },
   section: { gap: spacing.sm },

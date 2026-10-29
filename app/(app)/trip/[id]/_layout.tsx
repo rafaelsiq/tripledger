@@ -3,10 +3,15 @@ import { ActivityIndicator, Platform, View, type ColorValue } from 'react-native
 import { Tabs, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { subscribeExpenses, subscribePayments } from '@/src/services/expenses';
+import {
+  subscribeExpenses,
+  subscribePayments,
+  subscribeSettlements,
+} from '@/src/services/expenses';
+import { subscribeFundMovements, subscribeFunds } from '@/src/services/funds';
 import { subscribeMembers, subscribeTrip } from '@/src/services/trips';
 import { canMutateTrip, normalizeTripPhase } from '@/src/lib/tripPhase';
-import type { Expense, Payment, Trip, TripMember } from '@/src/types';
+import type { Expense, Fund, FundMovement, Payment, Settlement, Trip, TripMember } from '@/src/types';
 import { colors, fonts, navHeader } from '@/src/theme';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
@@ -51,6 +56,9 @@ export default function TripLayout() {
   const [members, setMembers] = useState<TripMember[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [funds, setFunds] = useState<Fund[]>([]);
+  const [fundMovements, setFundMovements] = useState<FundMovement[]>([]);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
@@ -62,6 +70,9 @@ export default function TripLayout() {
       subscribeMembers(tripId, setMembers),
       subscribeExpenses(tripId, setExpenses),
       subscribePayments(tripId, setPayments),
+      subscribeSettlements(tripId, setSettlements),
+      subscribeFunds(tripId, setFunds),
+      subscribeFundMovements(tripId, setFundMovements),
     ];
     return () => unsubs.forEach((u) => u());
   }, [tripId]);
@@ -76,13 +87,16 @@ export default function TripLayout() {
       members,
       expenses,
       payments,
+      settlements,
+      funds,
+      fundMovements,
       isAdmin,
       isFinanceLead,
       phase,
       isClosed: phase === 'closed',
       canMutate: canMutateTrip(trip, { isAdmin, isFinanceLead }),
     };
-  }, [tripId, trip, members, expenses, payments, user]);
+  }, [tripId, trip, members, expenses, payments, settlements, funds, fundMovements, user]);
 
   if (!ready) {
     return (

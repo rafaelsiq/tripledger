@@ -21,7 +21,13 @@ import { TripPhaseAdminActions } from '@/src/components/TripPhaseAdminActions';
 import { TripClosedBanner, TripPhasePromptBanner } from '@/src/components/TripPhaseBanner';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useLayout } from '@/src/hooks/useLayout';
-import { expenseTotals, memberBalance, paymentProgress } from '@/src/lib/finance';
+import {
+  computeLedgerBalances,
+  expenseTotals,
+  fundSummary,
+  memberBalance,
+  paymentProgress,
+} from '@/src/lib/finance';
 import { formatDateLabel } from '@/src/lib/dates';
 import { phaseLabel, phaseTone } from '@/src/lib/tripPhase';
 import { colors, fonts, radii, spacing } from '@/src/theme';
@@ -44,6 +50,9 @@ export default function TripSummaryScreen() {
     trip,
     expenses,
     payments,
+    settlements,
+    funds,
+    fundMovements,
     members,
     isAdmin,
     isFinanceLead,
@@ -53,8 +62,19 @@ export default function TripSummaryScreen() {
 
   const balance = useMemo(() => {
     if (!user) return null;
-    return memberBalance(user.uid, expenses, payments);
-  }, [user, expenses, payments]);
+    const ledger = computeLedgerBalances({ expenses, payments, settlements, fundMovements });
+    const fundBalance = funds.reduce((sum, fund) => {
+      const mine = fundSummary(fund, fundMovements, expenses).members.find(
+        (m) => m.uid === user.uid
+      );
+      return sum + (mine?.balance || 0);
+    }, 0);
+    return {
+      ...memberBalance(user.uid, expenses, payments),
+      net: ledger[user.uid] || 0,
+      fundBalance: funds.length ? fundBalance : undefined,
+    };
+  }, [user, expenses, payments, settlements, funds, fundMovements]);
 
   const totals = useMemo(() => expenseTotals(expenses), [expenses]);
   const progress = useMemo(() => paymentProgress(expenses), [expenses]);
@@ -94,9 +114,9 @@ export default function TripSummaryScreen() {
 
   const balanceCard = (
     <BalanceCard
-      status={balance.status}
-      netOwed={balance.netOwed}
+      net={balance.net}
       pendingFromMe={balance.pendingFromMe}
+      fundBalance={balance.fundBalance}
       onOpenFinance={() => router.push(`/(app)/trip/${trip.id}/finance`)}
     />
   );

@@ -1,6 +1,13 @@
-import { memberBalance, paymentProgress } from '@/src/lib/finance';
+import {
+  computeConsumption,
+  computeLedgerBalances,
+  expenseDay,
+  fundSummary,
+  memberBalance,
+  paymentProgress,
+} from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
-import type { Expense, Payment, Trip, TripMember } from '@/src/types';
+import type { Expense, Fund, FundMovement, Payment, Settlement, Trip, TripMember } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
 
 const KIND_LABELS: Record<Expense['kind'], string> = {
@@ -59,8 +66,21 @@ export function buildFinanceCsv(input: {
   expenses: Expense[];
   payments: Payment[];
   members: TripMember[];
+  settlements?: Settlement[];
+  funds?: Fund[];
+  fundMovements?: FundMovement[];
 }): string {
   const { trip, expenses, payments, members } = input;
+  const funds = input.funds || [];
+  const fundMovements = input.fundMovements || [];
+  const ledger = computeLedgerBalances({
+    expenses,
+    payments,
+    settlements: input.settlements,
+    fundMovements,
+  });
+  const consumption = computeConsumption(expenses);
+  const fundName = (id?: string) => funds.find((f) => f.id === id)?.name || '';
   const progress = paymentProgress(expenses);
   const lines: string[] = [];
 
@@ -85,6 +105,8 @@ export function buildFinanceCsv(input: {
       'Pago',
       'Em aberto',
       'Pago por',
+      'Caixa',
+      'Data',
       'Nota',
       'Criado em',
     ])
@@ -102,6 +124,8 @@ export function buildFinanceCsv(input: {
         money(paid),
         money(open),
         nameOf(members, expense.paidByUid),
+        fundName(expense.fundId),
+        expenseDay(expense),
         expense.note || '',
         new Date(expense.createdAt).toISOString(),
       ])
@@ -144,7 +168,58 @@ export function buildFinanceCsv(input: {
   }
   lines.push('');
 
-  lines.push(row(['MEMBROS', 'Deve (rateio)', 'Já pagou', 'Em aberto']));
+  if (funds.length) {
+    lines.push(row(['CAIXA', 'Com', 'Aportes', 'Gastos', 'Entradas', 'Devolvido', 'Saldo']));
+    for (const fund of funds) {
+      const summary = fundSummary(fund, fundMovements, expenses);
+      lines.push(
+        row([
+          fund.name,
+          nameOf(members, fund.holderUid),
+          money(summary.contributed),
+          money(summary.spent),
+          money(summary.received),
+          money(summary.refunded),
+          money(summary.balance),
+        ])
+      );
+      for (const item of summary.members) {
+        lines.push(
+          row([
+            '',
+            nameOf(members, item.uid),
+            money(item.contributed),
+            money(item.consumed),
+            '',
+            money(item.refunded),
+            money(item.balance),
+          ])
+        );
+      }
+    }
+    lines.push('');
+
+    lines.push(row(['MOVIMENTOS DO CAIXA', 'Caixa', 'Tipo', 'Membro', 'Valor', 'Status', 'Data', 'Nota']));
+    for (const movement of fundMovements.slice().sort((a, b) => a.createdAt - b.createdAt)) {
+      lines.push(
+        row([
+          '',
+          fundName(movement.fundId),
+          movement.type === 'contribution' ? 'Aporte' : 'Devolução',
+          nameOf(members, movement.memberUid),
+          money(movement.amount),
+          PAYMENT_STATUS[movement.status],
+          new Date(movement.createdAt).toISOString(),
+          movement.note || '',
+        ])
+      );
+    }
+    lines.push('');
+  }
+
+  lines.push(
+    row(['MEMBROS', 'Deve (rateio)', 'Já pagou', 'Em aberto', 'Consumo', 'Saldo final (+ receber / − pagar)'])
+  );
   for (const member of members) {
     const balance = memberBalance(member.uid, expenses, payments);
     lines.push(
@@ -153,6 +228,8 @@ export function buildFinanceCsv(input: {
         money(balance.owed),
         money(balance.paid),
         money(balance.netOwed),
+        money(consumption[member.uid] || 0),
+        money(ledger[member.uid] || 0),
       ])
     );
   }

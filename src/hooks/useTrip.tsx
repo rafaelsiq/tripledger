@@ -1,5 +1,14 @@
 import React, { createContext, useContext } from 'react';
-import type { Expense, Payment, Trip, TripMember, TripPhase } from '@/src/types';
+import type {
+  Expense,
+  Fund,
+  FundMovement,
+  Payment,
+  Settlement,
+  Trip,
+  TripMember,
+  TripPhase,
+} from '@/src/types';
 
 export type TripContextValue = {
   tripId: string;
@@ -7,6 +16,9 @@ export type TripContextValue = {
   members: TripMember[];
   expenses: Expense[];
   payments: Payment[];
+  settlements: Settlement[];
+  funds: Fund[];
+  fundMovements: FundMovement[];
   isAdmin: boolean;
   isFinanceLead: boolean;
   phase: TripPhase;

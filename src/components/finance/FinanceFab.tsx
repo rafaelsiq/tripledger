@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { ExpenseKind } from '@/src/types';
+import type { ExpenseKind, Fund } from '@/src/types';
 import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
 
 type FabOption = {
-  id: ExpenseKind;
+  id: ExpenseKind | 'fund';
   label: string;
   hint: string;
   icon: keyof typeof Ionicons.glyphMap;
@@ -28,23 +28,51 @@ const OPTIONS: FabOption[] = [
   {
     id: 'income',
     label: 'Receita',
-    hint: 'Entrada de valor no grupo',
+    hint: 'Reembolso ou valor recebido para o grupo',
     icon: 'trending-up-outline',
   },
 ];
 
 type Props = {
   tripId: string;
+  funds?: Fund[];
 };
 
 /** Bottom-right + FAB with new lançamento shortcuts. */
-export function FinanceFab({ tripId }: Props) {
+export function FinanceFab({ tripId, funds = [] }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
 
-  function go(kind: ExpenseKind) {
+  const options: FabOption[] = [
+    ...OPTIONS,
+    funds.length
+      ? {
+          id: 'fund',
+          label: 'Aporte no caixa',
+          hint: funds.length === 1 ? `Dinheiro entregue para ${funds[0]!.name}` : 'Escolha o caixa',
+          icon: 'wallet-outline',
+        }
+      : {
+          id: 'fund',
+          label: 'Criar caixa',
+          hint: 'Dinheiro do grupo guardado com alguém',
+          icon: 'wallet-outline',
+        },
+  ];
+
+  function go(id: FabOption['id']) {
     setOpen(false);
-    router.push(`/(app)/trip/${tripId}/finance/new?kind=${kind}`);
+    if (id === 'fund') {
+      router.push(
+        funds.length === 1
+          ? `/(app)/trip/${tripId}/finance/fund/${funds[0]!.id}`
+          : funds.length
+            ? `/(app)/trip/${tripId}/finance`
+            : `/(app)/trip/${tripId}/finance/fund/new`
+      );
+      return;
+    }
+    router.push(`/(app)/trip/${tripId}/finance/new?kind=${id}`);
   }
 
   return (
@@ -69,7 +97,7 @@ export function FinanceFab({ tripId }: Props) {
           <View style={styles.sheetWrap} pointerEvents="box-none">
             <View style={styles.menu}>
               <Text style={styles.menuTitle}>Novo lançamento</Text>
-              {OPTIONS.map((option) => (
+              {options.map((option) => (
                 <Pressable
                   key={option.id}
                   onPress={() => go(option.id)}
