@@ -3,8 +3,18 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import { countVotes } from '@/src/services/itinerary';
-import type { ItineraryItem } from '@/src/types';
+import type { ItineraryItem, ItineraryVoteValue } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
+
+const VOTE_CHIPS: {
+  value: ItineraryVoteValue;
+  icon: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+}[] = [
+  { value: 'yes', icon: 'thumbs-up', color: colors.success },
+  { value: 'maybe', icon: 'help', color: colors.warn },
+  { value: 'no', icon: 'thumbs-down', color: colors.danger },
+];
 
 type Props = {
   item: ItineraryItem;
@@ -61,16 +71,23 @@ export function ItineraryCard({ item, onPress, isLast }: Props) {
             </Text>
           ) : null}
           {!isRest ? (
-            <Text style={styles.votes}>
-              {counts.total === 0 ? (
-                <Text style={styles.votesCta}>Toque para votar com o grupo</Text>
-              ) : (
-                <>
-                  <Text style={styles.votesYes}>{counts.yes} topam</Text>
-                  {` · ${counts.maybe} talvez · ${counts.no} não`}
-                </>
-              )}
-            </Text>
+            counts.total === 0 ? (
+              <Text style={styles.votesCta}>Toque para votar com o grupo</Text>
+            ) : (
+              <View
+                style={styles.voteChips}
+                accessibilityLabel={`${counts.yes} topam, ${counts.maybe} talvez, ${counts.no} não topam`}
+              >
+                {VOTE_CHIPS.map((chip) => (
+                  <View key={chip.value} style={[styles.voteChip, styles[`chip_${chip.value}`]]}>
+                    <Ionicons name={chip.icon} size={12} color={chip.color} />
+                    <Text style={[styles.voteChipText, { color: chip.color }]}>
+                      {counts[chip.value]}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )
           ) : null}
         </View>
       </Pressable>
@@ -119,7 +136,18 @@ const styles = StyleSheet.create({
   titleDone: { textDecorationLine: 'line-through', color: colors.inkSoft },
   meta: { color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13 },
   desc: { color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13, lineHeight: 19 },
-  votes: { marginTop: 4, color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13 },
-  votesYes: { color: colors.success, fontFamily: fonts.uiBold },
-  votesCta: { color: colors.warn, fontFamily: fonts.uiSemi },
+  voteChips: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  voteChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radii.pill,
+  },
+  chip_yes: { backgroundColor: colors.successSoft },
+  chip_maybe: { backgroundColor: colors.warnSoft },
+  chip_no: { backgroundColor: colors.dangerSoft },
+  voteChipText: { fontFamily: fonts.uiBold, fontSize: 12, fontVariant: ['tabular-nums'] },
+  votesCta: { marginTop: 4, color: colors.warn, fontFamily: fonts.uiSemi, fontSize: 13 },
 });
