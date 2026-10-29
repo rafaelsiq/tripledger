@@ -1,18 +1,14 @@
 import { Stack } from 'expo-router';
 import { TripSwitcher } from '@/src/components/TripSwitcher';
 import { UserTripsProvider } from '@/src/hooks/useUserTrips';
-import { colors, fonts } from '@/src/theme';
+import { navHeader } from '@/src/theme';
 
 export default function AppLayout() {
   return (
     <UserTripsProvider>
       <Stack
         screenOptions={{
-          headerStyle: { backgroundColor: colors.bg },
-          headerTintColor: colors.ink,
-          headerTitleStyle: { fontFamily: fonts.uiSemi },
-          headerShadowVisible: false,
-          contentStyle: { backgroundColor: colors.bg },
+          ...navHeader,
           headerTitle: () => <TripSwitcher />,
           headerTitleAlign: 'left',
         }}

@@ -2,34 +2,52 @@ export const fonts = {
   ui: 'Manrope_500Medium',
   uiSemi: 'Manrope_600SemiBold',
   uiBold: 'Manrope_700Bold',
-  display: 'Fraunces_600SemiBold',
-  displayBold: 'Fraunces_700Bold',
+  uiHeavy: 'Manrope_800ExtraBold',
+  /** Page and section titles: Manrope only, serif is reserved for the wordmark. */
+  display: 'Manrope_800ExtraBold',
+  displayBold: 'Manrope_800ExtraBold',
+  /** TripLedger wordmark only. */
+  brand: 'Fraunces_600SemiBold',
 };
 
 export const colors = {
-  bg: '#F4F6F8',
-  bgSoft: '#EEF2F5',
+  bg: '#F5F6F8',
+  bgSoft: '#F0F2F5',
   surface: '#FFFFFF',
-  surfaceMuted: '#F0F3F6',
-  ink: '#14212B',
-  inkSoft: '#5A6B7A',
-  inkMuted: '#8A97A3',
-  border: '#E6EAF0',
-  accent: '#0C6B58',
-  accentSoft: '#E3F2EE',
-  accentDark: '#084C3F',
-  finance: '#243B53',
-  financeSoft: '#EAF0F5',
-  warn: '#A15C07',
-  warnSoft: '#FFF4DE',
+  surfaceMuted: '#F0F2F5',
+  surfaceSunken: '#E9ECF0',
+  ink: '#101828',
+  inkSoft: '#475467',
+  /** Lightest text tone that still passes 4.5:1 on white. */
+  inkMuted: '#667085',
+  inkLabel: '#344054',
+  border: '#E4E7EC',
+  borderStrong: '#D0D5DD',
+  divider: '#F0F2F5',
+  iconMuted: '#98A2B3',
+  accent: '#0B6E5C',
+  accentSoft: '#E6F2EF',
+  accentDark: '#08503F',
+  accentBorder: '#B7DCD3',
+  finance: '#101828',
+  financeSoft: '#F5F6F8',
+  info: '#2F4BB5',
+  infoSoft: '#EEF4FF',
+  infoBorder: '#C7D7FE',
+  warn: '#A04A05',
+  warnSoft: '#FFF6E5',
+  warnBorder: '#FEDF89',
+  warnStrong: '#F79009',
   danger: '#B42318',
-  dangerSoft: '#FEE4E2',
+  dangerSoft: '#FEF0EF',
+  dangerBorder: '#FDA29B',
   success: '#067647',
-  successSoft: '#DCFAE6',
+  successSoft: '#ECFDF3',
+  successBorder: '#ABEFC6',
   white: '#FFFFFF',
   black: '#000000',
-  overlay: 'rgba(20, 33, 43, 0.4)',
-  shadow: 'rgba(20, 33, 43, 0.08)',
+  overlay: 'rgba(16, 24, 40, 0.45)',
+  shadow: 'rgba(16, 24, 40, 0.08)',
 };
 
 export const spacing = {
@@ -42,10 +60,11 @@ export const spacing = {
 };
 
 export const radii = {
-  sm: 10,
-  md: 14,
-  lg: 18,
-  xl: 24,
+  sm: 8,
+  md: 10,
+  lg: 12,
+  xl: 16,
+  pill: 999,
 };
 
 export const layout = {
@@ -61,33 +80,57 @@ export const layout = {
 };
 
 export const shadows = {
+  /** Cards are flat: border only. Kept as a spread target for existing styles. */
   card: {
     shadowColor: colors.ink,
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 0,
   },
+  /** Floating surfaces only: sheets, menus, popovers, FAB. */
+  raised: {
+    shadowColor: colors.ink,
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+};
+
+/** Shared navigator header look: white bar with a hairline divider. */
+export const navHeader = {
+  headerStyle: { backgroundColor: colors.surface },
+  headerShadowVisible: true,
+  headerTintColor: colors.ink,
+  headerTitleStyle: { fontFamily: fonts.uiBold, fontSize: 16 },
+  contentStyle: { backgroundColor: colors.bg },
 };
 
 export const typography = {
   brand: {
-    fontFamily: fonts.displayBold,
+    fontFamily: fonts.brand,
     fontSize: 40,
-    fontWeight: '700' as const,
-    letterSpacing: -1,
+    fontWeight: '600' as const,
+    letterSpacing: -0.8,
     color: colors.ink,
   },
   title: {
     fontFamily: fonts.display,
     fontSize: 26,
-    fontWeight: '600' as const,
-    letterSpacing: -0.4,
+    fontWeight: '800' as const,
+    letterSpacing: -0.5,
+    color: colors.ink,
+  },
+  section: {
+    fontFamily: fonts.uiBold,
+    fontSize: 18,
+    fontWeight: '700' as const,
     color: colors.ink,
   },
   subtitle: {
     fontFamily: fonts.uiSemi,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600' as const,
     color: colors.ink,
   },
@@ -105,19 +148,20 @@ export const typography = {
     color: colors.inkSoft,
   },
   number: {
-    fontFamily: fonts.uiBold,
+    fontFamily: fonts.uiHeavy,
     fontSize: 28,
-    fontWeight: '700' as const,
-    letterSpacing: -0.8,
+    fontWeight: '800' as const,
+    letterSpacing: -0.6,
     color: colors.finance,
+    fontVariant: ['tabular-nums'] as ['tabular-nums'],
   },
   label: {
-    fontFamily: fonts.uiSemi,
+    fontFamily: fonts.uiBold,
     fontSize: 12,
-    fontWeight: '600' as const,
-    letterSpacing: 0.5,
+    fontWeight: '700' as const,
+    letterSpacing: 0.7,
     textTransform: 'uppercase' as const,
-    color: colors.inkMuted,
+    color: colors.inkSoft,
   },
 };
 

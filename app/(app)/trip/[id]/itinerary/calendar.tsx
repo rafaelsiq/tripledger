@@ -24,7 +24,8 @@ import {
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Body, Card, EmptyState, Label, Screen } from '@/src/components/ui';
+import { Body, Card, EmptyState, Label, PageHeader, Screen } from '@/src/components/ui';
+import { ItineraryViewSwitcher } from '@/src/components/itinerary/ItineraryViewSwitcher';
 import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
 import { useTrip } from '@/src/hooks/useTrip';
 import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
@@ -86,6 +87,8 @@ export default function ItineraryCalendarScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={styles.content}>
+        <PageHeader title="Roteiro" />
+        <ItineraryViewSwitcher tripId={trip.id} current="calendar" />
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
 
         <View style={styles.monthHeader}>
@@ -201,10 +204,11 @@ export default function ItineraryCalendarScreen() {
           <EmptyState title="Dia livre" subtitle="Ainda não há atividades neste dia." />
         ) : (
           <View style={styles.items}>
-            {items.map((item) => (
+            {items.map((item, index) => (
               <ItineraryCard
                 key={item.id}
                 item={item}
+                isLast={index === items.length - 1}
                 onPress={() =>
                   router.push({
                     pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
@@ -223,6 +227,7 @@ export default function ItineraryCalendarScreen() {
 const styles = StyleSheet.create({
   content: {
     gap: spacing.md,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.xxl,
   },
   monthHeader: {
@@ -241,8 +246,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   monthTitle: {
-    fontFamily: fonts.display,
-    fontSize: 22,
+    fontFamily: fonts.uiBold,
+    fontSize: 18,
     color: colors.ink,
     textTransform: 'capitalize',
   },
@@ -336,6 +341,6 @@ const styles = StyleSheet.create({
     color: colors.accentDark,
   },
   items: {
-    gap: spacing.sm,
+    gap: 0,
   },
 });

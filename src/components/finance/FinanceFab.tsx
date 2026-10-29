@@ -75,7 +75,7 @@ export function FinanceFab({ tripId }: Props) {
                   style={({ pressed }) => [styles.option, pressed && styles.optionPressed]}
                 >
                   <View style={styles.optionIcon}>
-                    <Ionicons name={option.icon} size={20} color={colors.finance} />
+                    <Ionicons name={option.icon} size={20} color={colors.accent} />
                   </View>
                   <View style={{ flex: 1, gap: 2 }}>
                     <Text style={styles.optionLabel}>{option.label}</Text>
@@ -107,10 +107,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.finance,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadows.card,
+    ...shadows.raised,
     elevation: 6,
     zIndex: 20,
   },
@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.lg,
     padding: spacing.sm,
     gap: 2,
-    ...shadows.card,
+    ...shadows.raised,
   },
   menuTitle: {
     fontFamily: fonts.uiBold,
@@ -155,13 +155,13 @@ const styles = StyleSheet.create({
     borderRadius: radii.md,
   },
   optionPressed: {
-    backgroundColor: colors.financeSoft,
+    backgroundColor: colors.accentSoft,
   },
   optionIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.financeSoft,
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },

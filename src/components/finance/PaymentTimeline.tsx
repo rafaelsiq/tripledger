@@ -13,11 +13,18 @@ type Props = {
   paid: number;
   payments: Payment[];
   members: TripMember[];
+  /** Caption above the total (defaults to the trip-wide wording). */
+  title?: string;
 };
 
-export function PaymentTimeline({ total, paid, payments, members }: Props) {
+export function PaymentTimeline({ total, paid, payments, members, title = 'Total lançado' }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const progress = total > 0 ? Math.min(1, paid / total) : 0;
+  const pending = payments
+    .filter((p) => p.status === 'pending')
+    .reduce((s, p) => s + p.amount, 0);
+  const pendingShare = total > 0 ? Math.min(1 - progress, pending / total) : 0;
+  const open = Math.max(0, total - paid - pending);
 
   const markers = useMemo(() => {
     const confirmed = payments
@@ -47,14 +54,18 @@ export function PaymentTimeline({ total, paid, payments, members }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <Text style={styles.label}>Progresso de pagamentos</Text>
-        <Text style={styles.value}>
-          {formatCurrency(paid)} / {formatCurrency(total)}
-        </Text>
+        <View style={{ gap: 2, flexShrink: 1 }}>
+          <Text style={styles.label}>{title}</Text>
+          <Text style={styles.total}>{formatCurrency(total)}</Text>
+        </View>
+        <Text style={styles.pct}>{Math.round(progress * 100)}% pago</Text>
       </View>
 
       <View style={styles.track}>
-        <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+        <View style={styles.fillRow}>
+          <View style={[styles.fill, { width: `${progress * 100}%` }]} />
+          <View style={[styles.fillPending, { width: `${pendingShare * 100}%` }]} />
+        </View>
         {markers.map(({ payment, left }) => (
           <Pressable
             key={payment.id}
@@ -64,7 +75,7 @@ export function PaymentTimeline({ total, paid, payments, members }: Props) {
               {
                 left: `${Math.min(96, Math.max(2, left))}%`,
                 backgroundColor:
-                  payment.status === 'confirmed' ? colors.accent : colors.warn,
+                  payment.status === 'confirmed' ? colors.accentDark : colors.warnStrong,
               },
             ]}
           />
@@ -72,8 +83,15 @@ export function PaymentTimeline({ total, paid, payments, members }: Props) {
       </View>
 
       <View style={styles.legend}>
-        <Caption>Toque nos pontos para ver quem pagou e quando</Caption>
+        <LegendItem color={colors.accent} text={`Pago ${formatCurrency(paid)}`} />
+        {pending > 0 ? (
+          <LegendItem color={colors.warnStrong} text={`Aguardando ${formatCurrency(pending)}`} />
+        ) : null}
+        <LegendItem color={colors.border} text={`Aberto ${formatCurrency(open)}`} />
       </View>
+      {markers.length > 0 ? (
+        <Caption>Toque nos pontos para ver quem pagou e quando</Caption>
+      ) : null}
 
       {selectedPayment ? (
         <View style={styles.tooltip}>
@@ -97,37 +115,71 @@ export function PaymentTimeline({ total, paid, payments, members }: Props) {
   );
 }
 
+function LegendItem({ color, text }: { color: string; text: string }) {
+  return (
+    <View style={styles.legendItem}>
+      <View style={[styles.legendSwatch, { backgroundColor: color }]} />
+      <Text style={styles.legendText}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   wrap: {
-    gap: spacing.sm,
+    gap: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
   },
   label: {
     color: colors.inkSoft,
     fontSize: 13,
     fontFamily: fonts.uiSemi,
   },
-  value: {
-    color: colors.finance,
-    fontSize: 13,
+  total: {
+    fontFamily: fonts.uiHeavy,
+    fontSize: 28,
+    letterSpacing: -0.6,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  pct: {
     fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.success,
   },
   track: {
-    height: 10,
+    height: 8,
     borderRadius: 999,
-    backgroundColor: colors.financeSoft,
+    backgroundColor: colors.surfaceMuted,
     overflow: 'visible',
     position: 'relative',
     justifyContent: 'center',
   },
-  fill: {
+  fillRow: {
+    flexDirection: 'row',
     height: '100%',
     borderRadius: 999,
+    overflow: 'hidden',
+  },
+  fill: {
+    height: '100%',
     backgroundColor: colors.accent,
+  },
+  fillPending: {
+    height: '100%',
+    backgroundColor: colors.warnStrong,
+  },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendSwatch: { width: 8, height: 8, borderRadius: 2 },
+  legendText: {
+    fontFamily: fonts.ui,
+    fontSize: 12,
+    color: colors.inkSoft,
+    fontVariant: ['tabular-nums'],
   },
   marker: {
     position: 'absolute',
@@ -140,11 +192,13 @@ const styles = StyleSheet.create({
     borderColor: colors.white,
   },
   legend: {
-    marginTop: 4,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: spacing.md,
+    rowGap: 4,
   },
   tooltip: {
-    marginTop: spacing.sm,
-    backgroundColor: colors.finance,
+    backgroundColor: colors.ink,
     borderRadius: radii.md,
     padding: spacing.md,
     gap: 4,

@@ -120,7 +120,7 @@ const styles = StyleSheet.create({
     flexGrow: 0,
     minHeight: 220,
     backgroundColor: colors.surface,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     borderWidth: 1,
     borderColor: colors.border,
     padding: spacing.md,
@@ -216,7 +216,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accentSoft,
     borderRadius: radii.md,
     borderWidth: 1,
-    borderColor: '#C6E3DB',
+    borderColor: colors.accentBorder,
     paddingVertical: 8,
   },
   addChipText: {

@@ -1,15 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { EmptyState, Label, Screen } from '@/src/components/ui';
+import { Button, EmptyState, PageHeader, Screen } from '@/src/components/ui';
 import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useTrip } from '@/src/hooks/useTrip';
 import { subscribeDayItems } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
-import { colors, fonts, radii, spacing } from '@/src/theme';
+import { spacing } from '@/src/theme';
 
 export default function DayDetailScreen() {
   const { dayId } = useLocalSearchParams<{ dayId: string }>();
@@ -41,27 +40,29 @@ export default function DayDetailScreen() {
               isAdmin={isAdmin}
               isFinanceLead={isFinanceLead}
             />
-            <View style={styles.sectionHeader}>
-              <Label>Programação</Label>
-              {canMutate ? (
-                <Pressable
-                  onPress={() =>
-                    router.push({
-                      pathname: `/(app)/trip/${currentTrip.id}/itinerary/new-item` as never,
-                      params: { dayId: String(dayId), order: String(items.length) },
-                    })
-                  }
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.newAction,
-                    pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
-                  ]}
-                >
-                  <Ionicons name="add" size={18} color={colors.white} />
-                  <Text style={styles.newActionText}>Nova atividade</Text>
-                </Pressable>
-              ) : null}
-            </View>
+            <PageHeader
+              title="Programação"
+              subtitle={
+                items.length > 0
+                  ? `${items.length} ${items.length === 1 ? 'item' : 'itens'} no dia`
+                  : undefined
+              }
+              actions={
+                canMutate ? (
+                  <Button
+                    title="Atividade"
+                    icon="add"
+                    size="sm"
+                    onPress={() =>
+                      router.push({
+                        pathname: `/(app)/trip/${currentTrip.id}/itinerary/new-item` as never,
+                        params: { dayId: String(dayId), order: String(items.length) },
+                      })
+                    }
+                  />
+                ) : undefined
+              }
+            />
           </View>
         }
         ListEmptyComponent={
@@ -74,9 +75,10 @@ export default function DayDetailScreen() {
             }
           />
         }
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <ItineraryCard
             item={item}
+            isLast={index === items.length - 1}
             onPress={() =>
               router.push({
                 pathname: `/(app)/trip/${currentTrip.id}/itinerary/item/[itemId]` as never,
@@ -97,26 +99,7 @@ const styles = StyleSheet.create({
   },
   headerBlock: {
     gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.md,
-  },
-  newAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  newActionText: {
-    color: colors.white,
-    fontFamily: fonts.uiBold,
-    fontSize: 13,
+    paddingTop: spacing.xs,
+    marginBottom: spacing.md,
   },
 });

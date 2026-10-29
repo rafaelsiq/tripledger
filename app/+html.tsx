@@ -11,7 +11,7 @@ export default function Root({ children }: { children: ReactNode }) {
           name="viewport"
           content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover"
         />
-        <meta name="theme-color" content="#0C6B58" />
+        <meta name="theme-color" content="#0B6E5C" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="description" content="Gerencie finanças, roteiro e memórias da sua viagem em grupo." />
@@ -50,7 +50,7 @@ html, body, #root {
   height: 100%;
 }
 body {
-  background-color: #F4F6F8;
+  background-color: #F5F6F8;
   margin: 0;
   overflow: hidden;
 }

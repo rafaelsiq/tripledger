@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   thumbRest: {
-    backgroundColor: '#D7E3EC',
+    backgroundColor: colors.surfaceSunken,
   },
   thumbLetter: {
     fontFamily: fonts.displayBold,

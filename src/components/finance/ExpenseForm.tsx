@@ -1,10 +1,22 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { DateField } from '@/src/components/DateField';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Body, Button, Input, Label, Screen } from '@/src/components/ui';
+import {
+  Body,
+  Button,
+  Card,
+  Input,
+  Label,
+  ListGroup,
+  Notice,
+  Screen,
+  SectionHeader,
+  Segmented,
+} from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -31,6 +43,14 @@ const KINDS: { id: ExpenseKind; label: string }[] = [
 ];
 
 const CATEGORIES = Object.keys(CATEGORY_LABELS) as ExpenseCategory[];
+
+const CATEGORY_ICONS: Record<ExpenseCategory, React.ComponentProps<typeof Ionicons>['name']> = {
+  lodging: 'bed-outline',
+  transport: 'car-outline',
+  food: 'restaurant-outline',
+  activities: 'trail-sign-outline',
+  other: 'ellipsis-horizontal',
+};
 
 function parseMoney(value: string) {
   const n = Number(String(value).replace(',', '.'));
@@ -475,87 +495,113 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
           <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
         ) : null}
         {mode === 'edit' ? (
-          <Body muted>
-            Valores já pagos são preservados ao editar; parcelas são recalculadas.
-          </Body>
+          <Notice
+            tone="neutral"
+            icon="information-circle-outline"
+            message="Valores já pagos são preservados ao editar; parcelas são recalculadas."
+          />
         ) : null}
 
-        <Label>Tipo</Label>
-        <View style={styles.chips}>
-          {KINDS.map((k) => (
-            <Pressable
-              key={k.id}
-              onPress={() => setKind(k.id)}
-              style={[styles.chip, kind === k.id && styles.chipOn]}
-            >
-              <Text style={[styles.chipText, kind === k.id && styles.chipTextOn]}>{k.label}</Text>
-            </Pressable>
-          ))}
+        <Segmented options={KINDS} value={kind} onChange={setKind} />
+
+        <Card style={styles.mainCard}>
+          <Input
+            label="Valor (R$)"
+            keyboardType="decimal-pad"
+            value={amount}
+            onChangeText={setAmount}
+            placeholder="0,00"
+            style={styles.amountInput}
+          />
+          <Input label="Descrição" value={title} onChangeText={setTitle} placeholder="Aluguel da casa" />
+          <View style={styles.twoCols}>
+            <View style={styles.col}>
+              <DateField
+                label="Vencimento"
+                value={dueDate}
+                onChange={setDueDate}
+                placeholder="Opcional"
+                optional
+              />
+            </View>
+          </View>
+        </Card>
+
+        <View style={styles.section}>
+          <SectionHeader title="Categoria" />
+          <View style={styles.catGrid}>
+            {CATEGORIES.map((c) => {
+              const on = category === c;
+              return (
+                <Pressable
+                  key={c}
+                  onPress={() => setCategory(c)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.catTile, on && styles.catTileOn]}
+                >
+                  <Ionicons
+                    name={CATEGORY_ICONS[c]}
+                    size={20}
+                    color={on ? colors.accentDark : colors.inkLabel}
+                  />
+                  <Text style={[styles.catText, on && styles.catTextOn]} numberOfLines={1}>
+                    {CATEGORY_LABELS[c]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </View>
 
-        <Label>Categoria</Label>
-        <View style={styles.chips}>
-          {CATEGORIES.map((c) => (
-            <Pressable
-              key={c}
-              onPress={() => setCategory(c)}
-              style={[styles.chip, category === c && styles.chipOn]}
-            >
-              <Text style={[styles.chipText, category === c && styles.chipTextOn]}>
-                {CATEGORY_LABELS[c]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Input label="Título" value={title} onChangeText={setTitle} placeholder="Aluguel da casa" />
-        <Input
-          label="Valor (R$)"
-          keyboardType="decimal-pad"
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="1200"
-        />
-        <DateField
-          label="Vencimento"
-          value={dueDate}
-          onChange={setDueDate}
-          placeholder="Opcional"
-          optional
-        />
-        <Input label="Nota" value={note} onChangeText={setNote} placeholder="Observações" />
-
-        <Label>Quem pagou / recebeu</Label>
-        <View style={styles.chips}>
-          {members.map((m) => (
-            <Pressable
-              key={m.uid}
-              onPress={() => setPaidByUid(m.uid)}
-              style={[styles.chip, paidByUid === m.uid && styles.chipOn]}
-            >
-              <Text style={[styles.chipText, paidByUid === m.uid && styles.chipTextOn]}>
-                {memberLabel(m)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
-        <Label>Quem divide</Label>
-        <View style={styles.chips}>
-          {members.map((m) => (
-            <Pressable
-              key={m.uid}
-              onPress={() => toggleMember(m.uid)}
-              style={[styles.chip, selected.includes(m.uid) && styles.chipOn]}
-            >
-              <Text
-                style={[styles.chipText, selected.includes(m.uid) && styles.chipTextOn]}
+        <View style={styles.section}>
+          <SectionHeader title={kind === 'income' ? 'Quem recebeu' : 'Quem pagou'} />
+          <View style={styles.chips}>
+            {members.map((m) => (
+              <Pressable
+                key={m.uid}
+                onPress={() => setPaidByUid(m.uid)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: paidByUid === m.uid }}
+                style={[styles.chip, paidByUid === m.uid && styles.chipOn]}
               >
-                {memberLabel(m)}
-              </Text>
-            </Pressable>
-          ))}
+                <Text style={[styles.chipText, paidByUid === m.uid && styles.chipTextOn]}>
+                  {memberLabel(m)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
+
+        <View style={styles.section}>
+          <SectionHeader
+            title="Quem divide"
+            trailing={`${selected.length} de ${members.length}`}
+          />
+          <ListGroup>
+            {members.map((m) => {
+              const on = selected.includes(m.uid);
+              return (
+                <Pressable
+                  key={m.uid}
+                  onPress={() => toggleMember(m.uid)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: on }}
+                  style={({ pressed }) => [styles.checkRow, pressed && { backgroundColor: colors.bg }]}
+                >
+                  <View style={[styles.checkbox, on && styles.checkboxOn]}>
+                    {on ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
+                  </View>
+                  <Text style={[styles.checkName, !on && { color: colors.inkSoft }]}>
+                    {memberLabel(m)}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ListGroup>
+        </View>
+
+        <Input label="Nota (opcional)" value={note} onChangeText={setNote} placeholder="Observações" />
 
         {kind !== 'income' && selected.length > 0 ? (
           <View style={styles.section}>
@@ -746,35 +792,79 @@ export function ExpenseForm({ mode, initialExpense, initialKind }: Props) {
 }
 
 const styles = StyleSheet.create({
-  form: { gap: spacing.md, paddingBottom: spacing.xxl },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
+  form: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  mainCard: { gap: spacing.md },
+  amountInput: {
+    fontFamily: fonts.uiHeavy,
+    fontSize: 26,
+    letterSpacing: -0.4,
+    fontVariant: ['tabular-nums'],
+  },
+  twoCols: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  col: { flexGrow: 1, flexBasis: 150 },
+  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  catTile: {
+    flexGrow: 1,
+    flexBasis: 60,
+    minHeight: 64,
+    borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingHorizontal: 4,
+  },
+  catTileOn: { borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  catText: { fontFamily: fonts.uiSemi, fontSize: 11, color: colors.inkLabel },
+  catTextOn: { fontFamily: fonts.uiBold, color: colors.accentDark },
+  checkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  checkName: { flex: 1, fontFamily: fonts.uiSemi, fontSize: 15, color: colors.ink },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    borderRadius: radii.pill,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
   chipOn: {
-    backgroundColor: colors.finance,
-    borderColor: colors.finance,
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
   },
-  chipText: { color: colors.ink, fontWeight: '600', fontSize: 13 },
-  chipTextOn: { color: colors.white },
+  chipText: { color: colors.inkLabel, fontFamily: fonts.uiSemi, fontSize: 13 },
+  chipTextOn: { color: colors.accentDark, fontFamily: fonts.uiBold },
   section: { gap: spacing.sm },
   equalCard: {
     gap: 4,
-    backgroundColor: colors.financeSoft,
-    borderRadius: radii.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
     padding: spacing.md,
     borderWidth: 1,
-    borderColor: '#D0DAE4',
+    borderColor: colors.border,
   },
   equalTitle: {
     fontFamily: fonts.uiBold,
     fontSize: 15,
-    color: colors.finance,
+    color: colors.ink,
   },
   overrideRow: {
     flexDirection: 'row',
@@ -791,5 +881,5 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: spacing.md,
   },
-  link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+  link: { color: colors.accent, fontFamily: fonts.uiBold, fontSize: 13 },
 });

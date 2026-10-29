@@ -126,11 +126,11 @@ const styles = StyleSheet.create({
   },
   error: {
     backgroundColor: colors.dangerSoft,
-    borderColor: '#FECACA',
+    borderColor: colors.dangerBorder,
   },
   success: {
     backgroundColor: colors.successSoft,
-    borderColor: '#A6F4C5',
+    borderColor: colors.successBorder,
   },
   info: {
     backgroundColor: colors.surface,

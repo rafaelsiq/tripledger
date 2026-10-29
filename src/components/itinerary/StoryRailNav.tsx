@@ -139,8 +139,9 @@ export function StoryRailNav({
 
 export const storyHeroStyles = StyleSheet.create({
   hero: {
-    gap: spacing.xs,
-    marginBottom: spacing.sm,
+    gap: 6,
+    paddingTop: spacing.xs,
+    marginBottom: spacing.md,
   },
   eyebrow: {
     color: colors.accent,
@@ -151,12 +152,12 @@ export const storyHeroStyles = StyleSheet.create({
   },
   title: {
     color: colors.ink,
-    fontSize: 32,
+    fontSize: 26,
     fontFamily: fonts.displayBold,
-    letterSpacing: -0.6,
+    letterSpacing: -0.5,
   },
   titleCompact: {
-    fontSize: 26,
+    fontSize: 24,
     letterSpacing: -0.4,
   },
   date: {
@@ -193,7 +194,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: '#C6E3DB',
+    borderColor: colors.accentBorder,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,

@@ -1,17 +1,13 @@
 import { Stack } from 'expo-router';
 import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 import { TripSwitcher } from '@/src/components/TripSwitcher';
-import { colors, fonts } from '@/src/theme';
+import { navHeader } from '@/src/theme';
 
 export default function FinanceLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.bg },
-        headerShadowVisible: false,
-        headerTintColor: colors.ink,
-        headerTitleStyle: { fontFamily: fonts.uiSemi },
-        contentStyle: { backgroundColor: colors.bg },
+        ...navHeader,
         headerTitle: () => <TripSwitcher />,
         headerTitleAlign: 'left',
       }}

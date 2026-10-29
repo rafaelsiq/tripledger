@@ -8,7 +8,8 @@ import {
   View,
 } from 'react-native';
 import { Link } from 'expo-router';
-import { Body, Button, Input, Screen, Title } from '@/src/components/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { BrandMark, Button, Input, Screen, Title } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/useToast';
 import { loginWithEmail } from '@/src/services/auth';
 import { colors, fonts, layout, spacing } from '@/src/theme';
@@ -63,20 +64,29 @@ export default function LoginScreen() {
     }
   }
 
-  const brand = (
-    <Animated.View style={[styles.brand, { opacity: fade, transform: [{ translateY: slide }] }]}>
-      <Text style={[styles.logo, site && styles.logoWide]}>TripLedger</Text>
-      <Body muted>Planeje, execute e feche a viagem — juntos e em dia.</Body>
+  const brandPanel = (
+    <Animated.View style={[styles.brandPanel, { opacity: fade, transform: [{ translateY: slide }] }]}>
+      <BrandMark size="lg" inverse />
+      <Text style={styles.brandHeadline}>Planeje, divida e feche a viagem com o grupo.</Text>
+      <View style={styles.brandPoints}>
+        <AuthPoint text="Despesas divididas e acerto de contas automático" />
+        <AuthPoint text="Roteiro do dia com votação do grupo" />
+        <AuthPoint text="Memórias da viagem num só lugar" />
+      </View>
     </Animated.View>
   );
 
   const form = (
     <View style={styles.form}>
-      <Title>Entrar</Title>
+      <View style={styles.heading}>
+        <Title>Entrar</Title>
+        <Text style={styles.subtitle}>Use o e-mail da sua conta TripLedger.</Text>
+      </View>
       <Input
         label="E-mail"
         autoCapitalize="none"
         keyboardType="email-address"
+        autoComplete="email"
         value={email}
         onChangeText={setEmail}
         placeholder="voce@email.com"
@@ -84,21 +94,26 @@ export default function LoginScreen() {
       <Input
         label="Senha"
         secureTextEntry
+        autoComplete="password"
         value={password}
         onChangeText={setPassword}
-        placeholder="••••••••"
+        placeholder="Sua senha"
+        onSubmitEditing={onLogin}
       />
       <Button title="Entrar" onPress={onLogin} loading={loading} />
-      <Link href="/(auth)/register" style={styles.link}>
-        Criar conta
-      </Link>
+      <Text style={styles.footer}>
+        Ainda não tem conta?{' '}
+        <Link href="/(auth)/register" style={styles.link}>
+          Criar conta
+        </Link>
+      </Text>
     </View>
   );
 
   if (site) {
     return (
       <View style={styles.split} testID="login-site-split">
-        <View style={styles.splitBrand}>{brand}</View>
+        <View style={styles.splitBrand}>{brandPanel}</View>
         <View style={styles.splitForm}>
           <View style={styles.splitFormInner}>{form}</View>
         </View>
@@ -107,22 +122,31 @@ export default function LoginScreen() {
   }
 
   return (
-    <Screen ambient style={styles.screen}>
+    <Screen style={styles.screen} narrow>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.inner}
       >
-        {brand}
+        <BrandMark />
         {form}
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
+function AuthPoint({ text }: { text: string }) {
+  return (
+    <View style={styles.point}>
+      <Ionicons name="checkmark-circle" size={18} color={colors.accentBorder} />
+      <Text style={styles.pointText}>{text}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  screen: { justifyContent: 'center' },
+  screen: { backgroundColor: colors.surface },
   inner: {
-    gap: spacing.xl,
+    gap: 40,
     flex: 1,
     justifyContent: 'center',
     width: '100%',
@@ -130,14 +154,14 @@ const styles = StyleSheet.create({
   split: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.bg,
+    backgroundColor: colors.surface,
   },
   splitBrand: {
-    flex: 1.15,
+    flex: 1.1,
     justifyContent: 'center',
-    paddingHorizontal: 56,
+    paddingHorizontal: 64,
     paddingVertical: spacing.xl,
-    backgroundColor: colors.accentSoft,
+    backgroundColor: colors.accent,
   },
   splitForm: {
     flex: 1,
@@ -148,25 +172,32 @@ const styles = StyleSheet.create({
   },
   splitFormInner: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 380,
     alignSelf: 'center',
   },
-  brand: { gap: spacing.sm, maxWidth: 520 },
-  logo: {
-    fontFamily: fonts.displayBold,
-    fontSize: 44,
-    letterSpacing: -1.2,
-    color: colors.ink,
+  brandPanel: { gap: spacing.lg, maxWidth: 480 },
+  brandHeadline: {
+    fontFamily: fonts.uiHeavy,
+    fontSize: 34,
+    lineHeight: 42,
+    letterSpacing: -0.6,
+    color: colors.white,
   },
-  logoWide: {
-    fontSize: 64,
-    letterSpacing: -2,
-  },
+  brandPoints: { gap: 12 },
+  point: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  pointText: { fontFamily: fonts.uiSemi, fontSize: 15, color: colors.accentSoft },
   form: { gap: spacing.md, width: '100%' },
-  link: {
+  heading: { gap: 6, marginBottom: spacing.xs },
+  subtitle: { fontFamily: fonts.ui, fontSize: 15, color: colors.inkSoft },
+  footer: {
     textAlign: 'center',
-    color: colors.accent,
-    fontFamily: fonts.uiSemi,
+    fontFamily: fonts.ui,
+    fontSize: 14,
+    color: colors.inkSoft,
     marginTop: spacing.sm,
+  },
+  link: {
+    color: colors.accent,
+    fontFamily: fonts.uiBold,
   },
 });

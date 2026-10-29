@@ -13,7 +13,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { Body, Button, Label, Screen } from '@/src/components/ui';
+import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
@@ -254,66 +254,109 @@ export default function ItineraryItemDetailScreen() {
             source={{ uri: currentItem.imageUrl }}
             style={[styles.hero, !isWide && styles.heroMobile]}
           />
-        ) : (
-          <View style={[styles.hero, !isWide && styles.heroMobile, styles.heroFallback]}>
-            <Text style={[styles.heroLetter, !isWide && styles.heroLetterMobile]}>
-              {currentItem.title.slice(0, 1).toUpperCase()}
-            </Text>
-          </View>
-        )}
+        ) : null}
 
         <View style={styles.header}>
+          <View style={styles.badges}>
+            <Badge
+              text={ITINERARY_ITEM_KIND_LABELS[itemKind(currentItem)]}
+              tone={itemKind(currentItem) === 'rest' ? 'neutral' : 'accent'}
+            />
+            {currentItem.done ? <Badge text="Feita" tone="success" dot /> : null}
+          </View>
+          <Text style={[styles.title, !isWide && styles.titleMobile]}>{currentItem.title}</Text>
           {currentItem.time || currentItem.endTime ? (
-            <View style={styles.scheduleBlock}>
-              {itemKind(currentItem) === 'rest' ? (
-                <>
-                  {currentItem.time ? (
-                    <Text style={[styles.time, styles.timeRest]}>
-                      Início {currentItem.time}
-                    </Text>
-                  ) : null}
-                  {currentItem.endTime ? (
-                    <Text style={[styles.time, styles.timeRest]}>
-                      Fim {currentItem.endTime}
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  {currentItem.time ? (
-                    <Text style={styles.time}>Ida {currentItem.time}</Text>
-                  ) : null}
-                  {currentItem.endTime ? (
-                    <Text style={styles.time}>Volta à estadia {currentItem.endTime}</Text>
-                  ) : null}
-                </>
-              )}
+            <View style={styles.metaRow}>
+              <Ionicons name="time-outline" size={16} color={colors.inkSoft} />
+              <Text style={styles.location}>
+                {itemKind(currentItem) === 'rest'
+                  ? [currentItem.time, currentItem.endTime].filter(Boolean).join(' → ')
+                  : [
+                      currentItem.time ? `Saída ${currentItem.time}` : null,
+                      currentItem.endTime ? `volta à estadia ${currentItem.endTime}` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+              </Text>
             </View>
           ) : null}
-          <Text style={styles.kindLabel}>
-            {ITINERARY_ITEM_KIND_LABELS[itemKind(currentItem)]}
-          </Text>
-          <Text style={[styles.title, !isWide && styles.titleMobile]}>{currentItem.title}</Text>
           {currentItem.location ? (
-            <Text style={styles.location}>{currentItem.location}</Text>
-          ) : null}
-          {currentItem.description ? (
-            <Body muted>{currentItem.description}</Body>
-          ) : null}
-          {myVote ? (
-            <Text style={styles.voteStatus}>
-              Seu voto: {ITINERARY_VOTE_LABELS[myVote]}
-              {counts ? ` · ${counts.total}/${totalMembers} votos` : ''}
-            </Text>
-          ) : null}
-          {currentItem.mapUrl ? (
+            <View style={styles.metaRow}>
+              <Ionicons name="location-outline" size={16} color={colors.inkSoft} />
+              <Text style={styles.location}>{currentItem.location}</Text>
+              {currentItem.mapUrl ? (
+                <Pressable onPress={() => Linking.openURL(currentItem.mapUrl!)} hitSlop={8}>
+                  <Text style={styles.mapLink}>Abrir no mapa</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : currentItem.mapUrl ? (
             <Button
               title="Abrir no mapa"
+              icon="map-outline"
               variant="secondary"
+              size="sm"
               onPress={() => Linking.openURL(currentItem.mapUrl!)}
             />
           ) : null}
         </View>
+
+        {itemKind(currentItem) !== 'rest' ? (
+          <Card style={styles.voteCard}>
+            <View style={styles.voteHead}>
+              <Text style={styles.voteTitle}>O grupo topa?</Text>
+              <Pressable onPress={() => setPopup('results')} hitSlop={8}>
+                <Text style={styles.mapLink}>
+                  {counts ? `${counts.total} de ${totalMembers} votaram` : 'Ver placar'}
+                </Text>
+              </Pressable>
+            </View>
+            <View style={styles.voteInline}>
+              {VOTE_OPTIONS.map((option) => {
+                const selected = myVote === option.value;
+                const count = counts?.[option.value] ?? 0;
+                return (
+                  <Pressable
+                    key={option.value}
+                    disabled={voting || !canMutate}
+                    onPress={() => onVote(option.value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selected }}
+                    style={({ pressed }) => [
+                      styles.voteChoice,
+                      selected && styles[`choice_${option.tone}`],
+                      pressed && { opacity: 0.9 },
+                      (!canMutate || voting) && { opacity: 0.55 },
+                    ]}
+                  >
+                    <Text style={[styles.voteChoiceLabel, selected && styles[`choiceText_${option.tone}`]]}>
+                      {ITINERARY_VOTE_LABELS[option.value]}
+                    </Text>
+                    <Text style={[styles.voteChoiceCount, selected && styles[`choiceText_${option.tone}`]]}>
+                      {count}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Card>
+        ) : null}
+
+        {currentItem.description ? (
+          <View style={styles.about}>
+            <Label>Sobre</Label>
+            <Body muted>{currentItem.description}</Body>
+          </View>
+        ) : null}
+
+        {canMutate ? (
+          <Button
+            title={currentItem.done ? 'Desmarcar como feita' : 'Marcar como feita'}
+            icon={currentItem.done ? 'refresh-outline' : 'checkmark'}
+            variant="secondary"
+            onPress={onToggleDone}
+          />
+        ) : null}
       </ScrollView>
 
       {/* Page actions menu */}
@@ -563,6 +606,38 @@ const styles = StyleSheet.create({
     fontSize: 48,
   },
   header: { gap: spacing.sm },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  mapLink: { fontFamily: fonts.uiBold, fontSize: 13, color: colors.accent },
+  voteCard: { gap: 12 },
+  voteHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  voteTitle: { fontFamily: fonts.uiBold, fontSize: 15, color: colors.ink },
+  voteInline: { flexDirection: 'row', gap: spacing.sm },
+  voteChoice: {
+    flex: 1,
+    minHeight: 56,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.borderStrong,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+  },
+  voteChoiceLabel: { fontFamily: fonts.uiBold, fontSize: 14, color: colors.inkLabel },
+  voteChoiceCount: {
+    fontFamily: fonts.uiSemi,
+    fontSize: 12,
+    color: colors.inkSoft,
+    fontVariant: ['tabular-nums'],
+  },
+  choice_yes: { borderWidth: 2, borderColor: colors.success, backgroundColor: colors.successSoft },
+  choice_maybe: { borderWidth: 2, borderColor: colors.warnStrong, backgroundColor: colors.warnSoft },
+  choice_no: { borderWidth: 2, borderColor: colors.danger, backgroundColor: colors.dangerSoft },
+  choiceText_yes: { color: colors.success },
+  choiceText_maybe: { color: colors.warn },
+  choiceText_no: { color: colors.danger },
+  about: { gap: 6 },
   scheduleBlock: { gap: 2 },
   time: {
     color: colors.accent,
@@ -615,7 +690,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     padding: spacing.lg,
     gap: spacing.md,
-    ...shadows.card,
+    ...shadows.raised,
   },
   sheetMobile: {
     borderTopLeftRadius: radii.xl,
@@ -700,8 +775,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   barFill: { height: '100%', borderRadius: 999 },
-  fill_yes: { backgroundColor: colors.accent },
-  fill_maybe: { backgroundColor: colors.warn },
+  fill_yes: { backgroundColor: colors.success },
+  fill_maybe: { backgroundColor: colors.warnStrong },
   fill_no: { backgroundColor: colors.danger },
   voterNames: {
     color: colors.inkMuted,

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { Body, Button, Card, Label } from '@/src/components/ui';
+import { StyleSheet, View } from 'react-native';
+import { Button, Notice } from '@/src/components/ui';
 import { useToast } from '@/src/hooks/useToast';
 import { confirmAction } from '@/src/lib/notify';
 import {
@@ -15,7 +15,7 @@ import {
 } from '@/src/lib/tripPhase';
 import { updateTripPhase } from '@/src/services/trips';
 import type { Trip } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import { spacing } from '@/src/theme';
 
 type PromptProps = {
   trip: Trip;
@@ -83,14 +83,25 @@ export function TripPhasePromptBanner({ trip, adminUid, currentUid, compact }: P
   }
 
   return (
-    <Card style={{ ...styles.promptCard, ...(compact ? styles.compact : null) }}>
-      <Label>{prompt.title}</Label>
-      <Body muted>{prompt.message}</Body>
-      <View style={styles.actions}>
-        <Button title={prompt.actionLabel} onPress={onConfirm} loading={loading} />
-        <Button title="Agora não" variant="ghost" onPress={onSnooze} disabled={loading} />
-      </View>
-    </Card>
+    <View style={compact ? styles.compact : undefined}>
+      <Notice tone="info" icon="calendar-outline" title={prompt.title} message={prompt.message}>
+        <View style={styles.actions}>
+          <Button
+            title={prompt.actionLabel}
+            size="sm"
+            onPress={onConfirm}
+            loading={loading}
+          />
+          <Button
+            title="Agora não"
+            size="sm"
+            variant="ghost"
+            onPress={onSnooze}
+            disabled={loading}
+          />
+        </View>
+      </Notice>
+    </View>
   );
 }
 
@@ -105,35 +116,18 @@ export function TripClosedBanner({ trip, isAdmin, isFinanceLead }: ClosedProps) 
   if (normalizeTripPhase(trip.phase) !== 'closed') return null;
   const manager = isAdmin || isFinanceLead;
   return (
-    <Card style={{ ...styles.closedCard, ...(manager ? styles.closedWarn : styles.closedBlock) }}>
-      <Text style={styles.closedTitle}>{manager ? 'Viagem concluída' : 'Somente leitura'}</Text>
-      <Body muted>{manager ? closedTripManagerMessage() : closedTripMemberMessage()}</Body>
-    </Card>
+    <Notice
+      tone={manager ? 'warn' : 'neutral'}
+      icon={manager ? 'alert-circle-outline' : 'lock-closed-outline'}
+      title={manager ? 'Viagem concluída.' : 'Somente leitura.'}
+      message={manager ? closedTripManagerMessage() : closedTripMemberMessage()}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  promptCard: {
-    gap: spacing.sm,
-    borderColor: colors.accent,
-    backgroundColor: colors.accentSoft,
-  },
   compact: {
     marginBottom: spacing.sm,
   },
-  actions: { gap: spacing.xs },
-  closedCard: { gap: spacing.xs },
-  closedWarn: {
-    borderColor: '#E6C98A',
-    backgroundColor: colors.warnSoft,
-  },
-  closedBlock: {
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-  },
-  closedTitle: {
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
-    color: colors.ink,
-  },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingLeft: 30 },
 });

@@ -1,23 +1,40 @@
 import React, { useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { EmptyState, Screen } from '@/src/components/ui';
-import { useLayout } from '@/src/hooks/useLayout';
+import {
+  EmptyState,
+  ListGroup,
+  ListRow,
+  PageHeader,
+  Screen,
+} from '@/src/components/ui';
+import { ItineraryViewSwitcher } from '@/src/components/itinerary/ItineraryViewSwitcher';
+import { todayValue } from '@/src/lib/dates';
 import { subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay } from '@/src/types';
-import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
+
+/** Weekday + day-of-month tile used as each day's leading element. */
+function DateTile({ date, today }: { date: string; today: boolean }) {
+  const parsed = parseISO(date);
+  return (
+    <View style={[styles.dateTile, today && styles.dateTileToday]}>
+      <Text style={[styles.dateWeekday, today && styles.dateTextToday]}>
+        {format(parsed, 'EEE', { locale: ptBR }).replace('.', '').toUpperCase()}
+      </Text>
+      <Text style={[styles.dateDay, today && styles.dateTextToday]}>{format(parsed, 'd')}</Text>
+    </View>
+  );
+}
 
 export default function ItineraryHome() {
   const { trip, isAdmin, isFinanceLead } = useTrip();
-  const { isWide, isLarge } = useLayout();
   const router = useRouter();
   const [days, setDays] = useState<ItineraryDay[]>([]);
-  const columns = isLarge ? 3 : isWide ? 2 : 1;
 
   useEffect(() => {
     if (!trip) return;
@@ -26,206 +43,70 @@ export default function ItineraryHome() {
 
   if (!trip) return null;
 
+  const today = todayValue();
+
   return (
     <Screen>
-      <Stack.Screen
-        options={{
-          headerRight: () => (
-            <View style={styles.headerActions}>
-              <Pressable
-                onPress={() =>
-                  router.push(`/(app)/trip/${trip.id}/itinerary/storytelling`)
-                }
-                hitSlop={10}
-                accessibilityLabel="Ver storytelling do roteiro"
-                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-              >
-                <Ionicons name="book-outline" size={18} color={colors.accent} />
-                <Text style={styles.headerActionText}>Storytelling</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
-                hitSlop={10}
-                accessibilityLabel="Ver calendário do roteiro"
-                style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.7 }]}
-              >
-                <Ionicons name="calendar-outline" size={18} color={colors.accent} />
-                <Text style={styles.headerActionText}>Calendário</Text>
-              </Pressable>
-            </View>
-          ),
-        }}
-      />
-
-      <View style={styles.heroRow}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.hero}>Roteiro</Text>
-          <Text style={styles.sub}>Cada dia, uma história visual da viagem.</Text>
-        </View>
-        <View style={styles.heroActions}>
-          <Pressable
-            onPress={() =>
-              router.push(`/(app)/trip/${trip.id}/itinerary/storytelling`)
-            }
-            style={({ pressed }) => [styles.storyBtn, pressed && { opacity: 0.88 }]}
-          >
-            <Ionicons name="book-outline" size={18} color={colors.accent} />
-            <Text style={styles.storyBtnText}>Storytelling</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push(`/(app)/trip/${trip.id}/itinerary/calendar`)}
-            style={({ pressed }) => [styles.calendarBtn, pressed && { opacity: 0.88 }]}
-          >
-            <Ionicons name="calendar-outline" size={18} color={colors.white} />
-            <Text style={styles.calendarBtnText}>Calendário</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={{ marginBottom: spacing.md }}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <PageHeader
+          title="Roteiro"
+          subtitle={
+            days.length > 0
+              ? `${days.length} ${days.length === 1 ? 'dia' : 'dias'} de programação`
+              : undefined
+          }
+        />
+        <ItineraryViewSwitcher tripId={trip.id} current="list" />
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
-      </View>
-      <FlatList
-        style={styles.list}
-        data={days}
-        key={`days-${columns}`}
-        keyExtractor={(item) => item.id}
-        numColumns={columns}
-        columnWrapperStyle={columns > 1 ? styles.gridRow : undefined}
-        contentContainerStyle={{ gap: spacing.md, paddingBottom: 40 }}
-        ListEmptyComponent={
+
+        {days.length === 0 ? (
           <EmptyState title="Sem dias" subtitle="Defina as datas da viagem para gerar a agenda." />
-        }
-        renderItem={({ item, index }) => (
-          <Pressable
-            onPress={() =>
-              router.push({
-                pathname: `/(app)/trip/${trip.id}/itinerary/day/[dayId]` as never,
-                params: { dayId: item.id },
-              })
-            }
-            style={({ pressed }) => [
-              styles.dayCard,
-              columns > 1 && styles.dayCardGrid,
-              pressed && { opacity: 0.92 },
-            ]}
-          >
-            <Text style={styles.dayIndex}>Dia {index + 1}</Text>
-            <Text style={styles.dayTitle}>{item.title || 'Programação'}</Text>
-            <Text style={styles.dayDate}>
-              {format(parseISO(item.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
-            </Text>
-          </Pressable>
+        ) : (
+          <ListGroup>
+            {days.map((item, index) => {
+              const isToday = item.date === today;
+              return (
+                <ListRow
+                  key={item.id}
+                  leading={<DateTile date={item.date} today={isToday} />}
+                  title={`Dia ${index + 1} · ${item.title || 'Programação'}`}
+                  subtitle={`${format(parseISO(item.date), "EEEE, d 'de' MMMM", { locale: ptBR })}${
+                    isToday ? ' · hoje' : ''
+                  }`}
+                  chevron
+                  onPress={() =>
+                    router.push({
+                      pathname: `/(app)/trip/${trip.id}/itinerary/day/[dayId]` as never,
+                      params: { dayId: item.id },
+                    })
+                  }
+                />
+              );
+            })}
+          </ListGroup>
         )}
-      />
+      </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  hero: {
-    color: colors.ink,
-    fontSize: 34,
-    fontFamily: fonts.displayBold,
-    letterSpacing: -0.8,
-  },
-  sub: {
-    color: colors.inkSoft,
-    fontFamily: fonts.ui,
-    marginTop: 6,
-  },
-  heroActions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: spacing.sm,
-    marginTop: 6,
-    maxWidth: 280,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingRight: 4,
-  },
-  headerAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingVertical: 4,
-  },
-  headerActionText: {
-    color: colors.accent,
-    fontFamily: fonts.uiSemi,
-    fontSize: 14,
-  },
-  storyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.accentSoft,
+  content: { gap: spacing.md, paddingTop: spacing.xs, paddingBottom: spacing.xxl },
+  dateTile: {
+    width: 46,
+    paddingVertical: 6,
     borderRadius: radii.md,
-    borderWidth: 1,
-    borderColor: '#C6E3DB',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  storyBtnText: {
-    color: colors.accent,
-    fontFamily: fonts.uiBold,
-    fontSize: 13,
-  },
-  calendarBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.accent,
-    borderRadius: radii.md,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  calendarBtnText: {
-    color: colors.white,
-    fontFamily: fonts.uiBold,
-    fontSize: 13,
-  },
-  list: { flex: 1 },
-  gridRow: { gap: spacing.md },
-  dayCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radii.xl,
-    padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.card,
+    alignItems: 'center',
   },
-  dayCardGrid: {
-    flex: 1,
-  },
-  dayIndex: {
-    color: colors.accent,
-    fontFamily: fonts.uiBold,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    fontSize: 12,
-  },
-  dayTitle: {
+  dateTileToday: { backgroundColor: colors.ink, borderColor: colors.ink },
+  dateWeekday: { fontFamily: fonts.uiBold, fontSize: 11, color: colors.inkSoft },
+  dateDay: {
+    fontFamily: fonts.uiHeavy,
+    fontSize: 17,
     color: colors.ink,
-    fontSize: 22,
-    fontFamily: fonts.display,
-    marginTop: 8,
+    fontVariant: ['tabular-nums'],
   },
-  dayDate: {
-    color: colors.inkMuted,
-    fontFamily: fonts.ui,
-    marginTop: 6,
-    textTransform: 'capitalize',
-  },
+  dateTextToday: { color: colors.white },
 });

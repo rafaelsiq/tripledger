@@ -1,161 +1,125 @@
 import React, { useMemo } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { formatItemSchedule, itemKind } from '@/src/lib/itineraryStory';
 import { countVotes } from '@/src/services/itinerary';
 import type { ItineraryItem } from '@/src/types';
-import { ITINERARY_ITEM_KIND_LABELS } from '@/src/types';
-import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 
 type Props = {
   item: ItineraryItem;
   onPress: () => void;
+  /** Hides the timeline connector below the last item of a day. */
+  isLast?: boolean;
 };
 
-export function ItineraryCard({ item, onPress }: Props) {
+/** One timeline entry: time column + activity card (rest blocks render as dashed). */
+export function ItineraryCard({ item, onPress, isLast }: Props) {
   const counts = useMemo(() => countVotes(item), [item]);
   const schedule = formatItemSchedule(item);
-  const kind = itemKind(item);
-  const isRest = kind === 'rest';
+  const isRest = itemKind(item) === 'rest';
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        isRest && styles.cardRest,
-        item.done && styles.done,
-        pressed && { opacity: 0.94 },
-      ]}
-    >
-      {item.imageUrl ? (
-        <Image source={{ uri: item.imageUrl }} style={styles.image} />
-      ) : (
-        <View style={[styles.image, styles.imageFallback, isRest && styles.imageFallbackRest]}>
-          <Text style={styles.fallbackText}>{item.title.slice(0, 1).toUpperCase()}</Text>
-        </View>
-      )}
-      <View style={styles.body}>
-        <View style={styles.meta}>
-          <Text style={[styles.kindTag, isRest && styles.kindTagRest]}>
-            {ITINERARY_ITEM_KIND_LABELS[kind]}
-          </Text>
-          {schedule ? <Text style={styles.time}>{schedule}</Text> : null}
-          {item.location ? <Text style={styles.location}>{item.location}</Text> : null}
-        </View>
-        <Text style={styles.title}>{item.title}</Text>
-        {item.description ? (
-          <Text style={styles.desc} numberOfLines={2}>
-            {item.description}
-          </Text>
-        ) : null}
-        <View style={styles.footer}>
-          <Text style={styles.voteSummary}>
-            {counts.total === 0
-              ? 'Toque para votar com o grupo'
-              : `${counts.yes} topa · ${counts.maybe} talvez · ${counts.no} não`}
-          </Text>
-          {item.done ? <Text style={styles.doneTag}>Feito</Text> : null}
-        </View>
+    <View style={styles.row}>
+      <View style={styles.timeCol}>
+        <Text style={styles.time}>{item.time?.trim() || '—'}</Text>
+        {!isLast ? <View style={styles.line} /> : null}
       </View>
-    </Pressable>
+
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        style={({ pressed }) => [
+          styles.card,
+          isRest && styles.cardRest,
+          item.done && styles.done,
+          pressed && { opacity: 0.92 },
+        ]}
+      >
+        {item.imageUrl && !isRest ? (
+          <Image source={{ uri: item.imageUrl }} style={styles.image} />
+        ) : null}
+        <View style={styles.body}>
+          <View style={styles.titleRow}>
+            {item.done ? (
+              <View style={styles.doneDot}>
+                <Ionicons name="checkmark" size={12} color={colors.white} />
+              </View>
+            ) : null}
+            <Text style={[styles.title, item.done && styles.titleDone]} numberOfLines={2}>
+              {item.title}
+            </Text>
+          </View>
+          {schedule || item.location ? (
+            <Text style={styles.meta} numberOfLines={1}>
+              {[schedule, item.location].filter(Boolean).join(' · ')}
+            </Text>
+          ) : null}
+          {item.description && !isRest ? (
+            <Text style={styles.desc} numberOfLines={2}>
+              {item.description}
+            </Text>
+          ) : null}
+          {!isRest ? (
+            <Text style={styles.votes}>
+              {counts.total === 0 ? (
+                <Text style={styles.votesCta}>Toque para votar com o grupo</Text>
+              ) : (
+                <>
+                  <Text style={styles.votesYes}>{counts.yes} topam</Text>
+                  {` · ${counts.maybe} talvez · ${counts.no} não`}
+                </>
+              )}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  row: { flexDirection: 'row', gap: 12 },
+  timeCol: { width: 46, alignItems: 'center', paddingTop: 12 },
+  time: {
+    fontFamily: fonts.uiBold,
+    fontSize: 13,
+    color: colors.ink,
+    fontVariant: ['tabular-nums'],
+  },
+  line: { flex: 1, width: 2, backgroundColor: colors.border, marginTop: 6 },
   card: {
+    flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: radii.xl,
+    borderRadius: radii.lg,
     overflow: 'hidden',
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm + 4,
     borderWidth: 1,
     borderColor: colors.border,
-    ...shadows.card,
   },
   cardRest: {
-    borderColor: '#D7E3EC',
+    backgroundColor: 'transparent',
+    borderStyle: 'dashed',
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
   },
-  done: {
-    opacity: 0.78,
-  },
-  image: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
-  imageFallback: {
-    backgroundColor: colors.accentSoft,
+  done: { opacity: 0.7 },
+  image: { width: '100%', height: 110 },
+  body: { paddingHorizontal: 14, paddingVertical: 12, gap: 4 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  doneDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imageFallbackRest: {
-    backgroundColor: colors.financeSoft,
-  },
-  fallbackText: {
-    color: colors.accent,
-    fontSize: 48,
-    fontFamily: fonts.displayBold,
-  },
-  body: {
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  meta: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  kindTag: {
-    color: colors.accent,
-    fontFamily: fonts.uiBold,
-    fontSize: 11,
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  kindTagRest: {
-    color: colors.finance,
-  },
-  time: {
-    color: colors.accent,
-    fontFamily: fonts.uiBold,
-    fontSize: 12,
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-  },
-  location: {
-    color: colors.inkSoft,
-    fontFamily: fonts.ui,
-    fontSize: 12,
-  },
-  title: {
-    color: colors.ink,
-    fontSize: 22,
-    fontFamily: fonts.display,
-    letterSpacing: -0.3,
-  },
-  desc: {
-    color: colors.inkSoft,
-    fontFamily: fonts.ui,
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.xs,
-  },
-  voteSummary: {
-    color: colors.inkMuted,
-    fontFamily: fonts.uiSemi,
-    fontSize: 12,
-    flex: 1,
-  },
-  doneTag: {
-    color: colors.accentDark,
-    fontFamily: fonts.uiBold,
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
+  title: { flex: 1, color: colors.ink, fontSize: 16, fontFamily: fonts.uiBold },
+  titleDone: { textDecorationLine: 'line-through', color: colors.inkSoft },
+  meta: { color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13 },
+  desc: { color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13, lineHeight: 19 },
+  votes: { marginTop: 4, color: colors.inkSoft, fontFamily: fonts.ui, fontSize: 13 },
+  votesYes: { color: colors.success, fontFamily: fonts.uiBold },
+  votesCta: { color: colors.warn, fontFamily: fonts.uiSemi },
 });
