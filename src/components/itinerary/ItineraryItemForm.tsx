@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { TimeField } from '@/src/components/TimeField';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Body, Button, Card, Input, Screen, SectionHeader, Segmented } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -17,7 +19,7 @@ import {
 } from '@/src/services/itinerary';
 import type { ItineraryItem, ItineraryItemKind } from '@/src/types';
 import { ITINERARY_ITEM_KIND_LABELS } from '@/src/types';
-import { colors, fonts, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 
 type Props = {
   mode: 'create' | 'edit';
@@ -55,6 +57,8 @@ export function ItineraryItemForm({
   const [existingImageUrl, setExistingImageUrl] = useState(initialItem?.imageUrl);
   const [clearImage, setClearImage] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Local, descrição, mapa and imagem start collapsed; editing an item that has them opens them.
+  const [extrasOpen, setExtrasOpen] = useState(false);
 
   const isRest = kind === 'rest';
 
@@ -75,6 +79,9 @@ export function ItineraryItemForm({
     setExistingImageUrl(initialItem.imageUrl);
     setClearImage(false);
     setImageUri(undefined);
+    setExtrasOpen(
+      !!(initialItem.location || initialItem.description || initialItem.mapUrl || initialItem.imageUrl)
+    );
   }, [mode, initialItem]);
 
   const canEdit =
@@ -121,24 +128,14 @@ export function ItineraryItemForm({
       return;
     }
 
+    // Times are optional (picked, never typed); only check the order when both are set.
     const startMinutes = parseItemTime(time);
     const endMinutes = parseItemTime(endTime);
-    const startLabel = isRest ? 'Início do descanso' : 'Horário de ida';
-    const endLabel = isRest ? 'Fim do descanso' : 'Horário de volta à estadia';
-
-    if (startMinutes === null) {
-      showError('Use o formato HH:mm (ex.: 09:30).', startLabel);
-      return;
-    }
-    if (endMinutes === null) {
-      showError('Use o formato HH:mm (ex.: 12:00).', endLabel);
-      return;
-    }
-    if (endMinutes <= startMinutes) {
+    if (startMinutes !== null && endMinutes !== null && endMinutes <= startMinutes) {
       showError(
         isRest
           ? 'O fim do descanso precisa ser depois do início.'
-          : 'A volta à estadia precisa ser depois da ida.',
+          : 'A volta à estadia precisa ser depois da saída.',
         'Horários'
       );
       return;
@@ -211,7 +208,15 @@ export function ItineraryItemForm({
     );
   }
 
-  const hasImage = !!imageUri || (!!existingImageUrl && !clearImage);
+  const previewUri = imageUri || (!clearImage ? existingImageUrl : undefined);
+  const extrasSummary = [
+    location.trim() ? 'local' : null,
+    description.trim() ? 'descrição' : null,
+    !isRest && mapUrl.trim() ? 'mapa' : null,
+    previewUri ? 'imagem' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <Screen>
@@ -233,80 +238,95 @@ export function ItineraryItemForm({
             onChangeText={setTitle}
             placeholder={isRest ? 'Descanso na casa' : 'Trilha da Lagoinha'}
           />
-          <Input
-            label="Descrição (opcional)"
-            value={description}
-            onChangeText={setDescription}
-            placeholder={isRest ? 'Pausa para almoço / regenerar' : 'Levar água e protetor'}
-            multiline
-            style={styles.multiline}
-          />
+          <View style={styles.timeRow}>
+            <View style={styles.timeField}>
+              <TimeField label={isRest ? 'Início' : 'Saída'} value={time} onChange={setTime} />
+            </View>
+            <View style={styles.timeField}>
+              <TimeField
+                label={isRest ? 'Fim' : 'Volta à estadia'}
+                value={endTime}
+                onChange={setEndTime}
+              />
+            </View>
+          </View>
         </Card>
 
         <View style={styles.section}>
-          <SectionHeader title="Quando e onde" />
-          <Card style={styles.card}>
-            <View style={styles.timeRow}>
-              <View style={styles.timeField}>
-                <Input
-                  label={isRest ? 'Início' : 'Saída'}
-                  value={time}
-                  onChangeText={setTime}
-                  placeholder="09:30"
-                  autoCapitalize="none"
-                  keyboardType="numbers-and-punctuation"
-                />
-              </View>
-              <View style={styles.timeField}>
-                <Input
-                  label={isRest ? 'Fim' : 'Volta à estadia'}
-                  value={endTime}
-                  onChangeText={setEndTime}
-                  placeholder="12:00"
-                  autoCapitalize="none"
-                  keyboardType="numbers-and-punctuation"
-                />
-              </View>
-            </View>
-            <Text style={styles.hint}>
-              {isRest
-                ? 'Defina o bloco de descanso com início e fim.'
-                : 'Saída = quando o grupo deixa a estadia. Volta = retorno à estadia.'}
-            </Text>
-            <Input
-              label="Local"
-              value={location}
-              onChangeText={setLocation}
-              placeholder={isRest ? 'Estadia' : 'Praia da Lagoinha'}
-            />
-            {!isRest ? (
-              <Input
-                label="Link do mapa (opcional)"
-                value={mapUrl}
-                onChangeText={setMapUrl}
-                placeholder="https://maps.google.com/..."
-                autoCapitalize="none"
+          <Pressable
+            onPress={() => setExtrasOpen((open) => !open)}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: extrasOpen }}
+            style={styles.extrasToggle}
+          >
+            <SectionHeader title="Mais detalhes" />
+            <View style={styles.extrasHint}>
+              {!extrasOpen && extrasSummary ? (
+                <Text style={styles.hint} numberOfLines={1}>
+                  {extrasSummary}
+                </Text>
+              ) : null}
+              <Ionicons
+                name={extrasOpen ? 'chevron-up' : 'chevron-down'}
+                size={18}
+                color={colors.inkSoft}
               />
-            ) : null}
-          </Card>
-        </View>
+            </View>
+          </Pressable>
 
-        <View style={styles.section}>
-          <SectionHeader title="Imagem" />
-          <View style={styles.imageRow}>
-            <Button
-              title={hasImage ? 'Trocar imagem' : 'Adicionar imagem'}
-              icon="image-outline"
-              variant="secondary"
-              size="sm"
-              onPress={pickImage}
-            />
-            {hasImage ? (
-              <Button title="Remover" variant="ghost" size="sm" onPress={removeImage} />
-            ) : (
-              <Text style={styles.hint}>Opcional</Text>
-            )}
-          </View>
+          {extrasOpen ? (
+            <Card style={styles.card}>
+              <Input
+                label="Local"
+                value={location}
+                onChangeText={setLocation}
+                placeholder={isRest ? 'Estadia' : 'Praia da Lagoinha'}
+              />
+              <Input
+                label="Descrição"
+                value={description}
+                onChangeText={setDescription}
+                placeholder={isRest ? 'Pausa para almoço / regenerar' : 'Levar água e protetor'}
+                multiline
+                style={styles.multiline}
+              />
+              {!isRest ? (
+                <Input
+                  label="Link do mapa"
+                  value={mapUrl}
+                  onChangeText={setMapUrl}
+                  placeholder="https://maps.google.com/..."
+                  autoCapitalize="none"
+                />
+              ) : null}
+
+              <View style={styles.imageRow}>
+                {previewUri ? (
+                  <Image source={{ uri: previewUri }} style={styles.thumb} />
+                ) : (
+                  <View style={[styles.thumb, styles.thumbEmpty]}>
+                    <Ionicons name="image-outline" size={22} color={colors.inkMuted} />
+                  </View>
+                )}
+                <View style={styles.imageText}>
+                  <Text style={styles.imageLabel}>
+                    {previewUri ? 'Imagem adicionada' : 'Sem imagem'}
+                  </Text>
+                  <View style={styles.imageActions}>
+                    <Button
+                      title={previewUri ? 'Trocar' : 'Adicionar imagem'}
+                      variant="secondary"
+                      size="sm"
+                      onPress={pickImage}
+                    />
+                    {previewUri ? (
+                      <Button title="Remover" variant="ghost" size="sm" onPress={removeImage} />
+                    ) : null}
+                  </View>
+                </View>
+              </View>
+            </Card>
+          ) : null}
         </View>
 
         <Button
@@ -332,5 +352,24 @@ const styles = StyleSheet.create({
   timeField: {
     flex: 1,
   },
-  imageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  extrasToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    minHeight: 32,
+  },
+  extrasHint: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  imageRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  thumb: { width: 52, height: 52, borderRadius: radii.md, backgroundColor: colors.surfaceMuted },
+  thumbEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.borderStrong,
+  },
+  imageText: { flex: 1, gap: 6 },
+  imageLabel: { fontFamily: fonts.uiSemi, fontSize: 14, color: colors.ink },
+  imageActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
 });

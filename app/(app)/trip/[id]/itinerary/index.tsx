@@ -5,24 +5,28 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
-import { EmptyState, PageHeader, Screen } from '@/src/components/ui';
-import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
+import { Button, EmptyState, PageHeader, Screen } from '@/src/components/ui';
+import { ItineraryAddFab } from '@/src/components/itinerary/ItineraryAddFab';
+import { ItineraryDayTimeline } from '@/src/components/itinerary/ItineraryDayTimeline';
 import { ItineraryViewSwitcher } from '@/src/components/itinerary/ItineraryViewSwitcher';
 import { todayValue } from '@/src/lib/dates';
-import { sortItemsByTime } from '@/src/lib/itineraryStory';
-import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
+import { subscribeItineraryDays, subscribeTripItineraryItems } from '@/src/services/itinerary';
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
-import { colors, fonts, radii, shadows, spacing } from '@/src/theme';
+import { colors, fonts, radii, spacing } from '@/src/theme';
 import { useTrip } from '@/src/hooks/useTrip';
 
-/** Weekday + day-of-month chip in the horizontal day strip. */
+const MAX_DOTS = 3;
+
+/** Weekday + day-of-month chip in the horizontal day strip, with one dot per planned item. */
 function DayChip({
   date,
+  itemCount,
   selected,
   today,
   onPress,
 }: {
   date: string;
+  itemCount: number;
   selected: boolean;
   today: boolean;
   onPress: () => void;
@@ -33,13 +37,26 @@ function DayChip({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={format(parsed, "EEEE, d 'de' MMMM", { locale: ptBR })}
+      accessibilityLabel={`${format(parsed, "EEEE, d 'de' MMMM", { locale: ptBR })}, ${
+        itemCount === 0 ? 'dia livre' : `${itemCount} ${itemCount === 1 ? 'item' : 'itens'}`
+      }`}
       style={[styles.chip, today && !selected && styles.chipToday, selected && styles.chipSelected]}
     >
       <Text style={[styles.chipWeekday, selected && styles.chipTextSelected]}>
         {format(parsed, 'EEE', { locale: ptBR }).replace('.', '').toUpperCase()}
       </Text>
       <Text style={[styles.chipDay, selected && styles.chipTextSelected]}>{format(parsed, 'd')}</Text>
+      <View style={styles.dots}>
+        {itemCount === 0 ? (
+          <View style={[styles.dot, styles.dotEmpty, selected && styles.dotEmptySelected]} />
+        ) : itemCount > MAX_DOTS ? (
+          <Text style={[styles.dotCount, selected && styles.chipTextSelected]}>{itemCount}</Text>
+        ) : (
+          Array.from({ length: itemCount }, (_, i) => (
+            <View key={i} style={[styles.dot, selected && styles.dotSelected]} />
+          ))
+        )}
+      </View>
     </Pressable>
   );
 }
@@ -49,7 +66,7 @@ export default function ItineraryHome() {
   const router = useRouter();
   const [days, setDays] = useState<ItineraryDay[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [items, setItems] = useState<ItineraryItem[]>([]);
+  const [itemsByDay, setItemsByDay] = useState<Record<string, ItineraryItem[]>>({});
   const today = todayValue();
 
   useEffect(() => {
@@ -64,18 +81,18 @@ export default function ItineraryHome() {
     setSelectedId((days.find((d) => d.date === today) ?? days[0]).id);
   }, [days, selectedId, today]);
 
+  // Every day's items, so each chip can preview how planned the day is.
+  const dayIdsKey = useMemo(() => days.map((d) => d.id).join('|'), [days]);
   useEffect(() => {
-    if (!trip || !selectedId) return;
-    setItems([]);
-    return subscribeDayItems(trip.id, selectedId, setItems);
-  }, [trip, selectedId]);
-
-  const sortedItems = useMemo(() => sortItemsByTime(items), [items]);
+    if (!trip) return;
+    return subscribeTripItineraryItems(trip.id, dayIdsKey ? dayIdsKey.split('|') : [], setItemsByDay);
+  }, [trip, dayIdsKey]);
 
   if (!trip) return null;
 
   const dayIndex = days.findIndex((d) => d.id === selectedId);
   const selectedDay = dayIndex >= 0 ? days[dayIndex] : null;
+  const items = (selectedId && itemsByDay[selectedId]) || [];
   const isToday = selectedDay?.date === today;
 
   function openDay() {
@@ -109,7 +126,10 @@ export default function ItineraryHome() {
         <TripClosedBanner trip={trip} isAdmin={isAdmin} isFinanceLead={isFinanceLead} />
 
         {days.length === 0 ? (
-          <EmptyState title="Sem dias" subtitle="Defina as datas da viagem para gerar a agenda." />
+          <EmptyState
+            title="Roteiro ainda sem dias"
+            subtitle="Os dias são gerados a partir das datas de início e fim da viagem."
+          />
         ) : (
           <>
             <ScrollView
@@ -121,6 +141,7 @@ export default function ItineraryHome() {
                 <DayChip
                   key={d.id}
                   date={d.date}
+                  itemCount={itemsByDay[d.id]?.length ?? 0}
                   selected={d.id === selectedId}
                   today={d.date === today}
                   onPress={() => setSelectedId(d.id)}
@@ -147,47 +168,36 @@ export default function ItineraryHome() {
               </View>
             ) : null}
 
-            {sortedItems.length === 0 ? (
-              <EmptyState
-                title="Dia livre"
-                subtitle={
-                  canMutate
-                    ? 'Toque em Atividade para montar o dia.'
-                    : 'Ainda não há atividades neste dia.'
+            {items.length === 0 ? (
+              <View style={styles.empty}>
+                <EmptyState
+                  title="Dia livre"
+                  subtitle={
+                    canMutate
+                      ? 'Nada planejado ainda. Toque para planejar o dia.'
+                      : 'Ainda não há atividades neste dia.'
+                  }
+                />
+                {canMutate && selectedDay ? (
+                  <Button title="Planejar o dia" icon="add" size="sm" onPress={newActivity} />
+                ) : null}
+              </View>
+            ) : (
+              <ItineraryDayTimeline
+                items={items}
+                onPressItem={(item) =>
+                  router.push({
+                    pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
+                    params: { itemId: item.id, dayId: item.dayId },
+                  })
                 }
               />
-            ) : (
-              <View>
-                {sortedItems.map((item, index) => (
-                  <ItineraryCard
-                    key={item.id}
-                    item={item}
-                    isLast={index === sortedItems.length - 1}
-                    onPress={() =>
-                      router.push({
-                        pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                        params: { itemId: item.id, dayId: item.dayId },
-                      })
-                    }
-                  />
-                ))}
-              </View>
             )}
           </>
         )}
       </ScrollView>
 
-      {canMutate && selectedDay ? (
-        <Pressable
-          onPress={newActivity}
-          accessibilityRole="button"
-          accessibilityLabel="Nova atividade neste dia"
-          style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.97 }] }]}
-        >
-          <Ionicons name="add" size={20} color={colors.white} />
-          <Text style={styles.fabText}>Atividade</Text>
-        </Pressable>
-      ) : null}
+      {canMutate && selectedDay ? <ItineraryAddFab onPress={newActivity} /> : null}
     </Screen>
   );
 }
@@ -197,7 +207,8 @@ const styles = StyleSheet.create({
   strip: { gap: 6 },
   chip: {
     width: 48,
-    paddingVertical: 7,
+    paddingTop: 7,
+    paddingBottom: 6,
     borderRadius: radii.md,
     borderWidth: 1,
     borderColor: colors.border,
@@ -214,6 +225,24 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   chipTextSelected: { color: colors.white },
+  dots: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    height: 12,
+    marginTop: 2,
+  },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: colors.accent },
+  dotSelected: { backgroundColor: colors.white },
+  dotEmpty: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.borderStrong },
+  dotEmptySelected: { borderColor: colors.inkMuted },
+  dotCount: {
+    fontFamily: fonts.uiBold,
+    fontSize: 10,
+    color: colors.accent,
+    fontVariant: ['tabular-nums'],
+  },
   dayHead: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
   eyebrow: {
     fontFamily: fonts.uiBold,
@@ -231,18 +260,5 @@ const styles = StyleSheet.create({
   },
   openDay: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 32 },
   openDayText: { fontFamily: fonts.uiBold, fontSize: 13, color: colors.accent },
-  fab: {
-    position: 'absolute',
-    right: spacing.md,
-    bottom: spacing.lg,
-    height: 52,
-    paddingHorizontal: 20,
-    borderRadius: radii.pill,
-    backgroundColor: colors.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    ...shadows.raised,
-  },
-  fabText: { fontFamily: fonts.uiBold, fontSize: 15, color: colors.white },
+  empty: { alignItems: 'center', gap: spacing.sm },
 });

@@ -26,7 +26,7 @@ import { ptBR } from 'date-fns/locale';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Body, Card, EmptyState, Label, PageHeader, Screen } from '@/src/components/ui';
 import { ItineraryViewSwitcher } from '@/src/components/itinerary/ItineraryViewSwitcher';
-import { ItineraryCard } from '@/src/components/itinerary/ItineraryCard';
+import { ItineraryDayTimeline } from '@/src/components/itinerary/ItineraryDayTimeline';
 import { useTrip } from '@/src/hooks/useTrip';
 import { subscribeDayItems, subscribeItineraryDays } from '@/src/services/itinerary';
 import type { ItineraryDay, ItineraryItem } from '@/src/types';
@@ -203,21 +203,15 @@ export default function ItineraryCalendarScreen() {
         ) : items.length === 0 ? (
           <EmptyState title="Dia livre" subtitle="Ainda não há atividades neste dia." />
         ) : (
-          <View style={styles.items}>
-            {items.map((item, index) => (
-              <ItineraryCard
-                key={item.id}
-                item={item}
-                isLast={index === items.length - 1}
-                onPress={() =>
-                  router.push({
-                    pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
-                    params: { dayId: selectedDay.id, itemId: item.id },
-                  })
-                }
-              />
-            ))}
-          </View>
+          <ItineraryDayTimeline
+            items={items}
+            onPressItem={(item) =>
+              router.push({
+                pathname: `/(app)/trip/${trip.id}/itinerary/item/[itemId]` as never,
+                params: { dayId: selectedDay.id, itemId: item.id },
+              })
+            }
+          />
         )}
       </ScrollView>
     </Screen>
@@ -339,8 +333,5 @@ const styles = StyleSheet.create({
     fontFamily: fonts.uiSemi,
     fontSize: 13,
     color: colors.accentDark,
-  },
-  items: {
-    gap: 0,
   },
 });

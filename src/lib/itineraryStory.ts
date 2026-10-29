@@ -91,6 +91,45 @@ export function splitTimedAndUntimed(items: ItineraryItem[]): {
   return { timed, untimed };
 }
 
+export type DayPeriod = 'morning' | 'afternoon' | 'night' | 'untimed';
+
+export const DAY_PERIOD_LABELS: Record<DayPeriod, string> = {
+  morning: 'Manhã',
+  afternoon: 'Tarde',
+  night: 'Noite',
+  untimed: 'Sem horário',
+};
+
+/** Manhã until 12:00, Tarde 12–18, Noite 18+; items without a start time are untimed. */
+export function itemPeriod(item: Pick<ItineraryItem, 'time'>): DayPeriod {
+  const minutes = parseItemTime(item.time);
+  if (minutes === null) return 'untimed';
+  if (minutes < 12 * 60) return 'morning';
+  if (minutes < 18 * 60) return 'afternoon';
+  return 'night';
+}
+
+export type DayPeriodGroup = { period: DayPeriod; items: ItineraryItem[] };
+
+/**
+ * Chronological items split by period of the day. `showLabels` is false when the
+ * separators would only add noise: everything in one period, or nothing timed.
+ */
+export function groupItemsByPeriod(items: ItineraryItem[]): {
+  groups: DayPeriodGroup[];
+  showLabels: boolean;
+} {
+  const groups: DayPeriodGroup[] = [];
+  for (const item of sortItemsByTime(items)) {
+    const period = itemPeriod(item);
+    const last = groups[groups.length - 1];
+    if (last && last.period === period) last.items.push(item);
+    else groups.push({ period, items: [item] });
+  }
+  const timedGroups = groups.filter((g) => g.period !== 'untimed').length;
+  return { groups, showLabels: groups.length > 1 && timedGroups > 0 };
+}
+
 export type StoryHourSlot = {
   hour: number;
   label: string;

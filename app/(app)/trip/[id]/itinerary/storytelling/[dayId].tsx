@@ -92,7 +92,8 @@ export default function StorytellingDayScreen() {
   }
 
   function openDay(targetId: string) {
-    router.replace(`/(app)/trip/${trip!.id}/itinerary/storytelling/${targetId}`);
+    // Push, not replace: back walks through the days the user visited.
+    router.push(`/(app)/trip/${trip!.id}/itinerary/storytelling/${targetId}`);
   }
 
   function scrollToHour(index: number) {
