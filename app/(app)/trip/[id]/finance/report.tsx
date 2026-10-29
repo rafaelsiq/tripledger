@@ -1,5 +1,5 @@
-import React, { useMemo, useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import {
@@ -15,19 +15,22 @@ import { SettlementList } from '@/src/components/finance/SettlementList';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
+import { useRouter } from 'expo-router';
 import {
-  computeNetBalances,
+  computeConsumption,
+  computeLedgerBalances,
   expenseTotals,
-  memberBalance,
+  fundSummary,
   paymentProgress,
   simplifyDebts,
 } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
+import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
+  deleteOpenSettlements,
   markSettlementSettled,
   saveSettlements,
-  subscribeSettlements,
 } from '@/src/services/expenses';
 import type { Settlement } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
@@ -62,14 +65,20 @@ function StatRow({
 export default function FinanceReportScreen() {
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
-  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const router = useRouter();
+  const {
+    trip,
+    expenses,
+    payments,
+    members,
+    settlements,
+    funds,
+    fundMovements,
+    isFinanceLead,
+    isAdmin,
+    canMutate,
+  } = useTrip();
   const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!trip) return;
-    return subscribeSettlements(trip.id, setSettlements);
-  }, [trip]);
 
   const report = useMemo(() => {
     const totals = expenseTotals(expenses);
@@ -81,16 +90,15 @@ export default function FinanceReportScreen() {
       entry.paid += e.splits.reduce((s, sp) => s + sp.paidAmount, 0);
       byCategory[e.category] = entry;
     }
-    const nets = computeNetBalances(progress.billable);
+    const nets = computeLedgerBalances({ expenses, payments, settlements, fundMovements });
+    const consumption = computeConsumption(expenses);
     const suggested = simplifyDebts(nets);
-    const memberRows = members.map((m) => {
-      const balance = memberBalance(m.uid, expenses, payments);
-      return {
-        member: m,
-        ...balance,
-        net: nets[m.uid] || 0,
-      };
-    });
+    const memberRows = members.map((m) => ({
+      member: m,
+      consumed: consumption[m.uid] || 0,
+      net: nets[m.uid] || 0,
+    }));
+    const fundRows = funds.map((fund) => fundSummary(fund, fundMovements, expenses));
     const paymentsConfirmed = payments
       .filter((p) => p.status === 'confirmed')
       .reduce((s, p) => s + p.amount, 0);
@@ -107,10 +115,11 @@ export default function FinanceReportScreen() {
       nets,
       suggested,
       memberRows,
+      fundRows,
       paymentsConfirmed: Math.round(paymentsConfirmed * 100) / 100,
       paymentsPending: Math.round(paymentsPending * 100) / 100,
     };
-  }, [expenses, payments, members]);
+  }, [expenses, payments, members, settlements, funds, fundMovements]);
 
   if (!trip || !user) return null;
 
@@ -130,10 +139,33 @@ export default function FinanceReportScreen() {
         showError('Já existem acertos em aberto.', 'Encerre os atuais primeiro');
         return;
       }
+      if (!report.suggested.length) {
+        showError('Ninguém deve a ninguém agora.', 'Nada a acertar');
+        return;
+      }
       await saveSettlements(trip!.id, report.suggested);
       showSuccess('Acerto gerado', 'Transferências mínimas criadas.');
     } catch (e) {
       showError(e, 'Falha ao gerar acerto');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function redoSettlements() {
+    const ok = await confirmAction({
+      title: 'Refazer acerto',
+      message:
+        'Os acertos ainda em aberto são descartados e um novo plano é calculado com os saldos atuais. Os já quitados continuam valendo.',
+      confirmText: 'Refazer',
+    });
+    if (!ok) return;
+    try {
+      setLoading(true);
+      await deleteOpenSettlements(trip!.id, user!.uid);
+      showSuccess('Acertos em aberto descartados', 'Gere um novo acerto.');
+    } catch (e) {
+      showError(e, 'Não foi possível refazer');
     } finally {
       setLoading(false);
     }
@@ -151,6 +183,17 @@ export default function FinanceReportScreen() {
   function onSettle(settlement: Settlement) {
     if (!canMutate) {
       showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    if (Platform.OS === 'web') {
+      // react-native-web's Alert ignores buttons — fall back to a plain confirm.
+      void confirmAction({
+        title: 'Quitar acerto',
+        message: `Confirmar que ${nameOf(settlement.fromUid)} pagou ${formatCurrency(settlement.amount)} para ${nameOf(settlement.toUid)}?`,
+        confirmText: 'Quitar',
+      }).then((ok) => {
+        if (ok) void settle(settlement);
+      });
       return;
     }
     Alert.alert('Quitar acerto', 'Comprovante é opcional.', [
@@ -186,6 +229,17 @@ export default function FinanceReportScreen() {
   const categories = Object.entries(report.byCategory).sort((a, b) => b[1].total - a[1].total);
   const categoryMax = Math.max(1, ...categories.map(([, v]) => v.total));
   const settledCount = settlements.filter((s) => s.status === 'settled').length;
+  const openSettlements = settlements.filter((s) => s.status === 'open');
+  // Open settlements are excluded from the ledger, so a fresh plan should reproduce them.
+  const settlementsStale = (() => {
+    if (!openSettlements.length) return false;
+    const key = (items: { fromUid: string; toUid: string; amount: number }[]) =>
+      items
+        .map((s) => `${s.fromUid}>${s.toUid}:${s.amount.toFixed(2)}`)
+        .sort()
+        .join('|');
+    return key(openSettlements) !== key(report.suggested);
+  })();
   const memberRows = report.memberRows.slice().sort((a, b) => b.net - a.net);
 
   return (
@@ -270,8 +324,7 @@ export default function FinanceReportScreen() {
           <View style={styles.table}>
             <View style={[styles.tableRow, styles.tableHead]}>
               <Text style={[styles.th, styles.colName]}>Pessoa</Text>
-              <Text style={[styles.th, styles.colNum]}>Deve</Text>
-              <Text style={[styles.th, styles.colNum]}>Pagou</Text>
+              <Text style={[styles.th, styles.colNum]}>Consumo</Text>
               <Text style={[styles.th, styles.colNum]}>Saldo</Text>
             </View>
             {memberRows.map((row) => (
@@ -279,14 +332,20 @@ export default function FinanceReportScreen() {
                 <Text style={[styles.td, styles.colName, styles.tdName]} numberOfLines={1}>
                   {row.member.uid === user.uid ? 'Você' : memberLabel(row.member)}
                 </Text>
-                <Text style={[styles.td, styles.colNum]}>{formatCurrency(row.owed)}</Text>
-                <Text style={[styles.td, styles.colNum]}>{formatCurrency(row.paid)}</Text>
+                <Text style={[styles.td, styles.colNum]}>{formatCurrency(row.consumed)}</Text>
                 <Text
                   style={[
                     styles.td,
                     styles.colNum,
                     styles.tdStrong,
-                    { color: row.net >= 0 ? colors.success : colors.danger },
+                    {
+                      color:
+                        Math.abs(row.net) <= 0.01
+                          ? colors.inkSoft
+                          : row.net > 0
+                            ? colors.success
+                            : colors.danger,
+                    },
                   ]}
                 >
                   {`${row.net >= 0 ? '+' : '−'}${formatCurrency(Math.abs(row.net))}`}
@@ -295,7 +354,8 @@ export default function FinanceReportScreen() {
             ))}
           </View>
           <Text style={styles.footnote}>
-            Saldo = quanto cada pessoa adiantou menos o que deve no rateio. Positivo = a receber.
+            Consumo = parte de cada um nos gastos. Saldo = tudo o que a pessoa adiantou, pagou ou
+            aportou no caixa menos o que consumiu. Positivo = a receber; negativo = a pagar.
           </Text>
         </View>
 
@@ -309,13 +369,34 @@ export default function FinanceReportScreen() {
             trailing={settlements.length > 0 ? `${settledCount} de ${settlements.length} quitado` : undefined}
           />
           {settlements.length > 0 ? (
-            <SettlementList
-              settlements={settlements}
-              members={members}
-              currentUid={user.uid}
-              canManage={(isFinanceLead || isAdmin) && canMutate}
-              onSettle={onSettle}
-            />
+            <>
+              <SettlementList
+                settlements={settlements}
+                members={members}
+                currentUid={user.uid}
+                canManage={(isFinanceLead || isAdmin) && canMutate}
+                onSettle={onSettle}
+              />
+              {openSettlements.length > 0 && settlementsStale ? (
+                <Notice
+                  tone="warn"
+                  icon="refresh-outline"
+                  title="Acerto desatualizado."
+                  message="Houve lançamentos ou pagamentos depois que o acerto foi gerado."
+                  actionLabel={(isFinanceLead || isAdmin) && canMutate ? 'Refazer' : undefined}
+                  onAction={(isFinanceLead || isAdmin) && canMutate ? redoSettlements : undefined}
+                />
+              ) : null}
+              {openSettlements.length === 0 && report.suggested.length > 0 && (isFinanceLead || isAdmin) && canMutate ? (
+                <Button
+                  title="Gerar novo acerto com os saldos atuais"
+                  icon="git-compare-outline"
+                  variant="secondary"
+                  onPress={generateSettlements}
+                  loading={loading}
+                />
+              ) : null}
+            </>
           ) : report.suggested.length === 0 ? (
             <Notice
               tone="success"
@@ -350,6 +431,36 @@ export default function FinanceReportScreen() {
           )}
         </View>
 
+        {report.fundRows.length > 0 ? (
+          <View style={styles.section}>
+            <SectionHeader title="Caixa" />
+            <Card style={styles.card}>
+              {report.fundRows.map((row) => (
+                <View key={row.fund.id} style={styles.categoryBlock}>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel} onPress={() => router.push(`/(app)/trip/${trip.id}/finance/fund/${row.fund.id}`)}>
+                      {row.fund.name} · com {nameOf(row.fund.holderUid)}
+                    </Text>
+                    <Text
+                      style={[styles.rowValue, { color: row.balance < -0.01 ? colors.danger : colors.success }]}
+                    >
+                      {formatCurrency(row.balance)}
+                    </Text>
+                  </View>
+                  <Text style={styles.categoryMeta}>
+                    {`Aportes ${formatCurrency(row.contributed)} · gastos ${formatCurrency(row.spent)} · devolvido ${formatCurrency(row.refunded)}`}
+                  </Text>
+                </View>
+              ))}
+              <Text style={styles.footnote}>
+                O saldo do caixa já entra no acerto: se sobrar dinheiro, quem guarda o caixa devolve a
+                sobra; se faltar, quem consumiu mais do que aportou completa. Você também pode registrar
+                as devoluções direto na tela do caixa.
+              </Text>
+            </Card>
+          </View>
+        ) : null}
+
         <View style={styles.section}>
           <SectionHeader title="Pagamentos registrados" />
           <Card style={styles.card}>
@@ -364,8 +475,8 @@ export default function FinanceReportScreen() {
               tone={report.paymentsPending > 0 ? 'danger' : 'muted'}
             />
             <Text style={styles.footnote}>
-              Valores enviados pelos membros. Podem diferir do “Pago” se houver rateios marcados como
-              pagos na criação.
+              Reembolsos registrados nos lançamentos. O “Pago” do topo também inclui a parte de quem
+              pagou a despesa e os gastos cobertos pelo caixa.
             </Text>
           </Card>
         </View>

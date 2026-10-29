@@ -82,9 +82,47 @@ export interface Expense {
   note?: string;
   receiptUrl?: string;
   dueDate?: string;
+  /** Day the cost happened (YYYY-MM-DD). Legacy expenses fall back to createdAt. */
+  date?: string;
+  /** Paid out of (or received into) a trip fund — paidByUid is then the fund holder. */
+  fundId?: string;
   createdByUid: string;
   createdAt: number;
   updatedAt: number;
+}
+
+/**
+ * Shared trip fund ("caixa"): members hand money to a holder, who pays group costs from it.
+ */
+export interface Fund {
+  id: string;
+  tripId: string;
+  name: string;
+  /** Member who physically keeps the money. */
+  holderUid: string;
+  createdByUid: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type FundMovementType = 'contribution' | 'refund';
+
+/** Money moving between a member and a fund holder (aporte or devolução). */
+export interface FundMovement {
+  id: string;
+  tripId: string;
+  fundId: string;
+  type: FundMovementType;
+  memberUid: string;
+  /** Fund holder at the time of the movement (counterparty in the ledger). */
+  holderUid: string;
+  amount: number;
+  status: PaymentStatus;
+  note?: string;
+  createdByUid: string;
+  createdAt: number;
+  confirmedByUid?: string;
+  confirmedAt?: number;
 }
 
 export interface Payment {
@@ -102,6 +140,9 @@ export interface Payment {
   note?: string;
   confirmedByUid?: string;
   confirmedAt?: number;
+  /** Set when a confirmed payment was reversed (estornado) by the finance lead/admin. */
+  reversedAt?: number;
+  reversedByUid?: string;
 }
 
 export interface ConsolidationRequest {

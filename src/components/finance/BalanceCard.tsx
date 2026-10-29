@@ -5,20 +5,38 @@ import { colors, fonts, spacing, typography } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
 
 type Props = {
-  status: 'em_dia' | 'aguardando' | 'pendente';
-  netOwed: number;
+  /** Ledger position: positive = a receber, negative = a pagar. */
+  net: number;
+  /** Registered payments still waiting for confirmation. */
   pendingFromMe: number;
+  /** Money the member still has inside trip funds (contributed − consumed). */
+  fundBalance?: number;
   /** Opens the finance tab; shown as the card's secondary action. */
   onOpenFinance?: () => void;
 };
 
-export function BalanceCard({ status, netOwed, pendingFromMe, onOpenFinance }: Props) {
-  const tone =
-    status === 'em_dia' ? 'success' : status === 'aguardando' ? 'warn' : 'danger';
-  const label =
-    status === 'em_dia' ? 'Em dia' : status === 'aguardando' ? 'Aguardando' : 'Pendente';
-  const amountColor =
-    status === 'em_dia' ? colors.success : status === 'aguardando' ? colors.warn : colors.danger;
+export function BalanceCard({ net, pendingFromMe, fundBalance, onOpenFinance }: Props) {
+  const settled = Math.abs(net) <= 0.01;
+  const receiving = net > 0.01;
+  const waiting = !settled && !receiving && pendingFromMe > 0.01;
+
+  const tone = settled ? 'success' : receiving ? 'info' : waiting ? 'warn' : 'danger';
+  const label = settled ? 'Em dia' : receiving ? 'A receber' : waiting ? 'Aguardando' : 'A pagar';
+  const amountColor = settled
+    ? colors.success
+    : receiving
+      ? colors.info
+      : waiting
+        ? colors.warn
+        : colors.danger;
+
+  const caption = settled
+    ? 'Nada a pagar nem a receber nesta viagem.'
+    : receiving
+      ? 'O grupo te deve este valor (você adiantou mais do que consumiu).'
+      : waiting
+        ? `${formatCurrency(pendingFromMe)} aguardando confirmação do responsável financeiro.`
+        : 'Registre um pagamento nos lançamentos em aberto ou aguarde o acerto final.';
 
   return (
     <Card style={styles.card}>
@@ -26,21 +44,24 @@ export function BalanceCard({ status, netOwed, pendingFromMe, onOpenFinance }: P
         <View style={{ gap: 2, flexShrink: 1 }}>
           <Text style={styles.label}>Seu saldo</Text>
           <Text style={[styles.amount, { color: amountColor }]}>
-            {status === 'em_dia' ? formatCurrency(0) : `− ${formatCurrency(netOwed)}`}
+            {settled
+              ? formatCurrency(0)
+              : `${receiving ? '+ ' : '− '}${formatCurrency(Math.abs(net))}`}
           </Text>
         </View>
         <Badge text={label} tone={tone} />
       </View>
-      <Text style={styles.caption}>
-        {status === 'em_dia'
-          ? 'Nenhum valor em aberto nesta viagem.'
-          : pendingFromMe > 0
-            ? `${formatCurrency(pendingFromMe)} aguardando confirmação do responsável financeiro.`
-            : 'Registre um pagamento para quitar (comprovante opcional).'}
-      </Text>
+      <Text style={styles.caption}>{caption}</Text>
+      {fundBalance !== undefined && Math.abs(fundBalance) > 0.01 ? (
+        <Text style={styles.caption}>
+          {fundBalance > 0
+            ? `Você ainda tem ${formatCurrency(fundBalance)} no caixa da viagem.`
+            : `Seus gastos no caixa passaram ${formatCurrency(-fundBalance)} do que você aportou.`}
+        </Text>
+      ) : null}
       {onOpenFinance ? (
         <Button
-          title={status === 'em_dia' ? 'Ver finanças' : 'Ver o que devo'}
+          title={settled || receiving ? 'Ver finanças' : 'Ver o que devo'}
           variant="secondary"
           size="sm"
           onPress={onOpenFinance}

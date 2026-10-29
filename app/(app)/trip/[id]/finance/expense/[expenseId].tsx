@@ -13,6 +13,7 @@ import {
   Input,
   Label,
   ListGroup,
+  Notice,
   Screen,
   SectionHeader,
 } from '@/src/components/ui';
@@ -20,7 +21,10 @@ import { PaymentTimeline } from '@/src/components/finance/PaymentTimeline';
 import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import { useTrip } from '@/src/hooks/useTrip';
-import { nextOpenInstallment } from '@/src/lib/finance';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { nextOpenInstallment, round2 } from '@/src/lib/finance';
+import { formatDateLabel } from '@/src/lib/dates';
 import {
   buildExpenseWhatsAppSummary,
   FinanceShareCancelledError,
@@ -30,15 +34,17 @@ import { memberLabel } from '@/src/lib/members';
 import { confirmAction } from '@/src/lib/notify';
 import { closedTripMemberMessage } from '@/src/lib/tripPhase';
 import {
+  cancelPayment,
   confirmPayment,
   canManageExpense,
   deleteExpense,
   registerPayment,
   rejectPayment,
   requestConsolidation,
+  reversePayment,
   subscribeConsolidationRequests,
 } from '@/src/services/expenses';
-import type { ConsolidationRequest, ExpenseInstallment } from '@/src/types';
+import type { ConsolidationRequest, ExpenseInstallment, Payment } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 import { formatCurrency } from '@/src/theme';
@@ -58,7 +64,8 @@ export default function ExpenseDetailScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { showError, showSuccess } = useToast();
-  const { trip, expenses, payments, members, isFinanceLead, isAdmin, canMutate } = useTrip();
+  const { trip, expenses, payments, members, funds, isFinanceLead, isAdmin, canMutate } =
+    useTrip();
   const [amount, setAmount] = useState('');
   const [proxyUid, setProxyUid] = useState<string>('');
   const [myInstallmentId, setMyInstallmentId] = useState<string>('');
@@ -68,8 +75,11 @@ export default function ExpenseDetailScreen() {
   const [deleting, setDeleting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [reqs, setReqs] = useState<ConsolidationRequest[]>([]);
+  const [busyPaymentId, setBusyPaymentId] = useState<string | null>(null);
 
   const expense = expenses.find((e) => e.id === expenseId);
+  const fund = expense?.fundId ? funds.find((f) => f.id === expense.fundId) : undefined;
+  const coveredByFund = !!expense?.fundId;
   const expensePayments = payments.filter((p) => p.expenseId === expenseId);
   const canManageFinance = isAdmin || isFinanceLead;
   const canManageThisExpense =
@@ -93,7 +103,7 @@ export default function ExpenseDetailScreen() {
   );
 
   const unpaidManagedSplits = useMemo(() => {
-    if (!expense || !canManageFinance) return [];
+    if (!expense || !canManageFinance || expense.fundId || expense.kind === 'income') return [];
     return expense.splits.filter(
       (s) => s.status !== 'paid' && s.uid !== expense.paidByUid
     );
@@ -200,7 +210,7 @@ export default function ExpenseDetailScreen() {
       showError(closedTripMemberMessage(), 'Viagem concluída');
       return;
     }
-    const value = Number(String(amount).replace(',', '.')) || owedLeft;
+    const value = round2(Number(String(amount).replace(',', '.')) || owedLeft);
     if (value <= 0) {
       showError('Informe um valor válido.', 'Pagamento');
       return;
@@ -366,6 +376,64 @@ export default function ExpenseDetailScreen() {
       p.status === 'pending' &&
       (p.toUid === currentUser.uid || isFinanceLead || isAdmin)
   );
+  const myPendingSent = expensePayments.filter(
+    (p) => p.status === 'pending' && p.fromUid === currentUser.uid
+  );
+  const history = expensePayments.slice().sort((a, b) => b.paidAt - a.paidAt);
+  const openRequestFor = (paymentId: string) =>
+    reqs.some((r) => r.paymentId === paymentId && r.status === 'pending');
+
+  async function runPaymentAction(payment: Payment, action: () => Promise<void>, done: string) {
+    if (!canMutate) {
+      showError(closedTripMemberMessage(), 'Viagem concluída');
+      return;
+    }
+    try {
+      setBusyPaymentId(payment.id);
+      await action();
+      showSuccess(done);
+    } catch (e) {
+      showError(e, 'Não foi possível concluir');
+    } finally {
+      setBusyPaymentId(null);
+    }
+  }
+
+  async function onCancelPayment(payment: Payment) {
+    const ok = await confirmAction({
+      title: 'Cancelar pagamento',
+      message: `Remover o registro de ${formatCurrency(payment.amount)} que ainda aguarda confirmação?`,
+      confirmText: 'Cancelar pagamento',
+      cancelText: 'Voltar',
+      destructive: true,
+    });
+    if (!ok) return;
+    await runPaymentAction(
+      payment,
+      () => cancelPayment({ tripId: currentTrip.id, payment, actorUid: currentUser.uid }),
+      'Pagamento cancelado'
+    );
+  }
+
+  async function onReversePayment(payment: Payment) {
+    const ok = await confirmAction({
+      title: 'Estornar pagamento',
+      message: `${formatCurrency(payment.amount)} de ${nameOf(payment.fromUid)} volta a ficar em aberto neste lançamento.`,
+      confirmText: 'Estornar',
+      destructive: true,
+    });
+    if (!ok) return;
+    await runPaymentAction(
+      payment,
+      () =>
+        reversePayment({
+          tripId: currentTrip.id,
+          paymentId: payment.id,
+          actorUid: currentUser.uid,
+        }),
+      'Pagamento estornado'
+    );
+  }
 
   function installmentRef(paymentInstallmentId?: string) {
     if (!paymentInstallmentId || !currentExpense.installments) return null;
@@ -459,10 +527,38 @@ export default function ExpenseDetailScreen() {
           </View>
           <Text style={styles.title}>{expense.title}</Text>
           <Text style={styles.meta}>
-            {expense.kind === 'income' ? 'Recebido por' : 'Pago por'} {nameOf(expense.paidByUid)} ·{' '}
-            {expense.splits.length} {expense.splits.length === 1 ? 'pessoa' : 'pessoas'}
+            {coveredByFund
+              ? `${expense.kind === 'income' ? 'Entrou no caixa' : 'Pago pelo caixa'} ${fund?.name || ''} (com ${nameOf(expense.paidByUid)})`
+              : `${expense.kind === 'income' ? 'Recebido por' : 'Pago por'} ${nameOf(expense.paidByUid)}`}{' '}
+            · {expense.splits.length} {expense.splits.length === 1 ? 'pessoa' : 'pessoas'}
+            {expense.date ? ` · ${formatDateLabel(expense.date)}` : ''}
           </Text>
+          {expense.note ? <Body muted>{expense.note}</Body> : null}
         </View>
+
+        {coveredByFund ? (
+          <Notice
+            tone="accent"
+            icon="wallet-outline"
+            message={
+              expense.kind === 'income'
+                ? 'Valor recebido no caixa: vira crédito no saldo de caixa de quem divide.'
+                : 'Pago com o dinheiro do caixa: a parte de cada um é descontada do saldo no caixa, sem reembolso individual.'
+            }
+            actionLabel={fund ? 'Ver caixa' : undefined}
+            onAction={
+              fund
+                ? () => router.push(`/(app)/trip/${currentTrip.id}/finance/fund/${fund.id}`)
+                : undefined
+            }
+          />
+        ) : expense.kind === 'income' ? (
+          <Notice
+            tone="success"
+            icon="trending-up-outline"
+            message={`${nameOf(expense.paidByUid)} recebeu este valor e fica devendo a parte de cada um — entra no acerto final.`}
+          />
+        ) : null}
 
         <Card>
           <PaymentTimeline
@@ -474,7 +570,14 @@ export default function ExpenseDetailScreen() {
           />
         </Card>
 
-        <SectionHeader title="Quem deve" trailing={`${expense.splits.filter((s) => s.status === 'paid').length} de ${expense.splits.length} pagos`} />
+        <SectionHeader
+          title={coveredByFund || expense.kind === 'income' ? 'Quem divide' : 'Quem deve'}
+          trailing={
+            coveredByFund || expense.kind === 'income'
+              ? undefined
+              : `${expense.splits.filter((s) => s.status === 'paid').length} de ${expense.splits.length} pagos`
+          }
+        />
         <ListGroup>
           {expense.splits.map((s) => {
             const userInstallments = installmentsByUser.get(s.uid) || [];
@@ -502,7 +605,11 @@ export default function ExpenseDetailScreen() {
                         },
                       ]}
                     >
-                      {isPayer && s.status === 'paid'
+                      {coveredByFund
+                        ? 'Do caixa'
+                        : expense.kind === 'income'
+                          ? 'A receber'
+                          : isPayer && s.status === 'paid'
                         ? 'Pagador'
                         : s.status === 'paid'
                           ? 'Pago'
@@ -543,6 +650,8 @@ export default function ExpenseDetailScreen() {
         />
 
         {canMutate &&
+        !coveredByFund &&
+        expense.kind !== 'income' &&
         mySplit &&
         mySplit.status !== 'paid' &&
         mySplit.uid !== expense.paidByUid ? (
@@ -655,7 +764,7 @@ export default function ExpenseDetailScreen() {
                         variant="danger"
                         onPress={async () => {
                           try {
-                            await rejectPayment(trip.id, p.id);
+                            await rejectPayment(trip.id, p.id, user.uid);
                             showSuccess('Pagamento rejeitado');
                           } catch (e) {
                             showError(e, 'Falha ao rejeitar');
@@ -664,13 +773,6 @@ export default function ExpenseDetailScreen() {
                       />
                     </View>
                   </View>
-                  {p.fromUid === user.uid ? (
-                    <Button
-                      title="Pedir consolidação ao resp. financeiro"
-                      variant="secondary"
-                      onPress={() => onRequestConsolidation(p.id)}
-                    />
-                  ) : null}
                 </View>
               );
             })}
@@ -685,7 +787,9 @@ export default function ExpenseDetailScreen() {
               .filter((r) => r.status === 'pending')
               .map((r) => {
                 const payment = payments.find((p) => p.id === r.paymentId);
-                if (!payment || payment.expenseId !== expense.id) return null;
+                if (!payment || payment.expenseId !== expense.id || payment.status !== 'pending') {
+                  return null;
+                }
                 return (
                   <Button
                     key={r.id}
@@ -696,6 +800,101 @@ export default function ExpenseDetailScreen() {
                 );
               })}
           </Card>
+        ) : null}
+
+        {canMutate && myPendingSent.length > 0 ? (
+          <Card style={{ gap: spacing.sm }}>
+            <Label>Seus pagamentos aguardando</Label>
+            <Body muted>
+              {nameOf(expense.paidByUid)} ou o responsável financeiro precisam confirmar o recebimento.
+            </Body>
+            {myPendingSent.map((p) => (
+              <View key={p.id} style={{ gap: spacing.sm }}>
+                <Text style={styles.pendingTitle}>
+                  {formatCurrency(p.amount)} · {format(p.paidAt, "d MMM 'às' HH:mm", { locale: ptBR })}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title={openRequestFor(p.id) ? 'Cobrança enviada' : 'Pedir confirmação'}
+                      variant="secondary"
+                      size="sm"
+                      disabled={openRequestFor(p.id) || busyPaymentId === p.id}
+                      onPress={() => onRequestConsolidation(p.id)}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Button
+                      title="Cancelar"
+                      variant="ghost"
+                      size="sm"
+                      loading={busyPaymentId === p.id}
+                      onPress={() => onCancelPayment(p)}
+                    />
+                  </View>
+                </View>
+              </View>
+            ))}
+          </Card>
+        ) : null}
+
+        {history.length > 0 ? (
+          <View style={{ gap: spacing.sm }}>
+            <SectionHeader title="Histórico de pagamentos" trailing={String(history.length)} />
+            <ListGroup>
+              {history.map((p) => {
+                const installment = installmentRef(p.installmentId);
+                const statusText =
+                  p.status === 'confirmed'
+                    ? 'Confirmado'
+                    : p.status === 'pending'
+                      ? 'Aguardando'
+                      : p.reversedAt
+                        ? 'Estornado'
+                        : 'Rejeitado';
+                const statusColor =
+                  p.status === 'confirmed'
+                    ? colors.success
+                    : p.status === 'pending'
+                      ? colors.warn
+                      : colors.inkSoft;
+                return (
+                  <View key={p.id} style={styles.historyRow}>
+                    <View style={{ flex: 1, gap: 2 }}>
+                      <Text style={styles.pendingTitle}>
+                        {nameOf(p.fromUid)} → {nameOf(p.toUid)}
+                      </Text>
+                      <Text style={styles.pendingMeta}>
+                        {format(p.paidAt, "d MMM yyyy 'às' HH:mm", { locale: ptBR })}
+                        {installment ? ` · ${installment.index}ª parcela` : ''}
+                        {p.proofUrl ? ' · com comprovante' : ''}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 2 }}>
+                      <Text
+                        style={[
+                          styles.splitValue,
+                          p.status === 'rejected' && { textDecorationLine: 'line-through', color: colors.inkSoft },
+                        ]}
+                      >
+                        {formatCurrency(p.amount)}
+                      </Text>
+                      <Text style={[styles.splitStatus, { color: statusColor }]}>{statusText}</Text>
+                      {canMutate && canManageFinance && p.status === 'confirmed' ? (
+                        <Pressable
+                          onPress={() => onReversePayment(p)}
+                          disabled={busyPaymentId === p.id}
+                          hitSlop={8}
+                        >
+                          <Text style={styles.linkDanger}>Estornar</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })}
+            </ListGroup>
+          </View>
         ) : null}
 
         {canManageThisExpense ? (
@@ -771,6 +970,14 @@ const styles = StyleSheet.create({
   installmentList: { gap: 2, paddingLeft: 44 },
   installmentLine: { fontFamily: fonts.ui, color: colors.inkSoft, fontSize: 12 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+  },
+  linkDanger: { color: colors.danger, fontFamily: fonts.uiBold, fontSize: 12 },
   chip: {
     borderWidth: 1,
     borderColor: colors.borderStrong,

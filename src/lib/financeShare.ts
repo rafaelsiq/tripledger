@@ -1,8 +1,8 @@
 import * as Clipboard from 'expo-clipboard';
 import { Share } from 'react-native';
-import { paymentProgress } from '@/src/lib/finance';
+import { fundSummary, paymentProgress } from '@/src/lib/finance';
 import { memberLabel } from '@/src/lib/members';
-import type { Expense, Trip, TripMember } from '@/src/types';
+import type { Expense, Fund, FundMovement, Trip, TripMember } from '@/src/types';
 import { CATEGORY_LABELS } from '@/src/types';
 import { formatCurrency } from '@/src/theme';
 
@@ -24,6 +24,11 @@ function expensePaidTotal(expense: Expense) {
 }
 
 function splitLines(expense: Expense, members: TripMember[], currency: string): string[] {
+  if (expense.fundId) {
+    return expense.splits.map(
+      (split) => `• ${nameOf(members, split.uid)}: ${money(split.amount, currency)} (do caixa)`
+    );
+  }
   return expense.splits.map((split) => {
     const remaining = round2(split.amount - split.paidAmount);
     const isPayer = split.uid === expense.paidByUid;
@@ -74,10 +79,13 @@ export function buildTripExpensesWhatsAppSummary(input: {
   trip: Trip;
   expenses: Expense[];
   members: TripMember[];
+  funds?: Fund[];
+  fundMovements?: FundMovement[];
 }): string {
   const { trip, expenses, members } = input;
   const currency = trip.currency || 'BRL';
   const progress = paymentProgress(expenses);
+  const funds = input.funds || [];
   const billable = expenses
     .filter((e) => e.kind !== 'income')
     .slice()
@@ -91,6 +99,22 @@ export function buildTripExpensesWhatsAppSummary(input: {
     `Em aberto: ${money(progress.open, currency)}`,
   ];
 
+  for (const fund of funds) {
+    const summary = fundSummary(fund, input.fundMovements || [], expenses);
+    lines.push(
+      '',
+      `*Caixa: ${fund.name}* (com ${nameOf(members, fund.holderUid)})`,
+      `Saldo: ${money(summary.balance, currency)} · aportes ${money(summary.contributed, currency)} · gastos ${money(summary.spent, currency)}`,
+      ...summary.members
+        .filter((m) => Math.abs(m.balance) > 0.01)
+        .map((m) =>
+          m.balance > 0
+            ? `• ${nameOf(members, m.uid)}: ${money(m.balance, currency)} no caixa`
+            : `• ${nameOf(members, m.uid)}: falta aportar ${money(-m.balance, currency)}`
+        )
+    );
+  }
+
   if (!billable.length) {
     lines.push('', 'Nenhuma despesa lançada ainda.', '', '_Resumo gerado no TripLedger_');
     return lines.join('\n');
@@ -103,7 +127,9 @@ export function buildTripExpensesWhatsAppSummary(input: {
       '',
       `*${expense.title}*`,
       `${CATEGORY_LABELS[expense.category] || expense.category} · ${money(expense.amount, currency)}`,
-      `Pago por: ${nameOf(members, expense.paidByUid)}`,
+      expense.fundId
+        ? 'Pago pelo caixa'
+        : `Pago por: ${nameOf(members, expense.paidByUid)}`,
       `Já pago: ${money(paid, currency)} · Em aberto: ${money(open, currency)}`,
       ...splitLines(expense, members, currency)
     );

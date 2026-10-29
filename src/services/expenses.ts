@@ -7,12 +7,19 @@ import {
   onSnapshot,
   orderBy,
   query,
+  runTransaction,
   where,
+  writeBatch,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { db, storage } from '@/src/lib/firebase';
-import { omitUndefinedDeep, safeSetDoc, safeUpdateDoc } from '@/src/lib/firestore';
+import {
+  omitUndefinedDeep,
+  safeBatchUpdate,
+  safeSetDoc,
+  safeUpdateDoc,
+} from '@/src/lib/firestore';
 import {
   amountsMatchTotal,
   applyPaidToInstallments,
@@ -20,6 +27,7 @@ import {
   clampInstallmentCount,
   equalSplits,
   nextOpenInstallment,
+  round2,
   splitStatus,
 } from '@/src/lib/finance';
 import { closedTripMemberMessage, canMutateTrip } from '@/src/lib/tripPhase';
@@ -31,6 +39,7 @@ import type {
   ExpenseInstallment,
   ExpenseKind,
   ExpenseSplit,
+  Fund,
   Payment,
   Settlement,
 } from '@/src/types';
@@ -83,6 +92,16 @@ async function uploadTripFile(
 }
 
 export { uploadTripFile };
+
+async function getFund(tripId: string, fundId: string) {
+  const snap = await getDoc(doc(db, 'trips', tripId, 'funds', fundId));
+  if (!snap.exists()) throw new Error('Caixa não encontrado.');
+  return snap.data() as Fund;
+}
+
+function canManageFinance(trip: { adminUid: string; financeLeadUid: string }, uid: string) {
+  return trip.adminUid === uid || trip.financeLeadUid === uid;
+}
 
 export function subscribeExpenses(
   tripId: string,
@@ -150,9 +169,14 @@ export async function createExpense(input: {
   note?: string;
   receiptUrl?: string;
   dueDate?: string;
+  /** Day the cost happened (YYYY-MM-DD). */
+  date?: string;
+  /** Pay from (or receive into) this fund; paidByUid becomes its holder. */
+  fundId?: string;
   createdByUid: string;
 }) {
   const defaultCount = clampInstallmentCount(input.defaultInstallmentCount, 1);
+  if (!(input.amount > 0)) throw new Error('Informe um valor maior que zero.');
 
   if (input.customSplits?.length) {
     if (!amountsMatchTotal(input.customSplits.map((s) => s.amount), input.amount)) {
@@ -160,51 +184,27 @@ export async function createExpense(input: {
     }
   }
 
-  const splits = input.customSplits
-    ? input.customSplits.map((s) => {
-        const installmentCount =
-          s.uid === input.paidByUid
-            ? 1
-            : clampInstallmentCount(s.installmentCount, defaultCount);
-        return {
-          uid: s.uid,
-          amount: Math.round(s.amount * 100) / 100,
-          paidAmount: s.uid === input.paidByUid ? Math.round(s.amount * 100) / 100 : 0,
-          status: splitStatus(
-            s.uid === input.paidByUid ? s.amount : 0,
-            s.amount
-          ),
-          installmentCount,
-        };
-      })
-    : equalSplits(input.memberIds, input.amount).map((s) => ({
-        ...s,
-        paidAmount: s.uid === input.paidByUid ? s.amount : 0,
-        status: splitStatus(s.uid === input.paidByUid ? s.amount : 0, s.amount),
-        installmentCount: s.uid === input.paidByUid ? 1 : defaultCount,
-      }));
-
-  if (input.kind === 'income') {
-    splits.forEach((s) => {
-      s.paidAmount = s.amount;
-      s.status = 'paid';
-      s.installmentCount = 1;
-    });
-  }
+  const fund = input.fundId ? await getFund(input.tripId, input.fundId) : null;
+  const paidByUid = fund ? fund.holderUid : input.paidByUid;
 
   const refDoc = doc(collection(db, 'trips', input.tripId, 'expenses'));
-  const installments =
-    input.kind === 'income'
-      ? []
-      : splits.flatMap((s) => {
-          if (s.uid === input.paidByUid || s.amount <= 0) return [];
-          return buildInstallments({
-            uid: s.uid,
-            total: s.amount,
-            count: s.installmentCount ?? defaultCount,
-            idPrefix: `${refDoc.id}_${s.uid}`,
-          });
-        });
+  const splits = buildSplitsForExpense({
+    kind: input.kind,
+    amount: input.amount,
+    paidByUid,
+    memberIds: input.memberIds,
+    customSplits: input.customSplits,
+    defaultInstallmentCount: defaultCount,
+    coveredByFund: !!fund,
+  });
+  const installments = buildInstallmentsForExpense({
+    expenseId: refDoc.id,
+    kind: input.kind,
+    paidByUid,
+    splits,
+    defaultInstallmentCount: defaultCount,
+    coveredByFund: !!fund,
+  });
 
   const now = Date.now();
   // Firestore rejects `undefined` fields (including nested) — omit them.
@@ -214,13 +214,15 @@ export async function createExpense(input: {
     kind: input.kind,
     title: input.title.trim(),
     category: input.category,
-    amount: input.amount,
-    paidByUid: input.paidByUid,
+    amount: round2(input.amount),
+    paidByUid,
     splits,
     installments: installments.length ? installments : undefined,
     note: input.note?.trim() || undefined,
     receiptUrl: input.receiptUrl,
     dueDate: input.dueDate || undefined,
+    date: input.date || undefined,
+    fundId: fund?.id,
     createdByUid: input.createdByUid,
     createdAt: now,
     updatedAt: now,
@@ -242,7 +244,37 @@ export async function registerPayment(input: {
   expense?: Expense;
 }) {
   let installmentId = input.installmentId;
-  const expense = input.expense;
+  const amount = round2(input.amount);
+  if (!(amount > 0)) throw new Error('Informe um valor maior que zero.');
+  if (input.fromUid === input.toUid) throw new Error('Quem pagou a despesa não deve a si mesmo.');
+
+  const expenseSnap = await getDoc(doc(db, 'trips', input.tripId, 'expenses', input.expenseId));
+  if (!expenseSnap.exists()) throw new Error('Lançamento não encontrado.');
+  const expense = expenseSnap.data() as Expense;
+  if (expense.fundId) {
+    throw new Error('Este gasto saiu do caixa — não há reembolso individual a registrar.');
+  }
+  const split = expense.splits.find((s) => s.uid === input.fromUid);
+  if (!split) throw new Error('Esta pessoa não participa deste lançamento.');
+  const pendingSnap = await getDocs(
+    query(
+      collection(db, 'trips', input.tripId, 'payments'),
+      where('expenseId', '==', input.expenseId)
+    )
+  );
+  const pendingAmount = pendingSnap.docs
+    .map((d) => d.data() as Payment)
+    .filter((p) => p.status === 'pending' && p.fromUid === input.fromUid)
+    .reduce((sum, p) => sum + p.amount, 0);
+  const available = round2(split.amount - split.paidAmount - pendingAmount);
+  if (amount > available + 0.009) {
+    throw new Error(
+      available <= 0.009
+        ? 'Não há valor em aberto: o restante já foi pago ou aguarda confirmação.'
+        : `O valor passa do que falta pagar (${available.toFixed(2).replace('.', ',')}).`
+    );
+  }
+
   if (expense?.installments?.length) {
     if (installmentId) {
       const installment = expense.installments.find((i) => i.id === installmentId);
@@ -265,7 +297,7 @@ export async function registerPayment(input: {
     expenseId: input.expenseId,
     fromUid: input.fromUid,
     toUid: input.toUid,
-    amount: input.amount,
+    amount,
     installmentId,
     proofUrl,
     paidAt: Date.now(),
@@ -276,69 +308,163 @@ export async function registerPayment(input: {
   return payment;
 }
 
+function applyPaymentToExpense(expense: Expense, payment: Payment, direction: 1 | -1) {
+  const delta = direction * payment.amount;
+  const splits = expense.splits.map((s) => {
+    if (s.uid !== payment.fromUid) return s;
+    const paidAmount = Math.max(0, Math.min(s.amount, round2(s.paidAmount + delta)));
+    return { ...s, paidAmount, status: splitStatus(paidAmount, s.amount) };
+  });
+
+  let installments = expense.installments;
+  if (installments?.length && direction === -1) {
+    // Reversal: rebuild the debtor's schedule from what is still paid.
+    const paidByUid = Object.fromEntries(
+      splits.filter((s) => s.uid !== expense.paidByUid).map((s) => [s.uid, s.paidAmount])
+    );
+    installments = applyPaidToInstallments(installments, paidByUid);
+  } else if (installments?.length) {
+    if (payment.installmentId && installments.some((i) => i.id === payment.installmentId)) {
+      installments = installments.map((item) =>
+        item.id === payment.installmentId ? applyPaymentToInstallment(item, payment.amount) : item
+      );
+    } else {
+      let remaining = payment.amount;
+      installments = installments
+        .slice()
+        .sort((a, b) => a.index - b.index)
+        .map((item) => {
+          if (item.uid !== payment.fromUid || remaining <= 0 || item.status === 'paid') {
+            return item;
+          }
+          const open = round2(item.amount - item.paidAmount);
+          const applied = Math.min(open, remaining);
+          remaining = round2(remaining - applied);
+          return applyPaymentToInstallment(item, applied);
+        });
+    }
+  }
+  return { splits, installments };
+}
+
+/**
+ * Confirm a pending payment and apply it to the expense split, atomically —
+ * a payment can never be applied twice (double tap, two managers at once).
+ */
 export async function confirmPayment(input: {
   tripId: string;
   payment: Payment;
   confirmedByUid: string;
-  expense: Expense;
+  /** Kept for callers; the transaction always re-reads the latest expense. */
+  expense?: Expense;
 }) {
-  await safeSetDoc(
-    doc(db, 'trips', input.tripId, 'payments', input.payment.id),
-    omitUndefinedDeep({
-      ...input.payment,
+  const paymentRef = doc(db, 'trips', input.tripId, 'payments', input.payment.id);
+  const expenseRef = doc(db, 'trips', input.tripId, 'expenses', input.payment.expenseId);
+  await runTransaction(db, async (tx) => {
+    const [paymentSnap, expenseSnap] = await Promise.all([tx.get(paymentRef), tx.get(expenseRef)]);
+    if (!paymentSnap.exists()) throw new Error('Pagamento não encontrado.');
+    if (!expenseSnap.exists()) throw new Error('Lançamento não encontrado.');
+    const payment = paymentSnap.data() as Payment;
+    if (payment.status !== 'pending') throw new Error('Este pagamento já foi resolvido.');
+    const expense = expenseSnap.data() as Expense;
+    const { splits, installments } = applyPaymentToExpense(expense, payment, 1);
+    tx.update(paymentRef, {
       status: 'confirmed',
       confirmedByUid: input.confirmedByUid,
       confirmedAt: Date.now(),
-    }),
-    { merge: true }
-  );
-
-  const splits = input.expense.splits.map((s) => {
-    if (s.uid !== input.payment.fromUid) return s;
-    const paidAmount = Math.min(s.amount, s.paidAmount + input.payment.amount);
-    return {
-      ...s,
-      paidAmount,
-      status: splitStatus(paidAmount, s.amount),
-    };
+    });
+    tx.update(
+      expenseRef,
+      omitUndefinedDeep({ splits, installments, updatedAt: Date.now() })
+    );
   });
+  await resolveRequestsForPayment(input.tripId, input.payment.id, 'approved', input.confirmedByUid);
+}
 
-  let installments = input.expense.installments;
-  if (installments?.length) {
-    if (input.payment.installmentId) {
-      installments = installments.map((item) =>
-        item.id === input.payment.installmentId
-          ? applyPaymentToInstallment(item, input.payment.amount)
-          : item
+/** Undo a confirmed payment (estorno): the amount goes back to "em aberto". Finance only. */
+export async function reversePayment(input: {
+  tripId: string;
+  paymentId: string;
+  actorUid: string;
+}) {
+  const trip = await getTrip(input.tripId);
+  if (!trip || !canManageFinance(trip, input.actorUid)) {
+    throw new Error('Apenas o admin ou o responsável financeiro podem estornar.');
+  }
+  const paymentRef = doc(db, 'trips', input.tripId, 'payments', input.paymentId);
+  await runTransaction(db, async (tx) => {
+    const paymentSnap = await tx.get(paymentRef);
+    if (!paymentSnap.exists()) throw new Error('Pagamento não encontrado.');
+    const payment = paymentSnap.data() as Payment;
+    if (payment.status !== 'confirmed') throw new Error('Só pagamentos confirmados podem ser estornados.');
+    const expenseRef = doc(db, 'trips', input.tripId, 'expenses', payment.expenseId);
+    const expenseSnap = await tx.get(expenseRef);
+    tx.update(paymentRef, {
+      status: 'rejected',
+      reversedAt: Date.now(),
+      reversedByUid: input.actorUid,
+    });
+    if (expenseSnap.exists()) {
+      const { splits, installments } = applyPaymentToExpense(
+        expenseSnap.data() as Expense,
+        payment,
+        -1
       );
-    } else {
-      let remaining = input.payment.amount;
-      installments = installments.map((item) => {
-        if (item.uid !== input.payment.fromUid || remaining <= 0 || item.status === 'paid') {
-          return item;
-        }
-        const open = Math.round((item.amount - item.paidAmount) * 100) / 100;
-        const applied = Math.min(open, remaining);
-        remaining = Math.round((remaining - applied) * 100) / 100;
-        return applyPaymentToInstallment(item, applied);
-      });
+      tx.update(expenseRef, omitUndefinedDeep({ splits, installments, updatedAt: Date.now() }));
+    }
+  });
+}
+
+/** The sender (or finance) withdraws a payment that was not confirmed yet. */
+export async function cancelPayment(input: {
+  tripId: string;
+  payment: Payment;
+  actorUid: string;
+}) {
+  if (input.payment.status !== 'pending') {
+    throw new Error('Só pagamentos aguardando confirmação podem ser cancelados.');
+  }
+  if (input.payment.fromUid !== input.actorUid) {
+    const trip = await getTrip(input.tripId);
+    if (!trip || !canManageFinance(trip, input.actorUid)) {
+      throw new Error('Só quem registrou ou o financeiro podem cancelar este pagamento.');
     }
   }
+  const reqs = await getDocs(
+    query(
+      collection(db, 'trips', input.tripId, 'consolidationRequests'),
+      where('paymentId', '==', input.payment.id)
+    )
+  );
+  await Promise.all([
+    ...reqs.docs.map((d) => deleteDoc(d.ref)),
+    deleteDoc(doc(db, 'trips', input.tripId, 'payments', input.payment.id)),
+  ]);
+}
 
-  await safeUpdateDoc(
-    doc(db, 'trips', input.tripId, 'expenses', input.expense.id),
-    omitUndefinedDeep({
-      splits,
-      installments,
-      updatedAt: Date.now(),
-    })
+async function resolveRequestsForPayment(
+  tripId: string,
+  paymentId: string,
+  status: 'approved' | 'rejected',
+  resolvedByUid: string
+) {
+  const reqs = await getDocs(
+    query(collection(db, 'trips', tripId, 'consolidationRequests'), where('paymentId', '==', paymentId))
+  );
+  await Promise.all(
+    reqs.docs
+      .filter((d) => (d.data() as ConsolidationRequest).status === 'pending')
+      .map((d) =>
+        safeUpdateDoc(d.ref, { status, resolvedAt: Date.now(), resolvedByUid })
+      )
   );
 }
 
-export async function rejectPayment(tripId: string, paymentId: string) {
+export async function rejectPayment(tripId: string, paymentId: string, actorUid?: string) {
   await safeUpdateDoc(doc(db, 'trips', tripId, 'payments', paymentId), {
     status: 'rejected',
   });
+  if (actorUid) await resolveRequestsForPayment(tripId, paymentId, 'rejected', actorUid);
 }
 
 export async function requestConsolidation(input: {
@@ -347,6 +473,15 @@ export async function requestConsolidation(input: {
   fromUid: string;
   toUid: string;
 }) {
+  const existing = await getDocs(
+    query(
+      collection(db, 'trips', input.tripId, 'consolidationRequests'),
+      where('paymentId', '==', input.paymentId)
+    )
+  );
+  if (existing.docs.some((d) => (d.data() as ConsolidationRequest).status === 'pending')) {
+    throw new Error('Já existe uma solicitação aberta para este pagamento.');
+  }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'consolidationRequests'));
   const req: ConsolidationRequest = {
     id: refDoc.id,
@@ -378,6 +513,8 @@ export async function saveSettlements(
   tripId: string,
   settlements: Omit<Settlement, 'id' | 'tripId' | 'createdAt' | 'status'>[]
 ) {
+  const batch = writeBatch(db);
+  const now = Date.now();
   for (const item of settlements) {
     const refDoc = doc(collection(db, 'trips', tripId, 'settlements'));
     const settlement: Settlement = {
@@ -387,29 +524,94 @@ export async function saveSettlements(
       toUid: item.toUid,
       amount: item.amount,
       status: 'open',
-      createdAt: Date.now(),
+      createdAt: now,
     };
-    await safeSetDoc(refDoc, settlement);
+    batch.set(refDoc, settlement);
   }
+  await batch.commit();
 }
 
+/** Drop open (not yet paid) settlements so a fresh plan can be generated. */
+export async function deleteOpenSettlements(tripId: string, actorUid: string) {
+  const trip = await getTrip(tripId);
+  if (!trip || !canManageFinance(trip, actorUid)) {
+    throw new Error('Apenas o admin ou o responsável financeiro podem refazer o acerto.');
+  }
+  const snap = await getDocs(collection(db, 'trips', tripId, 'settlements'));
+  await Promise.all(
+    snap.docs
+      .filter((d) => (d.data() as Settlement).status === 'open')
+      .map((d) => deleteDoc(d.ref))
+  );
+}
+
+/**
+ * Mark a settlement paid. The amount is also applied to the payer's open splits on
+ * expenses the receiver fronted (oldest first), so those lançamentos read as quitados.
+ * Anything left over (debts routed through the simplification) only moves the ledger.
+ */
 export async function markSettlementSettled(
   tripId: string,
   settlementId: string,
   proofUri?: string
 ) {
+  const settlementRef = doc(db, 'trips', tripId, 'settlements', settlementId);
+  const settlementSnap = await getDoc(settlementRef);
+  if (!settlementSnap.exists()) throw new Error('Acerto não encontrado.');
+  const settlement = settlementSnap.data() as Settlement;
+  if (settlement.status === 'settled') throw new Error('Este acerto já foi quitado.');
+
   let proofUrl: string | undefined;
   if (proofUri) {
     proofUrl = await uploadTripFile(tripId, 'settlements', proofUri);
   }
-  await safeUpdateDoc(
-    doc(db, 'trips', tripId, 'settlements', settlementId),
-    omitUndefinedDeep({
-      status: 'settled',
-      settledAt: Date.now(),
-      proofUrl,
-    })
+
+  const expensesSnap = await getDocs(
+    query(collection(db, 'trips', tripId, 'expenses'), where('paidByUid', '==', settlement.toUid))
   );
+  const batch = writeBatch(db);
+  let remaining = settlement.amount;
+  const candidates = expensesSnap.docs
+    .map((d) => d.data() as Expense)
+    .filter((e) => e.kind !== 'income' && !e.fundId)
+    .sort((a, b) => a.createdAt - b.createdAt);
+  for (const expense of candidates) {
+    if (remaining <= 0.009) break;
+    const split = expense.splits.find((s) => s.uid === settlement.fromUid);
+    if (!split) continue;
+    const open = round2(split.amount - split.paidAmount);
+    if (open <= 0.009) continue;
+    const applied = Math.min(open, remaining);
+    remaining = round2(remaining - applied);
+    const splits = expense.splits.map((s) =>
+      s.uid === split.uid
+        ? {
+            ...s,
+            paidAmount: round2(s.paidAmount + applied),
+            status: splitStatus(round2(s.paidAmount + applied), s.amount),
+          }
+        : s
+    );
+    const installments = expense.installments?.length
+      ? applyPaidToInstallments(
+          expense.installments,
+          Object.fromEntries(
+            splits.filter((s) => s.uid !== expense.paidByUid).map((s) => [s.uid, s.paidAmount])
+          )
+        )
+      : expense.installments;
+    safeBatchUpdate(batch, doc(db, 'trips', tripId, 'expenses', expense.id), {
+      splits,
+      installments,
+      updatedAt: Date.now(),
+    });
+  }
+  safeBatchUpdate(batch, settlementRef, {
+    status: 'settled',
+    settledAt: Date.now(),
+    proofUrl,
+  });
+  await batch.commit();
 }
 
 function buildSplitsForExpense(input: {
@@ -420,6 +622,8 @@ function buildSplitsForExpense(input: {
   customSplits?: { uid: string; amount: number; installmentCount?: number }[];
   defaultInstallmentCount: number;
   previousPaid?: Record<string, number>;
+  /** Paid from a fund: nobody repays the holder individually. */
+  coveredByFund?: boolean;
 }): ExpenseSplit[] {
   const defaultCount = input.defaultInstallmentCount;
   const previousPaid = input.previousPaid || {};
@@ -456,7 +660,7 @@ function buildSplitsForExpense(input: {
         };
       });
 
-  if (input.kind === 'income') {
+  if (input.kind === 'income' || input.coveredByFund) {
     splits.forEach((s) => {
       s.paidAmount = s.amount;
       s.status = 'paid';
@@ -473,8 +677,9 @@ function buildInstallmentsForExpense(input: {
   paidByUid: string;
   splits: ExpenseSplit[];
   defaultInstallmentCount: number;
+  coveredByFund?: boolean;
 }): ExpenseInstallment[] {
-  if (input.kind === 'income') return [];
+  if (input.kind === 'income' || input.coveredByFund) return [];
   return input.splits.flatMap((s) => {
     if (s.uid === input.paidByUid || s.amount <= 0) return [];
     return buildInstallments({
@@ -503,7 +708,10 @@ export async function updateExpense(input: {
   receiptUrl?: string;
   clearReceipt?: boolean;
   dueDate?: string;
+  date?: string;
+  fundId?: string;
 }) {
+  if (!(input.amount > 0)) throw new Error('Informe um valor maior que zero.');
   await assertCanManageExpense({
     tripId: input.tripId,
     expense: input.existing,
@@ -518,44 +726,60 @@ export async function updateExpense(input: {
     }
   }
 
-  const previousPaid = Object.fromEntries(
-    input.existing.splits.map((s) => [s.uid, s.paidAmount])
-  );
+  const fund = input.fundId ? await getFund(input.tripId, input.fundId) : null;
+  const paidByUid = fund ? fund.holderUid : input.paidByUid;
 
-  const splits = buildSplitsForExpense({
-    kind: input.kind,
-    amount: input.amount,
-    paidByUid: input.paidByUid,
-    memberIds: input.memberIds,
-    customSplits: input.customSplits,
-    defaultInstallmentCount: defaultCount,
-    previousPaid,
-  });
-
-  let installments = buildInstallmentsForExpense({
-    expenseId: input.expenseId,
-    kind: input.kind,
-    paidByUid: input.paidByUid,
-    splits,
-    defaultInstallmentCount: defaultCount,
-  });
-
-  if (installments.length) {
-    const paidForInstallments = Object.fromEntries(
-      splits
-        .filter((s) => s.uid !== input.paidByUid)
-        .map((s) => [s.uid, s.paidAmount])
-    );
-    installments = applyPaidToInstallments(installments, paidForInstallments);
-  }
-
-  const validInstallmentIds = new Set(installments.map((i) => i.id));
   const paymentsSnap = await getDocs(
     query(
       collection(db, 'trips', input.tripId, 'payments'),
       where('expenseId', '==', input.expenseId)
     )
   );
+  if (
+    fund &&
+    paymentsSnap.docs.some((d) => (d.data() as Payment).status !== 'rejected')
+  ) {
+    throw new Error(
+      'Este lançamento já tem pagamentos registrados. Cancele-os antes de passá-lo para o caixa.'
+    );
+  }
+
+  // Split "paid" flags of a fund/income expense are not real repayments — don't carry them over.
+  const previousWasCovered = !!input.existing.fundId || input.existing.kind === 'income';
+  const previousPaid = previousWasCovered
+    ? {}
+    : Object.fromEntries(input.existing.splits.map((s) => [s.uid, s.paidAmount]));
+
+  const splits = buildSplitsForExpense({
+    kind: input.kind,
+    amount: input.amount,
+    paidByUid,
+    memberIds: input.memberIds,
+    customSplits: input.customSplits,
+    defaultInstallmentCount: defaultCount,
+    previousPaid,
+    coveredByFund: !!fund,
+  });
+
+  let installments = buildInstallmentsForExpense({
+    expenseId: input.expenseId,
+    kind: input.kind,
+    paidByUid,
+    splits,
+    defaultInstallmentCount: defaultCount,
+    coveredByFund: !!fund,
+  });
+
+  if (installments.length) {
+    const paidForInstallments = Object.fromEntries(
+      splits
+        .filter((s) => s.uid !== paidByUid)
+        .map((s) => [s.uid, s.paidAmount])
+    );
+    installments = applyPaidToInstallments(installments, paidForInstallments);
+  }
+
+  const validInstallmentIds = new Set(installments.map((i) => i.id));
 
   await Promise.all(
     paymentsSnap.docs.map(async (paymentDoc) => {
@@ -582,13 +806,15 @@ export async function updateExpense(input: {
     kind: input.kind,
     title: input.title.trim(),
     category: input.category,
-    amount: input.amount,
-    paidByUid: input.paidByUid,
+    amount: round2(input.amount),
+    paidByUid,
     splits,
     installments: installments.length ? installments : null,
     note: input.note?.trim() || null,
     receiptUrl: receiptUrl || null,
     dueDate: input.dueDate || null,
+    date: input.date || null,
+    fundId: fund?.id || null,
     updatedAt: Date.now(),
   });
 
