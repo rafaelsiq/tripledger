@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -800,6 +800,23 @@ export default function ExpenseDetailScreen() {
                 );
               })}
           </Card>
+        ) : null}
+
+        {expense.note ? (
+          <View style={{ gap: 6 }}>
+            <Label>Nota</Label>
+            <Body muted>{expense.note}</Body>
+          </View>
+        ) : null}
+
+        {expense.receiptUrl ? (
+          <Button
+            title="Ver comprovante"
+            icon="document-attach-outline"
+            variant="secondary"
+            size="sm"
+            onPress={() => Linking.openURL(expense.receiptUrl!)}
+          />
         ) : null}
 
         {canMutate && myPendingSent.length > 0 ? (
