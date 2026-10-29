@@ -25,6 +25,8 @@ import { normalizeTripPhase } from '@/src/lib/tripPhase';
 import type {
   ConsolidationRequest,
   Expense,
+  Fund,
+  FundMovement,
   Payment,
   Settlement,
   Trip,
@@ -310,11 +312,20 @@ export async function linkDummyToRealMember(input: {
     throw new Error('O destino precisa ser um membro real da viagem');
   }
 
-  const [expensesSnap, paymentsSnap, settlementsSnap, consolidationSnap] = await Promise.all([
+  const [
+    expensesSnap,
+    paymentsSnap,
+    settlementsSnap,
+    consolidationSnap,
+    fundsSnap,
+    fundMovementsSnap,
+  ] = await Promise.all([
     getDocs(collection(db, 'trips', tripId, 'expenses')),
     getDocs(collection(db, 'trips', tripId, 'payments')),
     getDocs(collection(db, 'trips', tripId, 'settlements')),
     getDocs(collection(db, 'trips', tripId, 'consolidationRequests')),
+    getDocs(collection(db, 'trips', tripId, 'funds')),
+    getDocs(collection(db, 'trips', tripId, 'fundMovements')),
   ]);
 
   let batch = writeBatch(db);
@@ -373,6 +384,25 @@ export async function linkDummyToRealMember(input: {
     const toUid = req.toUid === dummyUid ? realUid : req.toUid;
     if (fromUid === req.fromUid && toUid === req.toUid) continue;
     safeBatchUpdate(batch, reqDoc.ref, { fromUid, toUid });
+    ops += 1;
+    await commitIfNeeded();
+  }
+
+  for (const fundDoc of fundsSnap.docs) {
+    const fund = fundDoc.data() as Fund;
+    if (fund.holderUid !== dummyUid) continue;
+    safeBatchUpdate(batch, fundDoc.ref, { holderUid: realUid, updatedAt: Date.now() });
+    ops += 1;
+    await commitIfNeeded();
+  }
+
+  for (const movementDoc of fundMovementsSnap.docs) {
+    const movement = movementDoc.data() as FundMovement;
+    const memberUid = movement.memberUid === dummyUid ? realUid : movement.memberUid;
+    const holderUid = movement.holderUid === dummyUid ? realUid : movement.holderUid;
+    const createdByUid = movement.createdByUid === dummyUid ? realUid : movement.createdByUid;
+    if (memberUid === movement.memberUid && holderUid === movement.holderUid) continue;
+    safeBatchUpdate(batch, movementDoc.ref, { memberUid, holderUid, createdByUid });
     ops += 1;
     await commitIfNeeded();
   }
@@ -455,6 +485,22 @@ export async function removeMember(tripId: string, uid: string, actorUid?: strin
         'Este placeholder ainda tem lançamentos. Vincule a um membro real antes de remover.'
       );
     }
+  }
+
+  const [fundsSnap, fundMovementsSnap] = await Promise.all([
+    getDocs(collection(db, 'trips', tripId, 'funds')),
+    getDocs(collection(db, 'trips', tripId, 'fundMovements')),
+  ]);
+  if (fundsSnap.docs.some((d) => (d.data() as Fund).holderUid === uid)) {
+    throw new Error('Este membro guarda um caixa da viagem e não pode ser removido enquanto o caixa existir.');
+  }
+  if (
+    fundMovementsSnap.docs.some((d) => {
+      const movement = d.data() as FundMovement;
+      return movement.memberUid === uid && movement.status !== 'rejected';
+    })
+  ) {
+    throw new Error('Este membro tem aportes no caixa. Devolva ou remova os aportes antes.');
   }
 
   await deleteDoc(doc(db, 'trips', tripId, 'members', uid));

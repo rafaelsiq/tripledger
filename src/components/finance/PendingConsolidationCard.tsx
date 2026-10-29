@@ -20,7 +20,10 @@ type Props = {
   members: TripMember[];
 };
 
-/** Queue of registered payments awaiting consolidation — admin & finance lead. */
+/**
+ * Queue of registered payments awaiting consolidation: everything for admin & finance lead,
+ * and payments addressed to the current member (they fronted the expense).
+ */
 export function PendingConsolidationCard({
   tripId,
   currentUid,
@@ -35,16 +38,16 @@ export function PendingConsolidationCard({
   const { showError, showSuccess } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const isManager = isAdmin || isFinanceLead;
   const pending = useMemo(
     () =>
       payments
-        .filter((p) => p.status === 'pending')
+        .filter((p) => p.status === 'pending' && (isManager || p.toUid === currentUid))
         .slice()
         .sort((a, b) => b.paidAt - a.paidAt),
-    [payments]
+    [payments, isManager, currentUid]
   );
 
-  if (!isAdmin && !isFinanceLead) return null;
   if (!pending.length) return null;
 
   const nameOf = (uid: string) => {
@@ -81,7 +84,7 @@ export function PendingConsolidationCard({
   async function onReject(payment: Payment) {
     try {
       setBusyId(payment.id);
-      await rejectPayment(tripId, payment.id);
+      await rejectPayment(tripId, payment.id, currentUid);
       showSuccess('Pagamento rejeitado');
     } catch (e) {
       showError(e, 'Falha ao rejeitar');
@@ -99,7 +102,9 @@ export function PendingConsolidationCard({
         </Text>
       </View>
       <Body muted>
-        Pagamentos registrados que ainda precisam da sua confirmação.
+        {isManager
+          ? 'Pagamentos registrados que ainda precisam da sua confirmação.'
+          : 'Confirme quando o dinheiro chegar até você.'}
       </Body>
 
       <View style={styles.list}>

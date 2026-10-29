@@ -52,7 +52,7 @@ Auth: e-mail/senha e Google Sign-In foram provisionados via Firebase CLI. Inclua
 
 1. Register / login
 2. Create a trip (creator becomes admin + finance lead) or join via invite code
-3. Finances: planned/actual expenses, splits, payments with proof, consolidation
+3. Finances: planned/actual expenses, splits, payments with proof, consolidation, trip funds (caixa: contributions, fund-paid expenses, refunds) and a ledger-based settlement plan
 4. Itinerary: day cards with images, RSVP, done state
 5. Feed: photos/videos, likes, comments
 6. Closing report: balances + simplified settlements

@@ -9,6 +9,12 @@ function parseKind(value?: string): ExpenseKind | undefined {
 }
 
 export default function NewExpenseScreen() {
-  const { kind } = useLocalSearchParams<{ kind?: string }>();
-  return <ExpenseForm mode="create" initialKind={parseKind(kind)} />;
+  const { kind, fundId } = useLocalSearchParams<{ kind?: string; fundId?: string }>();
+  return (
+    <ExpenseForm
+      mode="create"
+      initialKind={parseKind(kind)}
+      initialFundId={typeof fundId === 'string' ? fundId : undefined}
+    />
+  );
 }
