@@ -108,10 +108,14 @@ export async function createItineraryItem(input: {
   location?: string;
   mapUrl?: string;
   imageUri?: string;
+  /** Already-hosted image (e.g. from a catalog rolê); used when no new file is picked. */
+  imageUrl?: string;
   order: number;
   createdByUid: string;
+  catalogId?: string;
+  visibility?: ItineraryItem['visibility'];
 }) {
-  let imageUrl: string | undefined;
+  let imageUrl: string | undefined = optionalText(input.imageUrl);
   if (input.imageUri) {
     imageUrl = await uploadTripFile(input.tripId, 'itinerary', input.imageUri);
   }
@@ -128,6 +132,8 @@ export async function createItineraryItem(input: {
     location: optionalText(input.location),
     mapUrl: optionalText(input.mapUrl),
     order: input.order,
+    catalogId: input.catalogId,
+    visibility: input.visibility,
     done: false,
     attendees: [],
     votes: {},

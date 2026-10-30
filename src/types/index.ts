@@ -260,6 +260,10 @@ export interface ItineraryItem {
   endTime?: string;
   location?: string;
   mapUrl?: string;
+  /** Catalog rolê this item was copied from; edits never touch the catalog. */
+  catalogId?: string;
+  /** `submitted`: also sent to the catalog as a public suggestion. */
+  visibility?: 'private' | 'submitted';
   order: number;
   done: boolean;
   /** Legacy RSVP list — kept in sync with yes-votes. */

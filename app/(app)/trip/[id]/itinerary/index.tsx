@@ -107,7 +107,7 @@ export default function ItineraryHome() {
   function newActivity() {
     if (!selectedDay) return;
     router.push({
-      pathname: `/(app)/trip/${trip!.id}/itinerary/new-item` as never,
+      pathname: `/(app)/trip/${trip!.id}/itinerary/add` as never,
       params: { dayId: selectedDay.id, order: String(items.length) },
     });
   }

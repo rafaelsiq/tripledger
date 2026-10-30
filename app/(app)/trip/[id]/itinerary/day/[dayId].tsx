@@ -48,7 +48,7 @@ export default function DayDetailScreen() {
 
   function newActivity() {
     router.push({
-      pathname: `/(app)/trip/${currentTrip.id}/itinerary/new-item` as never,
+      pathname: `/(app)/trip/${currentTrip.id}/itinerary/add` as never,
       params: { dayId: String(dayId), order: String(items.length) },
     });
   }
