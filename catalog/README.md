@@ -1,14 +1,27 @@
 # Catálogo de rolês sugeridos
 
-Um arquivo por destino (`rio-de-janeiro.json`), gravado na coleção `activityCatalog`
-do Firestore pela action `.github/workflows/catalog.yml`:
+Os rolês ficam **só no Firestore**, na coleção `activityCatalog` (fonte da verdade).
+Nada de catálogo no repositório, branches ou PRs de dados.
 
-- **Rotina**: abre um PR de um branch `catalog/*` ou `claude/catalog-*` que só altera
-  `catalog/*.json`. A action valida, grava no Firestore e faz o merge sozinha.
-  Não há aprovação manual: os rolês chegam como `published` e aparecem no app na hora.
-- **Edição manual** (push na `master`): também é importada.
+Para gravar um lote, monte um arquivo JSON temporário (fora do repositório) e rode:
 
-Docs que já existem mantêm status, `usageCount` e `createdAt`; nada é apagado.
+```bash
+node scripts/catalog/upsert.mjs --list rio-de-janeiro      # o que já existe
+node scripts/catalog/upsert.mjs /tmp/lote.json --dry-run   # valida e simula
+node scripts/catalog/upsert.mjs /tmp/lote.json             # grava
+```
+
+```json
+{ "destinationKey": "rio-de-janeiro", "destinationName": "Rio de Janeiro", "entries": [ ... ] }
+```
+
+- Rolês novos entram como `published` e aparecem no app na hora; não há aprovação.
+- **Sem repetidos**: o script pula quem já existe no Firestore com o mesmo id
+  (`destinationKey__slug`), o mesmo título normalizado ou o mesmo `mapUrl`. Nunca
+  altera nem apaga um rolê existente.
+- Sem dependências: usa a API REST do Firestore com a config pública do app. Se as
+  regras de segurança exigirem login, defina `CATALOG_BOT_EMAIL` e
+  `CATALOG_BOT_PASSWORD` (usuário do Firebase Auth com permissão no catálogo).
 
 ## Formato de uma entrada
 
@@ -32,7 +45,7 @@ Docs que já existem mantêm status, `usageCount` e `createdAt`; nada é apagado
 
 | Campo | Obrigatório | Valores |
 | --- | --- | --- |
-| `slug` | sim | minúsculas-com-hífen, único no arquivo, **nunca muda** (é o id no Firestore) |
+| `slug` | sim | minúsculas-com-hífen, único no destino; vira o id no Firestore |
 | `title` | sim | nome curto como o grupo falaria |
 | `description` | não | 1–2 frases práticas: o que é, dica útil (melhor horário, o que levar, como chegar). Sem marketing |
 | `category` | sim | `praia`, `trilha`, `comida`, `passeio`, `noite`, `cultura`, `descanso` |
@@ -42,16 +55,11 @@ Docs que já existem mantêm status, `usageCount` e `createdAt`; nada é apagado
 | `durationMin` | não | inteiro, duração típica em minutos |
 | `bestPeriod` | não | `morning`, `afternoon`, `night`, `any` |
 | `costHint` | não | `free`, `$`, `$$`, `$$$` (por pessoa: até ~R$50, ~R$150, acima) |
-| `source` | não | `routine` (padrão) ou `curated` (cadastrado à mão por você) |
-| `sourceUrl` | sim para `routine` | a melhor página que confirma o rolê |
-| `extraSources` | sim para `routine` | até 5 URLs de **outros sites** que também confirmam. A validação exige pelo menos 2 domínios diferentes somando `sourceUrl` e `extraSources` |
+| `sourceUrl` | sim | a melhor página que confirma o rolê |
+| `extraSources` | sim | até 5 URLs de **outros sites** que também confirmam. A validação exige pelo menos 2 domínios diferentes somando `sourceUrl` e `extraSources` |
 | `batchId` | não | data do lote (`AAAA-MM-DD`) |
 
-Valide antes de abrir PR:
-
-```bash
-cd scripts/catalog && node import.mjs --dry-run
-```
+A validação exige pelo menos 2 sites diferentes por rolê (`sourceUrl` + `extraSources`).
 
 ## Regras da rotina de atualização
 
@@ -60,14 +68,15 @@ Sem limite: inclua **todos** os rolês novos encontrados que passem nas regras d
 fontes, cobertura e duplicidade. Priorize fechar as lacunas da cobertura abaixo.
 
 ### Sem repetidos (obrigatório)
-Antes de gravar, compare cada candidato com **todas** as entradas do arquivo e do lote:
+Antes de gravar, rode `--list` e compare cada candidato com **todos** os rolês já no
+Firestore e com o resto do lote:
 - mesmo lugar com nome diferente é repetido ("Arpoador" = "Pedra do Arpoador" =
   "Pôr do sol no Arpoador"); fique com a entrada que já existe;
 - um lugar dentro de outro já cadastrado só entra se for um programa diferente
   (ex.: "Feira de São Cristóvão" e "Forró na Feira de São Cristóvão" é repetido;
   "Parque Lage" e "Trilha do Corcovado saindo do Parque Lage" não é);
-- a validação recusa slug, título normalizado ou `mapUrl` iguais, mas ela não
-  pega sinônimos: a checagem de nomes diferentes para o mesmo lugar é sua.
+- o script pula slug, título normalizado ou `mapUrl` iguais, mas não pega
+  sinônimos: a checagem de nomes diferentes para o mesmo lugar é sua.
 
 ### Fontes (variedade é obrigatória)
 Pesquise em vários tipos de fonte e cruze as informações. Cada rolê novo precisa de
@@ -118,6 +127,6 @@ lugares fechados ou "em reforma", e qualquer coisa que dependa de guia ilegal ou
    Use `costHint` e `bestPeriod`, e diga na descrição quando precisa reservar ou
    comprar ingresso antes.
 4. Trilhas: diga o nível (leve, moderada, pesada) e se é melhor ir acompanhado de guia.
-5. Abre um PR por lote, de um branch `claude/catalog-rj-AAAA-MM-DD`, alterando só
-   `catalog/rio-de-janeiro.json` (qualquer outro arquivo impede a gravação automática). No corpo, liste cada rolê (título, categoria, bairro, fontes)
-   e um resumo da cobertura: quantos por categoria e por zona da cidade.
+5. Grava o lote direto no Firestore com `upsert.mjs` (sem commit, branch ou PR) e,
+   no resultado, lista cada rolê gravado (título, categoria, bairro, fontes), os
+   repetidos pulados e um resumo da cobertura: quantos por categoria e por zona.
