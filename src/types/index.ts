@@ -182,6 +182,61 @@ export const ITINERARY_ITEM_KIND_LABELS: Record<ItineraryItemKind, string> = {
   rest: 'Descanso',
 };
 
+export type ActivityCategory =
+  | 'praia'
+  | 'trilha'
+  | 'comida'
+  | 'passeio'
+  | 'noite'
+  | 'cultura'
+  | 'descanso';
+
+export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
+  praia: 'Praia',
+  trilha: 'Trilha',
+  comida: 'Comida',
+  passeio: 'Passeio',
+  noite: 'Noite',
+  cultura: 'Cultura',
+  descanso: 'Descanso',
+};
+
+export type ActivityBestPeriod = 'morning' | 'afternoon' | 'night' | 'any';
+export type ActivityCostHint = 'free' | '$' | '$$' | '$$$';
+export type ActivityCatalogSource = 'curated' | 'user' | 'routine';
+export type ActivityCatalogStatus = 'pending' | 'published' | 'rejected';
+
+/**
+ * Suggested rolê in the global `activityCatalog` collection, shared across trips
+ * to the same destination. Doc id: `${destinationKey}__${slug}`.
+ */
+export interface ActivityCatalogEntry {
+  id: string;
+  /** Normalized destination, e.g. "rio-de-janeiro". */
+  destinationKey: string;
+  destinationName: string;
+  title: string;
+  description?: string;
+  category: ActivityCategory;
+  kind: ItineraryItemKind;
+  location?: string;
+  mapUrl?: string;
+  imageUrl?: string;
+  durationMin?: number;
+  bestPeriod?: ActivityBestPeriod;
+  costHint?: ActivityCostHint;
+  source: ActivityCatalogSource;
+  status: ActivityCatalogStatus;
+  /** Where the routine found it. */
+  sourceUrl?: string;
+  batchId?: string;
+  createdByUid?: string;
+  /** Trips that added it; drives ordering. */
+  usageCount: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface ItineraryItem {
   id: string;
   dayId: string;
@@ -205,6 +260,10 @@ export interface ItineraryItem {
   endTime?: string;
   location?: string;
   mapUrl?: string;
+  /** Catalog rolê this item was copied from; edits never touch the catalog. */
+  catalogId?: string;
+  /** `submitted`: also sent to the catalog as a public suggestion. */
+  visibility?: 'private' | 'submitted';
   order: number;
   done: boolean;
   /** Legacy RSVP list — kept in sync with yes-votes. */

@@ -82,7 +82,7 @@ export default function StorytellingDayScreen() {
   function addAtTime(timeLabel: string) {
     if (!canMutate) return;
     router.push({
-      pathname: `/(app)/trip/${trip!.id}/itinerary/new-item` as never,
+      pathname: `/(app)/trip/${trip!.id}/itinerary/add` as never,
       params: {
         dayId: String(dayId),
         order: String(items.length),

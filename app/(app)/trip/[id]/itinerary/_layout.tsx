@@ -18,6 +18,9 @@ export default function ItineraryLayout() {
       <Stack.Screen name="storytelling/[dayId]" />
       <Stack.Screen name="day/[dayId]" />
       <Stack.Screen name="item/[itemId]" />
+      <Stack.Screen name="add" />
+      <Stack.Screen name="suggestion/[catalogId]" />
+      <Stack.Screen name="curation" />
       <Stack.Screen name="new-item" options={{ presentation: 'modal' }} />
       <Stack.Screen name="edit-item" options={{ presentation: 'modal' }} />
     </Stack>
