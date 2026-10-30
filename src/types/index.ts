@@ -221,7 +221,12 @@ export interface ActivityCatalogEntry {
   kind: ItineraryItemKind;
   location?: string;
   mapUrl?: string;
+  /** Freely licensed Wikimedia Commons photo; shown with `imageCredit`. */
   imageUrl?: string;
+  /** "Author · License", required by the photo's license. */
+  imageCredit?: string;
+  /** Commons file page of the photo. */
+  imageSourceUrl?: string;
   durationMin?: number;
   bestPeriod?: ActivityBestPeriod;
   costHint?: ActivityCostHint;
@@ -252,6 +257,9 @@ export interface ItineraryItem {
   title: string;
   description?: string;
   imageUrl?: string;
+  /** Credit of a photo copied from a catalog rolê ("Author · License"). */
+  imageCredit?: string;
+  imageSourceUrl?: string;
   /** Defaults to activity when missing (legacy items). */
   kind?: ItineraryItemKind;
   /**

@@ -46,6 +46,8 @@ export default function NewItineraryItem() {
           location: entry.location,
           mapUrl: entry.mapUrl,
           imageUrl: entry.imageUrl,
+          imageCredit: entry.imageCredit,
+          imageSourceUrl: entry.imageSourceUrl,
           ...suggestedTimes(entry),
         });
       }
@@ -68,6 +70,8 @@ export default function NewItineraryItem() {
           location: item.location,
           mapUrl: item.mapUrl,
           imageUrl: item.imageUrl,
+          imageCredit: item.imageCredit,
+          imageSourceUrl: item.imageSourceUrl,
         });
       }
       setReady(true);

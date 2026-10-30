@@ -3,13 +3,20 @@
 //   node upsert.mjs <batch.json>             validate, skip duplicates, create the rest
 //   node upsert.mjs <batch.json> --dry-run   validate and show what would be created
 //   node upsert.mjs --list <destinationKey>  print the rolês already in Firestore
+//   node upsert.mjs --fill-images <images.json> <destinationKey>
+//       images.json: [{ slug, imageUrl, imageCredit, imageSourceUrl }] (see find-image.mjs);
+//       adds a photo to existing rolês that have none (never replaces one)
 //
 // batch.json: { "destinationKey": "rio-de-janeiro", "destinationName": "Rio de Janeiro",
 //               "entries": [ ...see catalog/README.md... ] }
 //
 // Duplicates are never written: an entry is skipped when Firestore already has the same
 // doc id (destinationKey__slug), the same normalized title or the same mapUrl for that
-// destination. Existing docs are never changed or deleted. New docs land `published`.
+// destination. Existing docs are never changed or deleted (except --fill-images adding
+// a missing photo). New docs land `published`.
+//
+// Photos must be freely licensed Wikimedia Commons files with their credit
+// (imageCredit "Author · License"); find them with find-image.mjs.
 //
 // Uses the Firestore REST API with the app's public web config, so it needs no
 // dependencies. Set CATALOG_BOT_EMAIL / CATALOG_BOT_PASSWORD to sign in as a Firebase
@@ -38,6 +45,8 @@ const CONTENT_FIELDS = [
   'location',
   'mapUrl',
   'imageUrl',
+  'imageCredit',
+  'imageSourceUrl',
   'durationMin',
   'bestPeriod',
   'costHint',
@@ -48,6 +57,17 @@ const CONTENT_FIELDS = [
   'batchId',
 ];
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const WIKIMEDIA_IMAGE = /^https:\/\/(upload|thumb)\.wikimedia\.org\//;
+const COMMONS_PAGE = /^https:\/\/commons\.wikimedia\.org\//;
+
+function validateImage(at, entry, fail) {
+  if (entry.imageUrl === undefined) return;
+  if (!WIKIMEDIA_IMAGE.test(entry.imageUrl)) fail(`${at}: imageUrl must be a Wikimedia Commons file (use find-image.mjs)`);
+  if (!entry.imageCredit?.trim()) fail(`${at}: imageCredit is required with imageUrl`);
+  if (entry.imageSourceUrl !== undefined && !COMMONS_PAGE.test(entry.imageSourceUrl)) {
+    fail(`${at}: imageSourceUrl must be the Commons file page`);
+  }
+}
 const FILLER_WORDS = new Set(['o', 'a', 'os', 'as', 'do', 'da', 'dos', 'das', 'de', 'e', 'no', 'na', 'em', 'the', 'of']);
 
 /** "Praia do Arpoador" and "praia  arpoador" compare equal. */
@@ -101,7 +121,8 @@ export function validateBatch(batch) {
     if (entry.durationMin !== undefined && !(Number.isInteger(entry.durationMin) && entry.durationMin > 0)) {
       fail(`${at}: durationMin must be a positive integer`);
     }
-    for (const field of ['mapUrl', 'imageUrl', 'sourceUrl']) {
+    validateImage(at, entry, fail);
+    for (const field of ['mapUrl', 'sourceUrl']) {
       if (entry[field] !== undefined && !HTTPS.test(entry[field])) fail(`${at}: ${field} must be an https URL`);
     }
     if (entry.eventEnd !== undefined && entry.eventStart === undefined) fail(`${at}: eventEnd needs eventStart`);
@@ -190,6 +211,63 @@ async function listExisting(destinationKey, headers) {
     );
 }
 
+async function getDoc(id, headers) {
+  const res = await fetch(`${BASE}/${COLLECTION}/${encodeURIComponent(id)}?key=${WEB_API_KEY}`, { headers });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Read ${id} failed: ${res.status} ${await res.text()}`);
+  const doc = await res.json();
+  return Object.fromEntries(Object.entries(doc.fields ?? {}).map(([key, value]) => [key, fromValue(value)]));
+}
+
+/** Sets only the given fields of a doc that must already exist. */
+async function patchDoc(id, data, headers) {
+  const mask = Object.keys(data)
+    .map((field) => `updateMask.fieldPaths=${field}`)
+    .join('&');
+  const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, toValue(value)]));
+  const res = await fetch(
+    `${BASE}/${COLLECTION}/${encodeURIComponent(id)}?${mask}&currentDocument.exists=true&key=${WEB_API_KEY}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...headers },
+      body: JSON.stringify({ fields }),
+    }
+  );
+  if (!res.ok) throw new Error(`Update ${id} failed: ${res.status} ${await res.text()}`);
+}
+
+/** Adds a photo to existing rolês that have none; never replaces a photo. */
+async function fillImages(file, destinationKey, headers) {
+  const images = JSON.parse(readFileSync(file, 'utf8'));
+  let added = 0;
+  for (const image of images) {
+    validateImage(image.slug, image, (message) => {
+      throw new Error(message);
+    });
+    const id = `${destinationKey}__${image.slug}`;
+    const doc = await getDoc(id, headers);
+    if (!doc) {
+      console.log(`= sem rolê: ${image.slug}`);
+    } else if (doc.imageUrl) {
+      console.log(`= já tem foto: ${doc.title}`);
+    } else {
+      await patchDoc(
+        id,
+        {
+          imageUrl: image.imageUrl,
+          imageCredit: image.imageCredit,
+          ...(image.imageSourceUrl ? { imageSourceUrl: image.imageSourceUrl } : {}),
+          updatedAt: Date.now(),
+        },
+        headers
+      );
+      console.log(`+ foto: ${doc.title}`);
+      added += 1;
+    }
+  }
+  console.log(`${added} fotos adicionadas.`);
+}
+
 async function createDoc(id, data, headers) {
   const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, toValue(value)]));
   const res = await fetch(
@@ -210,6 +288,12 @@ async function createDoc(id, data, headers) {
 async function main() {
   const args = process.argv.slice(2);
   const headers = await authHeaders();
+
+  if (args[0] === '--fill-images') {
+    if (!args[1] || !args[2]) throw new Error('Usage: node upsert.mjs --fill-images <images.json> <destinationKey>');
+    await fillImages(args[1], args[2], headers);
+    return;
+  }
 
   if (args[0] === '--list') {
     const existing = await listExisting(args[1] ?? 'rio-de-janeiro', headers);

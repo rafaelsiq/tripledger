@@ -30,7 +30,7 @@ import { colors, fonts, radii, spacing } from '@/src/theme';
 
 /** Fields a new item starts with: copied from a catalog rolê or one of the user's items. */
 export type ItineraryItemPrefill = Partial<
-  Pick<ItineraryItem, 'title' | 'description' | 'kind' | 'time' | 'endTime' | 'location' | 'mapUrl' | 'imageUrl'>
+  Pick<ItineraryItem, 'title' | 'description' | 'kind' | 'time' | 'endTime' | 'location' | 'mapUrl' | 'imageUrl' | 'imageCredit' | 'imageSourceUrl'>
 >;
 
 type Props = {
@@ -204,6 +204,8 @@ export function ItineraryItemForm({
           mapUrl,
           imageUri,
           imageUrl: !clearImage ? existingImageUrl : undefined,
+          imageCredit: prefill?.imageCredit,
+          imageSourceUrl: prefill?.imageSourceUrl,
           order,
           createdByUid: user.uid,
           catalogId: fromCatalog ? catalogEntry!.id : undefined,
