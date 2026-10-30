@@ -7,6 +7,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { useToast } from '@/src/hooks/useToast';
 import {
   catalogSourceLabel,
+  categoryOf,
   setCatalogStatus,
   subscribeCatalogByStatus,
   subscribeIsCatalogCurator,
@@ -99,7 +100,7 @@ export default function CurationScreen() {
                 <View style={styles.badges}>
                   <Badge text={origin!} tone={entry.source === 'user' ? 'info' : entry.source === 'routine' ? 'warn' : 'accent'} />
                   <Badge
-                    text={`${entry.destinationName} · ${ACTIVITY_CATEGORY_LABELS[entry.category]}`}
+                    text={`${entry.destinationName} · ${ACTIVITY_CATEGORY_LABELS[categoryOf(entry)]}`}
                     tone="neutral"
                   />
                 </View>

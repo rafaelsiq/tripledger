@@ -4,13 +4,18 @@ import type { ActivityCategory } from '@/src/types';
 import { colors, fonts, radii } from '@/src/theme';
 
 const TINTS: Record<ActivityCategory, { bg: string; fg: string }> = {
-  praia: { bg: colors.dangerSoft, fg: colors.danger },
+  praia: { bg: colors.infoSoft, fg: colors.info },
   trilha: { bg: colors.accentSoft, fg: colors.accent },
-  comida: { bg: colors.warnSoft, fg: colors.warn },
+  mirante: { bg: colors.warnSoft, fg: colors.warn },
+  parque: { bg: colors.successSoft, fg: colors.success },
   passeio: { bg: colors.infoSoft, fg: colors.info },
-  noite: { bg: colors.surfaceMuted, fg: colors.inkLabel },
-  cultura: { bg: colors.accentSoft, fg: colors.accentDark },
-  descanso: { bg: colors.financeSoft, fg: colors.inkSoft },
+  museu: { bg: colors.surfaceMuted, fg: colors.inkLabel },
+  historico: { bg: colors.financeSoft, fg: colors.inkSoft },
+  bar: { bg: colors.warnSoft, fg: colors.warn },
+  gastronomia: { bg: colors.dangerSoft, fg: colors.danger },
+  musica: { bg: colors.dangerSoft, fg: colors.danger },
+  feira: { bg: colors.warnSoft, fg: colors.warn },
+  esporte: { bg: colors.accentSoft, fg: colors.accentDark },
 };
 
 /** Photo of a rolê, or its first letter on the category's tint. */

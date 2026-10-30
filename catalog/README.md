@@ -48,7 +48,7 @@ node scripts/catalog/upsert.mjs /tmp/lote.json             # grava
 | `slug` | sim | minúsculas-com-hífen, único no destino; vira o id no Firestore |
 | `title` | sim | nome curto como o grupo falaria |
 | `description` | não | 1–2 frases práticas: o que é, dica útil (melhor horário, o que levar, como chegar). Sem marketing |
-| `category` | sim | `praia`, `trilha`, `comida`, `passeio`, `noite`, `cultura`, `descanso` |
+| `category` | sim | o tipo do rolê; veja a tabela **Categorias** abaixo |
 | `kind` | não | `activity` (padrão) ou `rest` |
 | `location` | não | bairro (e endereço quando ajuda) |
 | `mapUrl` | não | URL `https://` |
@@ -62,6 +62,29 @@ node scripts/catalog/upsert.mjs /tmp/lote.json             # grava
 | `batchId` | não | data do lote (`AAAA-MM-DD`) |
 
 A validação exige pelo menos 2 sites diferentes por rolê (`sourceUrl` + `extraSources`).
+
+## Categorias
+
+Escolha a que descreve **o que o grupo vai fazer lá**. Na dúvida entre duas, use a
+mais específica.
+
+| `category` | No app | Use para | Exemplos |
+| --- | --- | --- | --- |
+| `praia` | Praias | praias e prainhas | Ipanema, Grumari, Joatinga |
+| `trilha` | Trilhas | trilhas e caminhadas na natureza | Dois Irmãos, Pedra do Telégrafo, Pista Cláudio Coutinho |
+| `mirante` | Mirantes | vista e pôr do sol (sem trilha longa) | Vista Chinesa, pôr do sol no Arpoador |
+| `parque` | Parques e jardins | parques, jardins, lagoas para pedalar/descansar | Jardim Botânico, Parque Lage, Lagoa |
+| `passeio` | Passeios | atrações e passeios guiados ou de transporte | Cristo, bondinhos, barco, Paquetá, AquaRio |
+| `museu` | Museus | museus, centros culturais, exposições | Museu do Amanhã, MAR, CCBB |
+| `historico` | História e arte | igrejas, prédios e marcos históricos, arte de rua | Mosteiro de São Bento, Selarón, Theatro Municipal |
+| `bar` | Bares e botecos | bares, botecos, mureta com petisco | Jobi, Bar do Mineiro, Mureta da Urca |
+| `gastronomia` | Restaurantes e cafés | restaurantes, cafés, confeitarias | Confeitaria Colombo |
+| `musica` | Samba e música | rodas de samba, casas de show, shows e vida noturna | Pedra do Sal, Carioca da Gema, Noite na Lapa |
+| `feira` | Feiras e mercados | feiras, mercados, compras populares | Feira de São Cristóvão, Mercadão de Madureira |
+| `esporte` | Esporte e aventura | estádios, jogos, voo livre, esportes | Maracanã, asa-delta |
+
+O app também tem os filtros **Eventos do dia** (rolês com `eventStart`) e **Grátis**
+(`costHint: free`), então preencha esses campos com cuidado.
 
 ## Regras da rotina de atualização
 
@@ -116,9 +139,8 @@ Cubra a cidade inteira, não só os cartões-postais:
 - **Zona Oeste**: Barra, Recreio, Prainha, Grumari, Joá, Guaratiba, Vargem Grande, Pedra de Guaratiba.
 - **Ilhas**: Paquetá.
 
-Equilibre as categorias: em um lote grande, pelo menos 4 de cada uma entre `praia`,
-`trilha`, `comida`, `passeio`, `noite` e `cultura`, e algumas de `descanso`
-(mirantes tranquilos, parques, programas leves para o fim do dia).
+Equilibre as categorias: cubra todos os tipos da tabela **Categorias**, priorizando os
+que têm menos rolês no `--list`.
 
 Equilibre também o perfil:
 - programas grátis e baratos tanto quanto pagos;

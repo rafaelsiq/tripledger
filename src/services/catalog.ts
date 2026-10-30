@@ -19,6 +19,7 @@ import type {
   ActivityCostHint,
   ItineraryItem,
 } from '@/src/types';
+import { ACTIVITY_CATEGORY_LABELS, LEGACY_ACTIVITY_CATEGORIES } from '@/src/types';
 
 const COLLECTION = 'activityCatalog';
 
@@ -35,6 +36,13 @@ export const COST_HINT_LABELS: Record<ActivityCostHint, string> = {
   $$: '$$',
   $$$: '$$$',
 };
+
+/** The rolê's category, mapping the pre-split ones (comida, noite…) to the new set. */
+export function categoryOf(entry: Pick<ActivityCatalogEntry, 'category'>): ActivityCategory {
+  const raw = entry.category as string;
+  if (raw in ACTIVITY_CATEGORY_LABELS) return raw as ActivityCategory;
+  return LEGACY_ACTIVITY_CATEGORIES[raw] ?? 'passeio';
+}
 
 /** Curadoria = you or the update routine; Comunidade = sent by users. */
 export function catalogSourceLabel(entry: Pick<ActivityCatalogEntry, 'source'>) {
@@ -186,7 +194,7 @@ export async function submitCatalogSuggestion(input: {
     destinationName: input.destination.trim(),
     title: input.item.title.trim(),
     description: input.item.description?.trim() || undefined,
-    category: input.category ?? (input.item.kind === 'rest' ? 'descanso' : 'passeio'),
+    category: input.category ?? (input.item.kind === 'rest' ? 'parque' : 'passeio'),
     kind: input.item.kind === 'rest' ? 'rest' : 'activity',
     location: input.item.location?.trim() || undefined,
     mapUrl: input.item.mapUrl?.trim() || undefined,

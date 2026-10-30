@@ -6,6 +6,8 @@
 //   node upsert.mjs --fill-images <images.json> <destinationKey>
 //       images.json: [{ slug, imageUrl, imageCredit, imageSourceUrl }] (see find-image.mjs);
 //       adds a photo to existing rolês that have none (never replaces one)
+//   node upsert.mjs --recategorize <categories.json> <destinationKey>
+//       categories.json: { "<slug>": "<category>" }; changes only the category
 //
 // batch.json: { "destinationKey": "rio-de-janeiro", "destinationName": "Rio de Janeiro",
 //               "entries": [ ...see catalog/README.md... ] }
@@ -30,7 +32,21 @@ const WEB_API_KEY = 'AIzaSyD754gAr8aOjZfbMlWcPbVIUcoxcTb5ebw';
 const COLLECTION = 'activityCatalog';
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-const CATEGORIES = ['praia', 'trilha', 'comida', 'passeio', 'noite', 'cultura', 'descanso'];
+// Same ids as ActivityCategory in src/types/index.ts.
+const CATEGORIES = [
+  'praia',
+  'trilha',
+  'mirante',
+  'parque',
+  'passeio',
+  'museu',
+  'historico',
+  'bar',
+  'gastronomia',
+  'musica',
+  'feira',
+  'esporte',
+];
 const KINDS = ['activity', 'rest'];
 const PERIODS = ['morning', 'afternoon', 'night', 'any'];
 const COSTS = ['free', '$', '$$', '$$$'];
@@ -268,6 +284,27 @@ async function fillImages(file, destinationKey, headers) {
   console.log(`${added} fotos adicionadas.`);
 }
 
+/** Moves existing rolês to another category; nothing else changes. */
+async function recategorize(file, destinationKey, headers) {
+  const map = JSON.parse(readFileSync(file, 'utf8'));
+  let changed = 0;
+  for (const [slug, category] of Object.entries(map)) {
+    if (!CATEGORIES.includes(category)) throw new Error(`${slug}: category must be one of ${CATEGORIES.join(', ')}`);
+    const id = `${destinationKey}__${slug}`;
+    const doc = await getDoc(id, headers);
+    if (!doc) {
+      console.log(`= sem rolê: ${slug}`);
+    } else if (doc.category === category) {
+      console.log(`= já está em ${category}: ${doc.title}`);
+    } else {
+      await patchDoc(id, { category, updatedAt: Date.now() }, headers);
+      console.log(`~ ${doc.title}: ${doc.category} -> ${category}`);
+      changed += 1;
+    }
+  }
+  console.log(`${changed} rolês recategorizados.`);
+}
+
 async function createDoc(id, data, headers) {
   const fields = Object.fromEntries(Object.entries(data).map(([key, value]) => [key, toValue(value)]));
   const res = await fetch(
@@ -292,6 +329,12 @@ async function main() {
   if (args[0] === '--fill-images') {
     if (!args[1] || !args[2]) throw new Error('Usage: node upsert.mjs --fill-images <images.json> <destinationKey>');
     await fillImages(args[1], args[2], headers);
+    return;
+  }
+
+  if (args[0] === '--recategorize') {
+    if (!args[1] || !args[2]) throw new Error('Usage: node upsert.mjs --recategorize <categories.json> <destinationKey>');
+    await recategorize(args[1], args[2], headers);
     return;
   }
 

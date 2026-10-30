@@ -182,23 +182,43 @@ export const ITINERARY_ITEM_KIND_LABELS: Record<ItineraryItemKind, string> = {
   rest: 'Descanso',
 };
 
+/** Type of rolê, the main filter in "Adicionar ao dia". */
 export type ActivityCategory =
   | 'praia'
   | 'trilha'
-  | 'comida'
+  | 'mirante'
+  | 'parque'
   | 'passeio'
-  | 'noite'
-  | 'cultura'
-  | 'descanso';
+  | 'museu'
+  | 'historico'
+  | 'bar'
+  | 'gastronomia'
+  | 'musica'
+  | 'feira'
+  | 'esporte';
 
+/** Display order of the filters follows this object. */
 export const ACTIVITY_CATEGORY_LABELS: Record<ActivityCategory, string> = {
-  praia: 'Praia',
-  trilha: 'Trilha',
-  comida: 'Comida',
-  passeio: 'Passeio',
-  noite: 'Noite',
-  cultura: 'Cultura',
-  descanso: 'Descanso',
+  praia: 'Praias',
+  trilha: 'Trilhas',
+  mirante: 'Mirantes',
+  parque: 'Parques e jardins',
+  passeio: 'Passeios',
+  museu: 'Museus',
+  historico: 'História e arte',
+  bar: 'Bares e botecos',
+  gastronomia: 'Restaurantes e cafés',
+  musica: 'Samba e música',
+  feira: 'Feiras e mercados',
+  esporte: 'Esporte e aventura',
+};
+
+/** Categories used before the split, still possible on old community suggestions. */
+export const LEGACY_ACTIVITY_CATEGORIES: Record<string, ActivityCategory> = {
+  comida: 'gastronomia',
+  noite: 'musica',
+  cultura: 'museu',
+  descanso: 'parque',
 };
 
 export type ActivityBestPeriod = 'morning' | 'afternoon' | 'night' | 'any';
