@@ -12,6 +12,7 @@ import {
   BEST_PERIOD_LABELS,
   COST_HINT_LABELS,
   catalogSourceLabel,
+  categoryOf,
   formatDuration,
   formatEventDates,
   subscribeCatalogEntry,
@@ -78,7 +79,7 @@ export default function SuggestionDetailScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <CatalogRoleTile
           title={role.title}
-          category={role.category}
+          category={categoryOf(role)}
           imageUrl={role.imageUrl}
           size={isWide ? 160 : 120}
           style={[styles.hero, !isWide && styles.heroMobile]}
@@ -90,7 +91,7 @@ export default function SuggestionDetailScreen() {
         <View style={styles.header}>
           <View style={styles.badges}>
             <Badge text={catalogSourceLabel(role)} tone={role.source === 'user' ? 'info' : 'accent'} />
-            <Badge text={ACTIVITY_CATEGORY_LABELS[role.category]} tone="neutral" />
+            <Badge text={ACTIVITY_CATEGORY_LABELS[categoryOf(role)]} tone="neutral" />
           </View>
           <Text style={[styles.title, !isWide && styles.titleMobile]}>{role.title}</Text>
           {role.description ? <Body muted>{role.description}</Body> : null}

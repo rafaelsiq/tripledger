@@ -12,6 +12,7 @@ import { destinationKey, slugify } from '@/src/lib/destinations';
 import {
   BEST_PERIOD_LABELS,
   catalogSourceLabel,
+  categoryOf,
   formatDuration,
   formatEventDates,
   isAvailableOn,
@@ -23,21 +24,23 @@ import type { ActivityCatalogEntry, ActivityCategory, ItineraryItem } from '@/sr
 import { ACTIVITY_CATEGORY_LABELS } from '@/src/types';
 import { colors, fonts, radii, spacing } from '@/src/theme';
 
-type Filter = ActivityCategory | 'all';
+/** A rolê type, or one of the shortcuts: everything, the day's events, free rolês. */
+type Filter = ActivityCategory | 'all' | 'events' | 'free';
 
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  ...(Object.keys(ACTIVITY_CATEGORY_LABELS) as ActivityCategory[]).map((id) => ({
-    id,
-    label: ACTIVITY_CATEGORY_LABELS[id],
-  })),
-];
+const CATEGORY_ORDER = Object.keys(ACTIVITY_CATEGORY_LABELS) as ActivityCategory[];
+
+function matchesFilter(entry: ActivityCatalogEntry, filter: Filter) {
+  if (filter === 'all') return true;
+  if (filter === 'events') return !!entry.eventStart;
+  if (filter === 'free') return entry.costHint === 'free';
+  return categoryOf(entry) === filter;
+}
 
 const MAX_OWN = 5;
 
 function roleMeta(entry: ActivityCatalogEntry) {
   return [
-    ACTIVITY_CATEGORY_LABELS[entry.category],
+    ACTIVITY_CATEGORY_LABELS[categoryOf(entry)],
     formatDuration(entry.durationMin),
     entry.bestPeriod && entry.bestPeriod !== 'any'
       ? `melhor ${BEST_PERIOD_LABELS[entry.bestPeriod].toLowerCase()}`
@@ -81,18 +84,38 @@ export default function AddToDayScreen() {
     return subscribeIsCatalogCurator(user.uid, setIsCurator);
   }, [user]);
 
+  // Rolês that can happen on this day (fixed ones plus events in their date range).
+  const available = useMemo(
+    () => (catalog ?? []).filter((entry) => isAvailableOn(entry, day?.date)),
+    [catalog, day?.date]
+  );
+
+  // Only filters that would show something, each with its count.
+  const filters = useMemo(() => {
+    const count = (filter: Filter) => available.filter((entry) => matchesFilter(entry, filter)).length;
+    const list: { id: Filter; label: string; count: number }[] = [
+      { id: 'all', label: 'Todos', count: available.length },
+      { id: 'events', label: 'Eventos do dia', count: count('events') },
+      { id: 'free', label: 'Grátis', count: count('free') },
+      ...CATEGORY_ORDER.map((id) => ({ id, label: ACTIVITY_CATEGORY_LABELS[id], count: count(id) })),
+    ];
+    return list.filter((item) => item.id === 'all' || item.count > 0);
+  }, [available]);
+
+  // A filter that no longer matches anything (e.g. another day without events) falls back to Todos.
+  const activeFilter: Filter = filters.some((item) => item.id === filter) ? filter : 'all';
+
   const shown = useMemo(() => {
     const needle = slugify(search);
-    return (catalog ?? [])
+    return available
       .filter(
         (entry) =>
-          isAvailableOn(entry, day?.date) &&
-          (filter === 'all' || entry.category === filter) &&
+          matchesFilter(entry, activeFilter) &&
           (!needle || slugify(`${entry.title} ${entry.location ?? ''}`).includes(needle))
       )
       // Events happening that day first; otherwise keep most-used order.
       .sort((a, b) => Number(!!b.eventStart) - Number(!!a.eventStart));
-  }, [catalog, filter, search, day?.date]);
+  }, [available, activeFilter, search]);
 
   // The user's own rolês in this trip that never came from the catalog, to repeat on another day.
   const ownRoles = useMemo(() => {
@@ -171,8 +194,8 @@ export default function AddToDayScreen() {
               />
             </View>
             <HorizontalScroller contentContainerStyle={styles.chips}>
-              {FILTERS.map((f) => {
-                const on = f.id === filter;
+              {filters.map((f) => {
+                const on = f.id === activeFilter;
                 return (
                   <Pressable
                     key={f.id}
@@ -181,7 +204,9 @@ export default function AddToDayScreen() {
                     accessibilityState={{ selected: on }}
                     style={[styles.chip, on && styles.chipOn]}
                   >
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{f.label}</Text>
+                    <Text style={[styles.chipText, on && styles.chipTextOn]}>
+                      {f.label} <Text style={[styles.chipCount, on && styles.chipTextOn]}>{f.count}</Text>
+                    </Text>
                   </Pressable>
                 );
               })}
@@ -231,7 +256,7 @@ export default function AddToDayScreen() {
                     accessibilityLabel={`${entry.title}, ${roleMeta(entry)}`}
                     style={({ pressed }) => [styles.rowMain, pressed && { opacity: 0.85 }]}
                   >
-                    <CatalogRoleTile title={entry.title} category={entry.category} imageUrl={entry.imageUrl} />
+                    <CatalogRoleTile title={entry.title} category={categoryOf(entry)} imageUrl={entry.imageUrl} />
                     <View style={styles.rowText}>
                       <Text style={styles.rowTitle} numberOfLines={1}>
                         {entry.title}
@@ -359,6 +384,7 @@ const styles = StyleSheet.create({
   chipOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   chipText: { fontFamily: fonts.uiSemi, fontSize: 13, color: colors.inkLabel },
   chipTextOn: { fontFamily: fonts.uiBold, color: colors.white },
+  chipCount: { fontFamily: fonts.ui, fontSize: 12, color: colors.inkMuted },
   scratch: {
     flexDirection: 'row',
     alignItems: 'center',
