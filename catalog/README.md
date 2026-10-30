@@ -1,8 +1,14 @@
 # Catálogo de rolês sugeridos
 
-Um arquivo por destino (`rio-de-janeiro.json`). Ao fazer merge na `master`, a action
-`.github/workflows/catalog.yml` importa tudo para a coleção `activityCatalog` do
-Firestore. O merge do PR é a revisão: entradas novas chegam como `published`.
+Um arquivo por destino (`rio-de-janeiro.json`), gravado na coleção `activityCatalog`
+do Firestore pela action `.github/workflows/catalog.yml`:
+
+- **Rotina**: abre um PR de um branch `catalog/*` ou `claude/catalog-*` que só altera
+  `catalog/*.json`. A action valida, grava no Firestore e faz o merge sozinha.
+  Não há aprovação manual: os rolês chegam como `published` e aparecem no app na hora.
+- **Edição manual** (push na `master`): também é importada.
+
+Docs que já existem mantêm status, `usageCount` e `createdAt`; nada é apagado.
 
 ## Formato de uma entrada
 
@@ -50,8 +56,18 @@ cd scripts/catalog && node import.mjs --dry-run
 ## Regras da rotina de atualização
 
 ### Tamanho do lote
-- Arquivo vazio ou com menos de 40 entradas: até **40** entradas novas no lote.
-- Depois disso: até **15** por lote, priorizando o que falta na cobertura abaixo.
+Sem limite: inclua **todos** os rolês novos encontrados que passem nas regras de
+fontes, cobertura e duplicidade. Priorize fechar as lacunas da cobertura abaixo.
+
+### Sem repetidos (obrigatório)
+Antes de gravar, compare cada candidato com **todas** as entradas do arquivo e do lote:
+- mesmo lugar com nome diferente é repetido ("Arpoador" = "Pedra do Arpoador" =
+  "Pôr do sol no Arpoador"); fique com a entrada que já existe;
+- um lugar dentro de outro já cadastrado só entra se for um programa diferente
+  (ex.: "Feira de São Cristóvão" e "Forró na Feira de São Cristóvão" é repetido;
+  "Parque Lage" e "Trilha do Corcovado saindo do Parque Lage" não é);
+- a validação recusa slug, título normalizado ou `mapUrl` iguais, mas ela não
+  pega sinônimos: a checagem de nomes diferentes para o mesmo lugar é sua.
 
 ### Fontes (variedade é obrigatória)
 Pesquise em vários tipos de fonte e cruze as informações. Cada rolê novo precisa de
@@ -102,5 +118,6 @@ lugares fechados ou "em reforma", e qualquer coisa que dependa de guia ilegal ou
    Use `costHint` e `bestPeriod`, e diga na descrição quando precisa reservar ou
    comprar ingresso antes.
 4. Trilhas: diga o nível (leve, moderada, pesada) e se é melhor ir acompanhado de guia.
-5. Abre um PR por lote. No corpo, liste cada rolê (título, categoria, bairro, fontes)
+5. Abre um PR por lote, de um branch `claude/catalog-rj-AAAA-MM-DD`, alterando só
+   `catalog/rio-de-janeiro.json` (qualquer outro arquivo impede a gravação automática). No corpo, liste cada rolê (título, categoria, bairro, fontes)
    e um resumo da cobertura: quantos por categoria e por zona da cidade.
