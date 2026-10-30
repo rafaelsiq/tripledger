@@ -6,8 +6,8 @@
 // Credentials: FIREBASE_SERVICE_ACCOUNT (the service account JSON as a string, used
 // by CI) or GOOGLE_APPLICATION_CREDENTIALS pointing at the key file (local runs).
 //
-// Merging a catalog PR is the review step, so new entries arrive `published`.
-// Existing docs keep their status, usageCount and createdAt: a rolê you rejected or
+// New entries arrive `published` (no manual approval). Duplicates are rejected by
+// validation: same slug, same normalized title or same map link. Existing docs keep their status, usageCount and createdAt: a rolê you rejected or
 // edited in Firestore is never reset by a later import, and removing an entry from
 // the file never deletes it.
 
@@ -50,6 +50,19 @@ function domainOf(url) {
   return new URL(url).hostname.replace(/^www\./, '');
 }
 
+const FILLER_WORDS = new Set(['o', 'a', 'os', 'as', 'do', 'da', 'dos', 'das', 'de', 'e', 'no', 'na', 'em', 'the', 'of']);
+
+/** "Praia do Arpoador" and "praia  arpoador" compare equal. */
+function titleKey(title) {
+  return title
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((word) => word && !FILLER_WORDS.has(word))
+    .join(' ');
+}
+
 const dryRun = process.argv.includes('--dry-run');
 
 function fail(file, message) {
@@ -62,12 +75,21 @@ function validate(file, catalog) {
   if (!Array.isArray(catalog.entries)) fail(file, 'entries must be an array');
 
   const seen = new Set();
+  const titles = new Map();
+  const maps = new Map();
   catalog.entries.forEach((entry, index) => {
     const at = `entries[${index}] (${entry.slug ?? 'no slug'})`;
     if (!SLUG.test(entry.slug ?? '')) fail(file, `${at}: slug must be lowercase-with-dashes`);
     if (seen.has(entry.slug)) fail(file, `${at}: duplicate slug`);
     seen.add(entry.slug);
     if (!entry.title?.trim()) fail(file, `${at}: title is required`);
+    const key = titleKey(entry.title);
+    if (titles.has(key)) fail(file, `${at}: same place as "${titles.get(key)}" (duplicate title)`);
+    titles.set(key, entry.slug);
+    if (entry.mapUrl) {
+      if (maps.has(entry.mapUrl)) fail(file, `${at}: same mapUrl as "${maps.get(entry.mapUrl)}"`);
+      maps.set(entry.mapUrl, entry.slug);
+    }
     if (!CATEGORIES.includes(entry.category)) fail(file, `${at}: category must be one of ${CATEGORIES.join(', ')}`);
     if (entry.kind !== undefined && !KINDS.includes(entry.kind)) fail(file, `${at}: kind must be activity or rest`);
     if (entry.bestPeriod !== undefined && !PERIODS.includes(entry.bestPeriod)) fail(file, `${at}: bad bestPeriod`);
