@@ -1,0 +1,53 @@
+name: Catálogo de rolês
+
+# PRs that touch the catalog are validated; merging into master imports into Firestore.
+on:
+  pull_request:
+    paths:
+      - 'catalog/**'
+      - 'scripts/catalog/**'
+  push:
+    branches: [master]
+    paths:
+      - 'catalog/**'
+      - 'scripts/catalog/**'
+  workflow_dispatch:
+
+concurrency:
+  group: catalog-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validar catálogo
+        working-directory: scripts/catalog
+        run: node import.mjs --dry-run
+
+  import:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Instalar firebase-admin
+        working-directory: scripts/catalog
+        run: npm install --no-audit --no-fund
+      - name: Importar no Firestore
+        working-directory: scripts/catalog
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::Secret FIREBASE_SERVICE_ACCOUNT não configurado no repositório."
+            exit 1
+          fi
+          node import.mjs
