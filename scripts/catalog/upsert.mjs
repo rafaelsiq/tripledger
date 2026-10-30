@@ -43,8 +43,11 @@ const CONTENT_FIELDS = [
   'costHint',
   'sourceUrl',
   'extraSources',
+  'eventStart',
+  'eventEnd',
   'batchId',
 ];
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const FILLER_WORDS = new Set(['o', 'a', 'os', 'as', 'do', 'da', 'dos', 'das', 'de', 'e', 'no', 'na', 'em', 'the', 'of']);
 
 /** "Praia do Arpoador" and "praia  arpoador" compare equal. */
@@ -56,6 +59,11 @@ export function titleKey(title) {
     .split(/[^a-z0-9]+/)
     .filter((word) => word && !FILLER_WORDS.has(word))
     .join(' ');
+}
+
+/** Dedupe key: the normalized title, plus the start date for dated events. */
+function entryKey(entry) {
+  return entry.eventStart ? `${titleKey(entry.title)} @${entry.eventStart}` : titleKey(entry.title);
 }
 
 function domainOf(url) {
@@ -79,7 +87,7 @@ export function validateBatch(batch) {
     if (slugs.has(entry.slug)) fail(`${at}: duplicate slug in batch`);
     slugs.add(entry.slug);
     if (!entry.title?.trim()) fail(`${at}: title is required`);
-    const key = titleKey(entry.title);
+    const key = entryKey(entry);
     if (titles.has(key)) fail(`${at}: same place as "${titles.get(key)}" in batch`);
     titles.set(key, entry.slug);
     if (entry.mapUrl) {
@@ -95,6 +103,15 @@ export function validateBatch(batch) {
     }
     for (const field of ['mapUrl', 'imageUrl', 'sourceUrl']) {
       if (entry[field] !== undefined && !HTTPS.test(entry[field])) fail(`${at}: ${field} must be an https URL`);
+    }
+    if (entry.eventEnd !== undefined && entry.eventStart === undefined) fail(`${at}: eventEnd needs eventStart`);
+    for (const field of ['eventStart', 'eventEnd']) {
+      if (entry[field] !== undefined && (!DATE.test(entry[field]) || Number.isNaN(Date.parse(entry[field])))) {
+        fail(`${at}: ${field} must be a YYYY-MM-DD date`);
+      }
+    }
+    if (entry.eventStart && entry.eventEnd && entry.eventEnd < entry.eventStart) {
+      fail(`${at}: eventEnd is before eventStart`);
     }
     const extra = entry.extraSources ?? [];
     if (!Array.isArray(extra) || extra.length > MAX_EXTRA_SOURCES || extra.some((url) => !HTTPS.test(url))) {
@@ -197,7 +214,8 @@ async function main() {
   if (args[0] === '--list') {
     const existing = await listExisting(args[1] ?? 'rio-de-janeiro', headers);
     for (const entry of existing.sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'))) {
-      console.log([entry.title, entry.category, entry.location ?? '', entry.status].join(' | '));
+      const when = entry.eventStart ? `evento ${entry.eventStart}${entry.eventEnd && entry.eventEnd !== entry.eventStart ? ` a ${entry.eventEnd}` : ''}` : 'fixo';
+      console.log([entry.title, entry.category, entry.location ?? '', when, entry.status].join(' | '));
     }
     console.log(`${existing.length} rolês em ${args[1] ?? 'rio-de-janeiro'}.`);
     return;
@@ -211,7 +229,7 @@ async function main() {
 
   const existing = await listExisting(batch.destinationKey, headers);
   const takenIds = new Set(existing.map((entry) => entry.id));
-  const takenTitles = new Map(existing.map((entry) => [titleKey(entry.title), entry.title]));
+  const takenTitles = new Map(existing.map((entry) => [entryKey(entry), entry.title]));
   const takenMaps = new Map(existing.filter((entry) => entry.mapUrl).map((entry) => [entry.mapUrl, entry.title]));
 
   const now = Date.now();
@@ -221,7 +239,7 @@ async function main() {
     const id = `${batch.destinationKey}__${entry.slug}`;
     const dupe =
       (takenIds.has(id) && 'mesmo id') ||
-      (takenTitles.has(titleKey(entry.title)) && `mesmo título que "${takenTitles.get(titleKey(entry.title))}"`) ||
+      (takenTitles.has(entryKey(entry)) && `mesmo título que "${takenTitles.get(entryKey(entry))}"`) ||
       (entry.mapUrl && takenMaps.has(entry.mapUrl) && `mesmo mapa que "${takenMaps.get(entry.mapUrl)}"`);
     if (dupe) {
       skipped.push(`${entry.title} (${dupe})`);
@@ -242,7 +260,7 @@ async function main() {
       console.log(`+ ${entry.title}`);
     }
     takenIds.add(id);
-    takenTitles.set(titleKey(entry.title), entry.title);
+    takenTitles.set(entryKey(entry), entry.title);
     if (entry.mapUrl) takenMaps.set(entry.mapUrl, entry.title);
     created += 1;
   }
