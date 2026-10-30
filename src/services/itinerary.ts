@@ -110,14 +110,21 @@ export async function createItineraryItem(input: {
   imageUri?: string;
   /** Already-hosted image (e.g. from a catalog rolê); used when no new file is picked. */
   imageUrl?: string;
+  /** Credit that must travel with `imageUrl` (catalog photos are Commons files). */
+  imageCredit?: string;
+  imageSourceUrl?: string;
   order: number;
   createdByUid: string;
   catalogId?: string;
   visibility?: ItineraryItem['visibility'];
 }) {
   let imageUrl: string | undefined = optionalText(input.imageUrl);
+  let imageCredit = imageUrl ? optionalText(input.imageCredit) : undefined;
+  let imageSourceUrl = imageUrl ? optionalText(input.imageSourceUrl) : undefined;
   if (input.imageUri) {
     imageUrl = await uploadTripFile(input.tripId, 'itinerary', input.imageUri);
+    imageCredit = undefined;
+    imageSourceUrl = undefined;
   }
   const refDoc = doc(collection(db, 'trips', input.tripId, 'itineraryDays', input.dayId, 'items'));
   const item = omitUndefinedDeep({
@@ -126,6 +133,8 @@ export async function createItineraryItem(input: {
     title: input.title.trim(),
     description: optionalText(input.description),
     imageUrl,
+    imageCredit,
+    imageSourceUrl,
     kind: input.kind === 'rest' ? 'rest' : 'activity',
     time: optionalText(input.time),
     endTime: optionalText(input.endTime),
@@ -270,6 +279,8 @@ export async function updateItineraryItem(input: {
       location: optionalText(input.location) ?? null,
       mapUrl: optionalText(input.mapUrl) ?? null,
       imageUrl: imageUrl ?? null,
+      // A replaced or removed photo drops the credit of the catalog photo it had.
+      ...(input.clearImage || input.imageUri ? { imageCredit: null, imageSourceUrl: null } : {}),
       order: input.item.order,
       done: input.item.done,
       attendees: input.item.attendees || [],

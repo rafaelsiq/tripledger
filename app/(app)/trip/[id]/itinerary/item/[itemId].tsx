@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { PhotoCredit } from '@/src/components/itinerary/PhotoCredit';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Badge, Body, Button, Card, Label, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -257,10 +258,15 @@ export default function ItineraryItemDetailScreen() {
         />
 
         {currentItem.imageUrl ? (
-          <Image
-            source={{ uri: currentItem.imageUrl }}
-            style={[styles.hero, !isWide && styles.heroMobile]}
-          />
+          <>
+            <Image
+              source={{ uri: currentItem.imageUrl }}
+              style={[styles.hero, !isWide && styles.heroMobile]}
+            />
+            {currentItem.imageCredit ? (
+              <PhotoCredit credit={currentItem.imageCredit} sourceUrl={currentItem.imageSourceUrl} />
+            ) : null}
+          </>
         ) : (
           <View
             style={[

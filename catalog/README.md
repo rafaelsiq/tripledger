@@ -51,7 +51,8 @@ node scripts/catalog/upsert.mjs /tmp/lote.json             # grava
 | `category` | sim | `praia`, `trilha`, `comida`, `passeio`, `noite`, `cultura`, `descanso` |
 | `kind` | não | `activity` (padrão) ou `rest` |
 | `location` | não | bairro (e endereço quando ajuda) |
-| `mapUrl`, `imageUrl` | não | URL `https://` |
+| `mapUrl` | não | URL `https://` |
+| `imageUrl`, `imageCredit`, `imageSourceUrl` | não (recomendado) | foto do local **só do Wikimedia Commons**, com crédito `Autor · Licença` e a página do arquivo. Obtenha com `find-image.mjs` |
 | `durationMin` | não | inteiro, duração típica em minutos |
 | `bestPeriod` | não | `morning`, `afternoon`, `night`, `any` |
 | `costHint` | não | `free`, `$`, `$$`, `$$$` (por pessoa: até ~R$50, ~R$150, acima) |
@@ -140,6 +141,12 @@ janela de eventos, eventos sem data confirmada, lugares fechados ou "em reforma"
    comprar ingresso antes. Para eventos, pode citar o horário de início na
    descrição se a fonte oficial informar.
 4. Trilhas: diga o nível (leve, moderada, pesada) e se é melhor ir acompanhado de guia.
-5. Grava o lote direto no Firestore com `upsert.mjs` (sem commit, branch ou PR) e,
+5. Fotos: rode `node scripts/catalog/find-image.mjs "<título exato do artigo na Wikipedia em português>"`
+   e use o resultado só se a foto mostra o próprio lugar (confira o nome do arquivo em
+   `imageSourceUrl`: logo, mapa, satélite ou outro lugar não serve). Sem artigo ou sem
+   foto adequada, deixe sem foto: o app mostra a inicial. Nunca use foto de outros
+   sites (direitos autorais). Para rolês já gravados sem foto, use
+   `node scripts/catalog/upsert.mjs --fill-images <fotos.json> rio-de-janeiro`.
+6. Grava o lote direto no Firestore com `upsert.mjs` (sem commit, branch ou PR) e,
    no resultado, lista cada rolê gravado (título, categoria, bairro, fontes), os
    repetidos pulados e um resumo da cobertura: quantos por categoria e por zona.

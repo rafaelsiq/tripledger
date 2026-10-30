@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { HorizontalScroller } from '@/src/components/HorizontalScroller';
 import { CatalogRoleTile } from '@/src/components/itinerary/CatalogRoleTile';
 import { EmptyState, Screen } from '@/src/components/ui';
 import { useAuth } from '@/src/hooks/useAuth';
@@ -169,12 +170,7 @@ export default function AddToDayScreen() {
                 returnKeyType="search"
               />
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.chips}
-              style={styles.chipsRow}
-            >
+            <HorizontalScroller contentContainerStyle={styles.chips}>
               {FILTERS.map((f) => {
                 const on = f.id === filter;
                 return (
@@ -189,7 +185,7 @@ export default function AddToDayScreen() {
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </HorizontalScroller>
           </>
         ) : null}
 
@@ -350,7 +346,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   searchInput: { flex: 1, fontFamily: fonts.ui, fontSize: 15, color: colors.ink, paddingVertical: 0 },
-  chipsRow: { flexGrow: 0 },
   chips: { gap: 8 },
   chip: {
     height: 36,

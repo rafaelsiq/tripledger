@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { HorizontalScroller } from '@/src/components/HorizontalScroller';
 import { TripClosedBanner } from '@/src/components/TripPhaseBanner';
 import { Button, EmptyState, PageHeader, Screen } from '@/src/components/ui';
 import { ItineraryAddFab } from '@/src/components/itinerary/ItineraryAddFab';
@@ -133,11 +134,7 @@ export default function ItineraryHome() {
           />
         ) : (
           <>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.strip}
-            >
+            <HorizontalScroller contentContainerStyle={styles.strip}>
               {days.map((d) => (
                 <DayChip
                   key={d.id}
@@ -148,7 +145,7 @@ export default function ItineraryHome() {
                   onPress={() => setSelectedId(d.id)}
                 />
               ))}
-            </ScrollView>
+            </HorizontalScroller>
 
             {selectedDay ? (
               <View style={styles.dayHead}>
