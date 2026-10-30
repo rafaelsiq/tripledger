@@ -12,6 +12,7 @@ import {
   COST_HINT_LABELS,
   catalogSourceLabel,
   formatDuration,
+  formatEventDates,
   subscribeCatalogEntry,
 } from '@/src/services/catalog';
 import type { ActivityCatalogEntry } from '@/src/types';
@@ -50,6 +51,7 @@ export default function SuggestionDetailScreen() {
   const role = entry;
 
   const tiles = [
+    { label: 'Quando', value: formatEventDates(role) },
     { label: 'Duração', value: formatDuration(role.durationMin) },
     {
       label: 'Melhor',

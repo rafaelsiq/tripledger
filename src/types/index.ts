@@ -231,6 +231,13 @@ export interface ActivityCatalogEntry {
   sourceUrl?: string;
   /** Other sites that confirm it (the routine needs at least one). */
   extraSources?: string[];
+  /**
+   * Dated event (show, festival, seasonal program), `YYYY-MM-DD`. Without these the
+   * rolê is always available. Events are only suggested on days inside the range.
+   */
+  eventStart?: string;
+  /** Last day of the event; defaults to `eventStart` (one-day event). */
+  eventEnd?: string;
   batchId?: string;
   createdByUid?: string;
   /** Trips that added it; drives ordering. */

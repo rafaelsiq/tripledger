@@ -67,6 +67,30 @@ export function suggestedTimes(
   };
 }
 
+/** Fixed rolês are always available; dated events only on days inside their range. */
+export function isAvailableOn(
+  entry: Pick<ActivityCatalogEntry, 'eventStart' | 'eventEnd'>,
+  date: string | undefined
+): boolean {
+  if (!entry.eventStart) return true;
+  if (!date) return false;
+  return date >= entry.eventStart && date <= (entry.eventEnd || entry.eventStart);
+}
+
+const MONTHS = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+
+/** "18 dez" or "18–20 dez" (or "30 dez – 2 jan"); null for fixed rolês. */
+export function formatEventDates(
+  entry: Pick<ActivityCatalogEntry, 'eventStart' | 'eventEnd'>
+): string | null {
+  if (!entry.eventStart) return null;
+  const [, sm, sd] = entry.eventStart.split('-').map(Number);
+  const [, em, ed] = (entry.eventEnd || entry.eventStart).split('-').map(Number);
+  if (sm === em && sd === ed) return `${sd} ${MONTHS[sm - 1]}`;
+  if (sm === em) return `${sd}–${ed} ${MONTHS[sm - 1]}`;
+  return `${sd} ${MONTHS[sm - 1]} – ${ed} ${MONTHS[em - 1]}`;
+}
+
 function byUsage(a: ActivityCatalogEntry, b: ActivityCatalogEntry) {
   return (b.usageCount ?? 0) - (a.usageCount ?? 0) || a.title.localeCompare(b.title, 'pt-BR');
 }

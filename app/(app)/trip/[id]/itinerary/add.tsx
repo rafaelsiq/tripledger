@@ -12,6 +12,8 @@ import {
   BEST_PERIOD_LABELS,
   catalogSourceLabel,
   formatDuration,
+  formatEventDates,
+  isAvailableOn,
   subscribeIsCatalogCurator,
   subscribePublishedCatalog,
 } from '@/src/services/catalog';
@@ -50,7 +52,7 @@ export default function AddToDayScreen() {
   const { trip } = useTrip();
   const { user } = useAuth();
   const router = useRouter();
-  const { days, eyebrow } = useItineraryDay(trip?.id, dayId ? String(dayId) : undefined);
+  const { days, day, eyebrow } = useItineraryDay(trip?.id, dayId ? String(dayId) : undefined);
   const [catalog, setCatalog] = useState<ActivityCatalogEntry[] | null>(null);
   const [itemsByDay, setItemsByDay] = useState<Record<string, ItineraryItem[]>>({});
   const [filter, setFilter] = useState<Filter>('all');
@@ -80,12 +82,16 @@ export default function AddToDayScreen() {
 
   const shown = useMemo(() => {
     const needle = slugify(search);
-    return (catalog ?? []).filter(
-      (entry) =>
-        (filter === 'all' || entry.category === filter) &&
-        (!needle || slugify(`${entry.title} ${entry.location ?? ''}`).includes(needle))
-    );
-  }, [catalog, filter, search]);
+    return (catalog ?? [])
+      .filter(
+        (entry) =>
+          isAvailableOn(entry, day?.date) &&
+          (filter === 'all' || entry.category === filter) &&
+          (!needle || slugify(`${entry.title} ${entry.location ?? ''}`).includes(needle))
+      )
+      // Events happening that day first; otherwise keep most-used order.
+      .sort((a, b) => Number(!!b.eventStart) - Number(!!a.eventStart));
+  }, [catalog, filter, search, day?.date]);
 
   // The user's own rolês in this trip that never came from the catalog, to repeat on another day.
   const ownRoles = useMemo(() => {
@@ -248,6 +254,13 @@ export default function AddToDayScreen() {
                             {catalogSourceLabel(entry)}
                           </Text>
                         </View>
+                        {entry.eventStart ? (
+                          <View style={[styles.badge, styles.badgeEvent]}>
+                            <Text style={[styles.badgeText, { color: colors.warn }]}>
+                              Evento · {formatEventDates(entry)}
+                            </Text>
+                          </View>
+                        ) : null}
                         {entry.usageCount > 0 ? (
                           <Text style={styles.used}>
                             em {entry.usageCount} {entry.usageCount === 1 ? 'viagem' : 'viagens'}
@@ -401,6 +414,7 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: radii.pill },
   badgeCurated: { backgroundColor: colors.accentSoft },
   badgeCommunity: { backgroundColor: colors.infoSoft },
+  badgeEvent: { backgroundColor: colors.warnSoft },
   badgeText: { fontFamily: fonts.uiBold, fontSize: 11 },
   used: { fontFamily: fonts.uiSemi, fontSize: 11, color: colors.inkMuted },
   addBtn: {

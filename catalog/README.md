@@ -57,11 +57,23 @@ node scripts/catalog/upsert.mjs /tmp/lote.json             # grava
 | `costHint` | não | `free`, `$`, `$$`, `$$$` (por pessoa: até ~R$50, ~R$150, acima) |
 | `sourceUrl` | sim | a melhor página que confirma o rolê |
 | `extraSources` | sim | até 5 URLs de **outros sites** que também confirmam. A validação exige pelo menos 2 domínios diferentes somando `sourceUrl` e `extraSources` |
+| `eventStart`, `eventEnd` | só para eventos | `AAAA-MM-DD`; o app só sugere o evento nos dias dentro do intervalo. Sem `eventEnd` = evento de um dia |
 | `batchId` | não | data do lote (`AAAA-MM-DD`) |
 
 A validação exige pelo menos 2 sites diferentes por rolê (`sourceUrl` + `extraSources`).
 
 ## Regras da rotina de atualização
+
+### Dois tipos de rolê
+- **Fixos**: o que está sempre disponível ou se repete toda semana ou mês
+  (praias, trilhas, museus, bares, rodas de samba semanais, feiras). Sem datas.
+- **Eventos**: o que acontece em datas específicas (shows, festivais, programação
+  de Natal e fim de ano, jogos, exposições temporárias, feiras especiais). Levam
+  `eventStart`/`eventEnd` e só entram se acontecem dentro da **janela de eventos**
+  definida no pedido da rotina. Confirme as datas em 2 sites, de preferência a
+  página oficial do evento ou do local mais uma agenda ou matéria de imprensa.
+  Evento recorrente que já está como fixo (ex.: roda de samba semanal) não entra
+  de novo como evento.
 
 ### Tamanho do lote
 Sem limite: inclua **todos** os rolês novos encontrados que passem nas regras de
@@ -114,8 +126,8 @@ Equilibre também o perfil:
 - clássicos (Cristo, Pão de Açúcar) **e** o que um grupo de amigos faria com um morador
   (botecos, rodas de samba, feiras, praias menos óbvias, trilhas curtas).
 
-Fora do escopo: outras cidades (Niterói, Petrópolis, Arraial etc.), festas únicas,
-lugares fechados ou "em reforma", e qualquer coisa que dependa de guia ilegal ou
+Fora do escopo: outras cidades (Niterói, Petrópolis, Arraial etc.), eventos fora da
+janela de eventos, eventos sem data confirmada, lugares fechados ou "em reforma", e qualquer coisa que dependa de guia ilegal ou
 área de risco sem acesso seguro.
 
 ### Conteúdo
@@ -125,7 +137,8 @@ lugares fechados ou "em reforma", e qualquer coisa que dependa de guia ilegal ou
    como duplicado).
 3. Nada de preços exatos, horários de funcionamento ou telefones: mudam muito.
    Use `costHint` e `bestPeriod`, e diga na descrição quando precisa reservar ou
-   comprar ingresso antes.
+   comprar ingresso antes. Para eventos, pode citar o horário de início na
+   descrição se a fonte oficial informar.
 4. Trilhas: diga o nível (leve, moderada, pesada) e se é melhor ir acompanhado de guia.
 5. Grava o lote direto no Firestore com `upsert.mjs` (sem commit, branch ou PR) e,
    no resultado, lista cada rolê gravado (título, categoria, bairro, fontes), os
