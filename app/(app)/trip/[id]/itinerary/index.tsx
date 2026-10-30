@@ -43,7 +43,8 @@ function DayChip({
       style={[styles.chip, today && !selected && styles.chipToday, selected && styles.chipSelected]}
     >
       <Text style={[styles.chipWeekday, selected && styles.chipTextSelected]}>
-        {format(parsed, 'EEE', { locale: ptBR }).replace('.', '').toUpperCase()}
+        {/* ptBR "EEE" can come back as the full name ("domingo"); the chip only fits 3 letters. */}
+        {format(parsed, 'EEE', { locale: ptBR }).replace('.', '').slice(0, 3).toUpperCase()}
       </Text>
       <Text style={[styles.chipDay, selected && styles.chipTextSelected]}>{format(parsed, 'd')}</Text>
       <View style={styles.dots}>

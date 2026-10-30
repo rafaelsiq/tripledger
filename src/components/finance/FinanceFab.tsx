@@ -117,7 +117,7 @@ export function FinanceFab({ tripId, funds = [] }: Props) {
             <Pressable
               onPress={() => setOpen(false)}
               accessibilityLabel="Fechar"
-              style={({ pressed }) => [styles.fab, styles.fabClose, pressed && { opacity: 0.9 }]}
+              style={({ pressed }) => [styles.fab, styles.fabRound, styles.fabClose, pressed && { opacity: 0.9 }]}
             >
               <Ionicons name="close" size={26} color={colors.white} />
             </Pressable>
@@ -133,9 +133,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: spacing.md,
     bottom: spacing.lg,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
     backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -143,14 +140,15 @@ const styles = StyleSheet.create({
     elevation: 6,
     zIndex: 20,
   },
+  // Sizes live in separate styles: `width: undefined` does not reset a width on web.
   fabExtended: {
-    width: undefined,
     height: 52,
     borderRadius: radii.pill,
     paddingHorizontal: 20,
     flexDirection: 'row',
     gap: 8,
   },
+  fabRound: { width: 56, height: 56, borderRadius: 28 },
   fabText: { fontFamily: fonts.uiBold, fontSize: 15, color: colors.white },
   fabClose: {
     position: 'relative',
