@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, View, type ColorValue } from 'react-native';
+import { ActivityIndicator, View, type ColorValue } from 'react-native';
 import { Tabs, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   subscribeExpenses,
   subscribePayments,
@@ -18,31 +17,14 @@ import { useLayout } from '@/src/hooks/useLayout';
 import { TripProvider } from '@/src/hooks/useTrip';
 import { TripHomeBackButton } from '@/src/components/TripHomeBackButton';
 import { TripSwitcher } from '@/src/components/TripSwitcher';
+import { TripTabBar } from '@/src/components/TripTabBar';
 
 type TabIconBase = 'home' | 'wallet' | 'map' | 'images' | 'people';
 
-/**
- * Tab icon (filled glyph when focused). On the mobile bottom bar the active icon
- * sits on a soft pill; the desktop sidebar highlights the whole item instead.
- */
-function tabIcon(base: TabIconBase, pill: boolean) {
+/** Desktop sidebar icon (filled glyph when focused). Mobile uses TripTabBar instead. */
+function tabIcon(base: TabIconBase) {
   return function TabIcon({ color, focused }: { color: ColorValue; focused: boolean }) {
-    return (
-      <View
-        style={
-          pill
-            ? {
-                paddingHorizontal: 16,
-                paddingVertical: 3,
-                borderRadius: 999,
-                backgroundColor: focused ? colors.accentSoft : 'transparent',
-              }
-            : undefined
-        }
-      >
-        <Ionicons name={focused ? base : `${base}-outline`} color={color} size={20} />
-      </View>
-    );
+    return <Ionicons name={focused ? base : `${base}-outline`} color={color} size={20} />;
   };
 }
 
@@ -51,7 +33,6 @@ export default function TripLayout() {
   const tripId = String(id);
   const { user } = useAuth();
   const { isWide } = useLayout();
-  const insets = useSafeAreaInsets();
   const [trip, setTrip] = useState<Trip | null>(null);
   const [members, setMembers] = useState<TripMember[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -106,60 +87,41 @@ export default function TripLayout() {
     );
   }
 
-  const bottomInset = isWide
-    ? 10
-    : Math.max(insets.bottom, Platform.OS === 'web' ? 10 : 0);
-
   return (
     <TripProvider value={value}>
       <Tabs
+        // Desktop: the default bar laid out as a sidebar; mobile: our bottom bar.
+        tabBar={isWide ? undefined : (props) => <TripTabBar {...props} />}
         screenOptions={{
           headerStyle: navHeader.headerStyle,
           headerShadowVisible: navHeader.headerShadowVisible,
           headerLeft: () => <TripHomeBackButton />,
           headerTitle: () => <TripSwitcher />,
           headerTitleAlign: 'left',
-          // Desktop: sidebar navigation; mobile: bottom tab bar.
           tabBarPosition: isWide ? 'left' : 'bottom',
-          tabBarVariant: isWide ? 'material' : 'uikit',
-          tabBarLabelPosition: isWide ? 'beside-icon' : 'below-icon',
-          tabBarActiveTintColor: isWide ? colors.accentDark : colors.accent,
+          tabBarVariant: 'material',
+          tabBarLabelPosition: 'beside-icon',
+          tabBarActiveTintColor: colors.accentDark,
           tabBarInactiveTintColor: colors.inkSoft,
-          tabBarActiveBackgroundColor: isWide ? colors.accentSoft : undefined,
-          tabBarStyle: isWide
-            ? {
-                backgroundColor: colors.surface,
-                borderRightColor: colors.border,
-                borderRightWidth: 1,
-                minWidth: 220,
-                paddingTop: 12,
-                paddingHorizontal: 8,
-              }
-            : {
-                backgroundColor: colors.surface,
-                borderTopColor: colors.border,
-                borderTopWidth: 1,
-                paddingTop: 8,
-                paddingBottom: bottomInset,
-              },
-          tabBarItemStyle: isWide
-            ? {
-                borderRadius: 8,
-                marginVertical: 2,
-                minHeight: 40,
-                justifyContent: 'flex-start',
-              }
-            : {
-                paddingTop: 2,
-                paddingBottom: 2,
-              },
-          tabBarLabelStyle: {
-            fontSize: isWide ? 14 : 11,
-            fontFamily: fonts.uiBold,
-            lineHeight: isWide ? 18 : 14,
+          tabBarActiveBackgroundColor: colors.accentSoft,
+          tabBarStyle: {
+            backgroundColor: colors.surface,
+            borderRightColor: colors.border,
+            borderRightWidth: 1,
+            minWidth: 220,
+            paddingTop: 12,
+            paddingHorizontal: 8,
           },
-          tabBarIconStyle: {
-            marginBottom: 0,
+          tabBarItemStyle: {
+            borderRadius: 8,
+            marginVertical: 2,
+            minHeight: 40,
+            justifyContent: 'flex-start',
+          },
+          tabBarLabelStyle: {
+            fontSize: 14,
+            fontFamily: fonts.uiBold,
+            lineHeight: 18,
           },
         }}
       >
@@ -168,7 +130,7 @@ export default function TripLayout() {
           options={{
             title: 'Resumo',
             tabBarLabel: 'Resumo',
-            tabBarIcon: tabIcon('home', !isWide),
+            tabBarIcon: tabIcon('home'),
           }}
         />
         <Tabs.Screen
@@ -176,7 +138,7 @@ export default function TripLayout() {
           options={{
             title: 'Finanças',
             headerShown: false,
-            tabBarIcon: tabIcon('wallet', !isWide),
+            tabBarIcon: tabIcon('wallet'),
           }}
         />
         <Tabs.Screen
@@ -184,7 +146,7 @@ export default function TripLayout() {
           options={{
             title: 'Roteiro',
             headerShown: false,
-            tabBarIcon: tabIcon('map', !isWide),
+            tabBarIcon: tabIcon('map'),
           }}
         />
         <Tabs.Screen
@@ -192,14 +154,14 @@ export default function TripLayout() {
           options={{
             title: 'Feed',
             headerShown: false,
-            tabBarIcon: tabIcon('images', !isWide),
+            tabBarIcon: tabIcon('images'),
           }}
         />
         <Tabs.Screen
           name="members"
           options={{
             title: 'Membros',
-            tabBarIcon: tabIcon('people', !isWide),
+            tabBarIcon: tabIcon('people'),
           }}
         />
       </Tabs>
