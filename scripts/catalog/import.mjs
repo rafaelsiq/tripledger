@@ -40,8 +40,15 @@ const CONTENT_FIELDS = [
   'bestPeriod',
   'costHint',
   'sourceUrl',
+  'extraSources',
   'batchId',
 ];
+
+const MAX_EXTRA_SOURCES = 5;
+
+function domainOf(url) {
+  return new URL(url).hostname.replace(/^www\./, '');
+}
 
 const dryRun = process.argv.includes('--dry-run');
 
@@ -72,8 +79,21 @@ function validate(file, catalog) {
     for (const key of ['mapUrl', 'imageUrl', 'sourceUrl']) {
       if (entry[key] !== undefined && !/^https:\/\//.test(entry[key])) fail(file, `${at}: ${key} must be an https URL`);
     }
-    if ((entry.source ?? 'routine') === 'routine' && !entry.sourceUrl) {
-      fail(file, `${at}: routine entries need a sourceUrl`);
+    if (entry.extraSources !== undefined) {
+      if (!Array.isArray(entry.extraSources) || entry.extraSources.length > MAX_EXTRA_SOURCES) {
+        fail(file, `${at}: extraSources must be a list of up to ${MAX_EXTRA_SOURCES} URLs`);
+      }
+      for (const url of entry.extraSources) {
+        if (typeof url !== 'string' || !/^https:\/\//.test(url)) fail(file, `${at}: extraSources must be https URLs`);
+      }
+    }
+    if ((entry.source ?? 'routine') === 'routine') {
+      // Routine rolês are cross-checked: the main source plus at least one other site.
+      if (!entry.sourceUrl) fail(file, `${at}: routine entries need a sourceUrl`);
+      const domains = new Set([entry.sourceUrl, ...(entry.extraSources ?? [])].map(domainOf));
+      if (domains.size < 2) {
+        fail(file, `${at}: routine entries need sources from at least 2 different sites (sourceUrl + extraSources)`);
+      }
     }
   });
 }
