@@ -229,6 +229,8 @@ export interface ActivityCatalogEntry {
   status: ActivityCatalogStatus;
   /** Where the routine found it. */
   sourceUrl?: string;
+  /** Other sites that confirm it (the routine needs at least one). */
+  extraSources?: string[];
   batchId?: string;
   createdByUid?: string;
   /** Trips that added it; drives ordering. */
